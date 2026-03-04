@@ -1,0 +1,4186 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Overload — Live Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --ink: #141210;
+        --ink-2: #2a2620;
+        --paper: #f5f1eb;
+        --paper-2: #ede8df;
+        --paper-3: #e3ddd3;
+        --surface: #ffffff;
+        --muted: #9a9080;
+        --muted-2: #beb5a8;
+        --red: #c8391a;
+        --red-s: rgba(200, 57, 26, 0.08);
+        --red-m: rgba(200, 57, 26, 0.18);
+        --amber: #c47d1a;
+        --amber-s: rgba(196, 125, 26, 0.1);
+        --amber-m: rgba(196, 125, 26, 0.22);
+        --green: #2a7a4a;
+        --green-s: rgba(42, 122, 74, 0.1);
+        --green-m: rgba(42, 122, 74, 0.22);
+        --serif: "Instrument Serif", Georgia, serif;
+        --sans: "DM Sans", system-ui, sans-serif;
+        --mono: "DM Mono", monospace;
+      }
+      html,
+      body {
+        height: 100%;
+        font-family: var(--sans);
+        -webkit-font-smoothing: antialiased;
+        overflow: hidden;
+      }
+      body {
+        background: var(--ink);
+        color: var(--paper);
+      }
+
+      /* ═══════════════════════════════════════
+   ACT SYSTEM — full-screen scenes
+═══════════════════════════════════════ */
+      .act {
+        position: fixed;
+        inset: 0;
+        display: none;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .act.live {
+        display: flex;
+      }
+
+      /* ═══════════════════════════════════════
+   ACT 0 — TITLE CARD
+═══════════════════════════════════════ */
+      #act0 {
+        background: var(--ink);
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        cursor: pointer;
+      }
+      #act0::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse at 50% 40%,
+          rgba(200, 57, 26, 0.12) 0%,
+          transparent 65%
+        );
+      }
+      .a0-eyebrow {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: rgba(200, 57, 26, 0.7);
+        margin-bottom: 28px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      .a0-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--red);
+        animation: blink 2s infinite;
+      }
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.2;
+        }
+      }
+      .a0-title {
+        font-family: var(--serif);
+        font-size: clamp(52px, 8vw, 104px);
+        line-height: 0.95;
+        letter-spacing: -0.03em;
+        position: relative;
+        margin-bottom: 20px;
+      }
+      .a0-title em {
+        font-style: italic;
+        color: rgba(200, 57, 26, 0.8);
+      }
+      .a0-sub {
+        font-size: clamp(15px, 2vw, 18px);
+        color: rgba(245, 241, 235, 0.45);
+        max-width: 480px;
+        margin: 0 auto 52px;
+        line-height: 1.7;
+        font-weight: 300;
+        position: relative;
+      }
+      .a0-cta {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: rgba(245, 241, 235, 0.8);
+        padding: 14px 28px;
+        border-radius: 100px;
+        font-size: 15px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .a0-cta:hover {
+        background: rgba(255, 255, 255, 0.12);
+        border-color: rgba(255, 255, 255, 0.22);
+        transform: translateY(-2px);
+      }
+      .a0-hint {
+        position: absolute;
+        bottom: 32px;
+        font-size: 12px;
+        color: rgba(245, 241, 235, 0.2);
+        letter-spacing: 0.05em;
+      }
+
+      /* ═══════════════════════════════════════
+   ACT 1 — ALEX'S STORY (timeline)
+═══════════════════════════════════════ */
+      #act1 {
+        background: var(--ink);
+        flex-direction: column;
+      }
+
+      .story-shell {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+      }
+
+      /* Left: chapter nav */
+      .story-nav {
+        width: 220px;
+        flex-shrink: 0;
+        border-right: 1px solid rgba(255, 255, 255, 0.07);
+        padding: 28px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        overflow-y: auto;
+      }
+      .story-nav-top {
+        padding: 0 24px 24px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        margin-bottom: 16px;
+      }
+      .story-nav-logo {
+        font-family: var(--serif);
+        font-size: 18px;
+        color: rgba(245, 241, 235, 0.8);
+      }
+      .story-nav-logo em {
+        font-style: italic;
+        color: rgba(200, 57, 26, 0.7);
+      }
+      .story-nav-user {
+        font-size: 12px;
+        color: rgba(245, 241, 235, 0.3);
+        margin-top: 4px;
+      }
+
+      .chap-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px 24px;
+        cursor: pointer;
+        transition: background 0.15s;
+        position: relative;
+      }
+      .chap-item:hover {
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .chap-item.active {
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .chap-item.active::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--red);
+      }
+      .chap-dot {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 1.5px solid rgba(255, 255, 255, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        flex-shrink: 0;
+        margin-top: 1px;
+        transition: all 0.3s;
+      }
+      .chap-item.active .chap-dot {
+        border-color: var(--red);
+        background: var(--red-s);
+      }
+      .chap-item.done .chap-dot {
+        border-color: rgba(255, 255, 255, 0.3);
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(245, 241, 235, 0.6);
+      }
+      .chap-info {
+      }
+      .chap-day {
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(245, 241, 235, 0.3);
+        margin-bottom: 2px;
+      }
+      .chap-title {
+        font-size: 13px;
+        color: rgba(245, 241, 235, 0.65);
+        line-height: 1.35;
+      }
+      .chap-item.active .chap-title {
+        color: rgba(245, 241, 235, 0.9);
+      }
+
+      /* Story main area */
+      .story-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      /* Chapter topbar */
+      .story-topbar {
+        height: 52px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 36px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      }
+      .story-progress-track {
+        flex: 1;
+        max-width: 280px;
+        height: 2px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 2px;
+        overflow: hidden;
+        margin: 0 24px;
+      }
+      .story-progress-fill {
+        height: 100%;
+        background: var(--red);
+        border-radius: 2px;
+        transition: width 0.6s ease;
+      }
+      .story-progress-label {
+        font-size: 11px;
+        color: rgba(245, 241, 235, 0.3);
+        font-family: var(--mono);
+        white-space: nowrap;
+      }
+
+      /* Chapter content */
+      .chapter {
+        display: none;
+        flex: 1;
+        overflow-y: auto;
+        padding: 40px 48px;
+        animation: fadein 0.35s ease;
+      }
+      .chapter.active {
+        display: flex;
+        flex-direction: column;
+      }
+      .chapter::-webkit-scrollbar {
+        width: 4px;
+      }
+      .chapter::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .chapter::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+      }
+
+      @keyframes fadein {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .ch-eyebrow {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: rgba(245, 241, 235, 0.3);
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .ch-title {
+        font-family: var(--serif);
+        font-size: clamp(28px, 4vw, 48px);
+        letter-spacing: -0.025em;
+        line-height: 1.1;
+        margin-bottom: 12px;
+      }
+      .ch-title em {
+        font-style: italic;
+      }
+      .ch-narrative {
+        font-size: 15px;
+        color: rgba(245, 241, 235, 0.5);
+        line-height: 1.75;
+        font-weight: 300;
+        max-width: 560px;
+        margin-bottom: 32px;
+      }
+      .ch-narrative strong {
+        color: rgba(245, 241, 235, 0.8);
+        font-weight: 500;
+      }
+
+      /* Score pill inside chapter */
+      .ch-score-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 20px;
+        border-radius: 100px;
+        margin-bottom: 28px;
+        border: 1px solid;
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .pill-green {
+        background: var(--green-s);
+        border-color: var(--green-m);
+        color: #4ade80;
+      }
+      .pill-amber {
+        background: var(--amber-s);
+        border-color: var(--amber-m);
+        color: #fbbf24;
+      }
+      .pill-red {
+        background: var(--red-s);
+        border-color: var(--red-m);
+        color: #f87171;
+      }
+      .pill-crit {
+        background: rgba(200, 57, 26, 0.15);
+        border-color: rgba(200, 57, 26, 0.35);
+        color: var(--red);
+      }
+
+      /* Chapter "dashboard card" — mini snapshot */
+      .ch-snapshot {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 24px;
+        max-width: 560px;
+        margin-bottom: 28px;
+      }
+      .ch-snap-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 20px;
+      }
+      .ch-snap-title {
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(245, 241, 235, 0.3);
+      }
+      .ch-snap-score {
+        font-family: var(--serif);
+        font-size: 40px;
+        letter-spacing: -0.03em;
+        line-height: 1;
+      }
+      .ch-bars {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .ch-bar-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .ch-bar-label {
+        font-size: 12px;
+        color: rgba(245, 241, 235, 0.45);
+        width: 120px;
+        flex-shrink: 0;
+      }
+      .ch-bar-track {
+        flex: 1;
+        height: 3px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .ch-bar-fill {
+        height: 100%;
+        border-radius: 2px;
+        transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .ch-bar-val {
+        font-size: 11px;
+        font-family: var(--mono);
+        color: rgba(245, 241, 235, 0.35);
+        width: 28px;
+        text-align: right;
+        flex-shrink: 0;
+      }
+
+      /* Alert card inside chapter */
+      .ch-alert {
+        border-radius: 12px;
+        padding: 16px 18px;
+        max-width: 560px;
+        margin-bottom: 12px;
+        border: 1px solid;
+      }
+      .ch-alert.red {
+        background: var(--red-s);
+        border-color: var(--red-m);
+      }
+      .ch-alert.amber {
+        background: var(--amber-s);
+        border-color: var(--amber-m);
+      }
+      .ch-alert.green {
+        background: var(--green-s);
+        border-color: var(--green-m);
+      }
+      .ch-alert-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .ch-alert-badge {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 3px 10px;
+        border-radius: 100px;
+      }
+      .badge-r {
+        background: var(--red-s);
+        color: var(--red);
+        border: 1px solid var(--red-m);
+      }
+      .badge-a {
+        background: var(--amber-s);
+        color: var(--amber);
+        border: 1px solid var(--amber-m);
+      }
+      .badge-g {
+        background: var(--green-s);
+        color: var(--green);
+        border: 1px solid var(--green-m);
+      }
+      .ch-alert-text {
+        font-size: 13px;
+        color: rgba(245, 241, 235, 0.7);
+        line-height: 1.55;
+      }
+
+      /* Notification toast inside story */
+      .story-notif {
+        position: fixed;
+        top: 80px;
+        right: 28px;
+        z-index: 999;
+        background: var(--surface);
+        color: var(--ink);
+        border-radius: 16px;
+        padding: 16px 20px;
+        max-width: 320px;
+        box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35);
+        display: none;
+        animation: notif-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        border: 1px solid var(--paper-3);
+      }
+      @keyframes notif-in {
+        from {
+          transform: translateX(120%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+      .story-notif.show {
+        display: block;
+      }
+      .sn-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .sn-app {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--red);
+      }
+      .sn-time {
+        font-size: 11px;
+        color: var(--muted);
+        margin-left: auto;
+        font-family: var(--mono);
+      }
+      .sn-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--ink);
+        margin-bottom: 4px;
+      }
+      .sn-body {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+      .sn-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .sn-btn {
+        font-size: 12px;
+        font-weight: 500;
+        padding: 6px 14px;
+        border-radius: 100px;
+        cursor: pointer;
+        border: none;
+        transition: all 0.15s;
+      }
+      .sn-btn-p {
+        background: var(--ink);
+        color: var(--paper);
+      }
+      .sn-btn-p:hover {
+        background: var(--red);
+      }
+      .sn-btn-s {
+        background: var(--paper-2);
+        color: var(--muted);
+      }
+
+      /* Chapter nav buttons */
+      .ch-nav {
+        margin-top: auto;
+        padding-top: 32px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .btn-chap {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 24px;
+        border-radius: 100px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: none;
+        font-family: var(--sans);
+      }
+      .btn-chap-next {
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(245, 241, 235, 0.9);
+      }
+      .btn-chap-next:hover {
+        background: rgba(255, 255, 255, 0.16);
+      }
+      .btn-chap-next.cta {
+        background: var(--red);
+        color: white;
+      }
+      .btn-chap-next.cta:hover {
+        background: #a82e15;
+      }
+      .btn-chap-back {
+        background: transparent;
+        color: rgba(245, 241, 235, 0.3);
+      }
+      .btn-chap-back:hover {
+        color: rgba(245, 241, 235, 0.7);
+      }
+
+      /* ═══════════════════════════════════════
+   ACT 2 — PERSONALIZED SCORE
+═══════════════════════════════════════ */
+      #act2 {
+        background: var(--paper);
+        color: var(--ink);
+        align-items: center;
+        justify-content: center;
+      }
+      #act2::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse at 60% 40%,
+          rgba(200, 57, 26, 0.05) 0%,
+          transparent 60%
+        );
+      }
+      .a2-inner {
+        max-width: 560px;
+        width: 90%;
+        position: relative;
+        z-index: 1;
+      }
+
+      .a2-progress {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 36px;
+      }
+      .a2p-dot {
+        height: 3px;
+        flex: 1;
+        border-radius: 2px;
+        background: var(--paper-3);
+        transition: background 0.3s;
+      }
+      .a2p-dot.done {
+        background: var(--ink);
+      }
+      .a2p-dot.cur {
+        background: var(--red);
+      }
+
+      .a2-step {
+        display: none;
+        animation: fadein-light 0.3s ease;
+      }
+      .a2-step.active {
+        display: block;
+      }
+      @keyframes fadein-light {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .a2-q {
+        font-family: var(--serif);
+        font-size: clamp(24px, 4vw, 36px);
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        margin-bottom: 8px;
+      }
+      .a2-q em {
+        font-style: italic;
+        color: var(--muted);
+      }
+      .a2-sub {
+        font-size: 14px;
+        color: var(--muted);
+        margin-bottom: 28px;
+        font-weight: 300;
+      }
+
+      .a2-opts {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 28px;
+      }
+      .a2-opt {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 15px 20px;
+        background: var(--surface);
+        border: 1.5px solid var(--paper-3);
+        border-radius: 14px;
+        cursor: pointer;
+        transition: all 0.15s;
+        font-size: 15px;
+        color: var(--ink);
+      }
+      .a2-opt:hover {
+        border-color: var(--ink);
+        background: var(--paper);
+      }
+      .a2-opt.sel {
+        border-color: var(--ink);
+        background: var(--ink);
+        color: var(--paper);
+      }
+      .a2-opt-em {
+        font-size: 20px;
+        width: 32px;
+        text-align: center;
+      }
+
+      .a2-nav {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .btn-a2-next {
+        background: var(--ink);
+        color: var(--paper);
+        border: none;
+        padding: 13px 28px;
+        border-radius: 100px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: var(--sans);
+      }
+      .btn-a2-next:hover {
+        background: var(--red);
+        transform: translateY(-1px);
+      }
+      .btn-a2-next:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .btn-a2-back {
+        background: transparent;
+        border: none;
+        font-size: 14px;
+        color: var(--muted);
+        cursor: pointer;
+        font-family: var(--sans);
+      }
+      .btn-a2-back:hover {
+        color: var(--ink);
+      }
+
+      /* Score reveal */
+      .a2-reveal {
+        text-align: center;
+        padding: 20px 0;
+      }
+      .a2r-pre {
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted-2);
+        margin-bottom: 16px;
+      }
+      .a2r-score {
+        font-family: var(--serif);
+        font-size: clamp(80px, 15vw, 120px);
+        letter-spacing: -0.05em;
+        line-height: 1;
+        transition: color 0.8s;
+      }
+      .a2r-label {
+        font-size: 18px;
+        font-weight: 500;
+        margin-top: 6px;
+        transition: color 0.8s;
+      }
+      .a2r-msg {
+        font-size: 15px;
+        color: var(--muted);
+        max-width: 400px;
+        margin: 16px auto 0;
+        line-height: 1.7;
+        font-weight: 300;
+      }
+      .a2r-bars {
+        max-width: 420px;
+        margin: 32px auto 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .a2r-bar-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .a2r-bar-name {
+        font-size: 12px;
+        color: var(--muted);
+        width: 110px;
+        flex-shrink: 0;
+      }
+      .a2r-bar-track {
+        flex: 1;
+        height: 4px;
+        background: var(--paper-2);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .a2r-bar-fill {
+        height: 100%;
+        border-radius: 2px;
+        transition: width 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .a2r-cta {
+        margin-top: 36px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+      .btn-enter-app {
+        background: var(--ink);
+        color: var(--paper);
+        border: none;
+        padding: 16px 40px;
+        border-radius: 100px;
+        font-size: 16px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: var(--sans);
+      }
+      .btn-enter-app:hover {
+        background: var(--red);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 28px rgba(200, 57, 26, 0.2);
+      }
+      .a2r-sub {
+        font-size: 13px;
+        color: var(--muted-2);
+      }
+
+      /* ═══════════════════════════════════════
+   ACT 3 — FULL APP
+═══════════════════════════════════════ */
+      #act3 {
+        background: var(--paper);
+        color: var(--ink);
+        flex-direction: column;
+      }
+
+      .app-shell {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+      }
+
+      /* Sidebar */
+      .sidebar {
+        width: 236px;
+        flex-shrink: 0;
+        background: var(--ink);
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid rgba(255, 255, 255, 0.06);
+      }
+      .sb-logo {
+        padding: 24px 22px 18px;
+        font-family: var(--serif);
+        font-size: 19px;
+        color: rgba(245, 241, 235, 0.85);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      }
+      .sb-logo em {
+        font-style: italic;
+        color: rgba(200, 57, 26, 0.75);
+      }
+      .sb-user {
+        padding: 14px 18px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .sb-av {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: rgba(200, 57, 26, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--serif);
+        font-style: italic;
+        font-size: 13px;
+        color: rgba(245, 241, 235, 0.6);
+        flex-shrink: 0;
+      }
+      .sb-uname {
+        font-size: 13px;
+        font-weight: 500;
+        color: rgba(245, 241, 235, 0.75);
+      }
+      .sb-urole {
+        font-size: 11px;
+        color: rgba(245, 241, 235, 0.28);
+        margin-top: 1px;
+      }
+
+      .sb-score-box {
+        margin: 14px 16px;
+        padding: 14px;
+        background: rgba(200, 57, 26, 0.1);
+        border: 1px solid rgba(200, 57, 26, 0.2);
+        border-radius: 12px;
+        cursor: pointer;
+      }
+      .sb-score-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+      }
+      .sb-score-lbl {
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: rgba(245, 241, 235, 0.28);
+      }
+      .sb-score-n {
+        font-family: var(--serif);
+        font-size: 28px;
+        color: var(--red);
+      }
+      .sb-score-bar {
+        height: 3px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .sb-score-fill {
+        height: 100%;
+        border-radius: 2px;
+        transition: width 1s ease;
+      }
+      .sb-score-st {
+        font-size: 11px;
+        color: rgba(200, 57, 26, 0.75);
+        margin-top: 5px;
+        font-weight: 500;
+      }
+
+      .sb-nav {
+        flex: 1;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+      }
+      .sb-item {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 9px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 13px;
+        color: rgba(245, 241, 235, 0.4);
+        transition: all 0.12s;
+      }
+      .sb-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(245, 241, 235, 0.75);
+      }
+      .sb-item.on {
+        background: rgba(255, 255, 255, 0.07);
+        color: rgba(245, 241, 235, 0.9);
+      }
+      .sb-item svg {
+        width: 15px;
+        height: 15px;
+        opacity: 0.55;
+        flex-shrink: 0;
+      }
+      .sb-item.on svg {
+        opacity: 1;
+      }
+      .sb-badge {
+        margin-left: auto;
+        background: var(--red);
+        color: white;
+        font-size: 10px;
+        font-weight: 600;
+        padding: 2px 6px;
+        border-radius: 100px;
+      }
+      .sb-foot {
+        padding: 14px 18px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        font-size: 11px;
+        color: rgba(245, 241, 235, 0.18);
+        text-align: center;
+      }
+
+      /* App topbar */
+      .app-topbar {
+        height: 52px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 28px;
+        background: rgba(245, 241, 235, 0.95);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--paper-3);
+      }
+      .app-topbar-title {
+        font-family: var(--serif);
+        font-size: 17px;
+        letter-spacing: -0.02em;
+      }
+      .ap-pill {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--red-s);
+        border: 1px solid var(--red-m);
+        color: var(--red);
+        font-size: 12px;
+        font-weight: 500;
+        padding: 5px 12px;
+        border-radius: 100px;
+        cursor: pointer;
+      }
+      .ap-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--red);
+        animation: blink 2s infinite;
+      }
+
+      /* App scroll */
+      .app-scroll {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px 28px;
+      }
+      .app-scroll::-webkit-scrollbar {
+        width: 5px;
+      }
+      .app-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .app-scroll::-webkit-scrollbar-thumb {
+        background: var(--paper-3);
+        border-radius: 3px;
+      }
+
+      /* App views */
+      .app-view {
+        display: none;
+        animation: fadein-light 0.25s ease;
+      }
+      .app-view.on {
+        display: block;
+      }
+
+      /* Stat cards */
+      .g4 {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        margin-bottom: 14px;
+      }
+      .g2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .g2-3 {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+        gap: 14px;
+      }
+      .stk {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .sc {
+        background: var(--surface);
+        border: 1px solid var(--paper-3);
+        border-radius: 14px;
+        padding: 18px;
+      }
+      .sc-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 10px;
+      }
+      .sc-lbl {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .sc-icon {
+        font-size: 15px;
+      }
+      .sc-val {
+        font-family: var(--serif);
+        font-size: 32px;
+        letter-spacing: -0.03em;
+        line-height: 1;
+      }
+      .sc-sub {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 3px;
+      }
+      .sc-delta {
+        font-size: 12px;
+        font-weight: 500;
+        margin-top: 5px;
+      }
+      .red {
+        color: var(--red);
+      }
+      .amber {
+        color: var(--amber);
+      }
+      .green {
+        color: var(--green);
+      }
+
+      /* section label */
+      .slbl {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted-2);
+        margin-bottom: 10px;
+      }
+
+      /* mini bars */
+      .mbr {
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+      }
+      .mbr-item {
+      }
+      .mbr-hd {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        margin-bottom: 4px;
+      }
+      .mbr-n {
+        color: var(--ink);
+        font-weight: 500;
+      }
+      .mbr-v {
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 11px;
+      }
+      .mbr-track {
+        height: 3px;
+        background: var(--paper-2);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .mbr-fill {
+        height: 100%;
+        border-radius: 2px;
+        transition: width 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      /* alert items */
+      .al-list {
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+      }
+      .al-item {
+        display: flex;
+        gap: 11px;
+        align-items: flex-start;
+        padding: 13px 14px;
+        border-radius: 11px;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: transform 0.15s;
+      }
+      .al-item:hover {
+        transform: translateX(3px);
+      }
+      .al-item.cr {
+        background: var(--red-s);
+        border-color: var(--red-m);
+      }
+      .al-item.wa {
+        background: var(--amber-s);
+        border-color: var(--amber-m);
+      }
+      .al-item.ok {
+        background: var(--green-s);
+        border-color: var(--green-m);
+      }
+      .al-ico {
+        font-size: 15px;
+        flex-shrink: 0;
+        margin-top: 1px;
+      }
+      .al-txt {
+        font-size: 13px;
+        color: var(--ink);
+        line-height: 1.45;
+        flex: 1;
+      }
+      .al-meta {
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 2px;
+        font-family: var(--mono);
+      }
+      .al-bdg {
+        flex-shrink: 0;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 2px 9px;
+        border-radius: 100px;
+        white-space: nowrap;
+      }
+      .bdg-r {
+        background: var(--red-s);
+        color: var(--red);
+        border: 1px solid var(--red-m);
+      }
+      .bdg-a {
+        background: var(--amber-s);
+        color: var(--amber);
+        border: 1px solid var(--amber-m);
+      }
+      .bdg-g {
+        background: var(--green-s);
+        color: var(--green);
+        border: 1px solid var(--green-m);
+      }
+
+      /* forecast strip */
+      .f7 {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 8px;
+        margin-bottom: 0;
+      }
+      .fd {
+        background: var(--surface);
+        border: 1px solid var(--paper-3);
+        border-radius: 12px;
+        padding: 12px 8px;
+        text-align: center;
+      }
+      .fd-name {
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 7px;
+      }
+      .fd-val {
+        font-family: var(--serif);
+        font-size: 20px;
+        letter-spacing: -0.02em;
+        margin-bottom: 5px;
+      }
+      .fd-bar {
+        height: 3px;
+        background: var(--paper-2);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-bottom: 5px;
+      }
+      .fd-fill {
+        height: 100%;
+        border-radius: 2px;
+      }
+      .fd-note {
+        font-size: 10px;
+        color: var(--muted);
+      }
+
+      /* weekly day cells */
+      .day-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 8px;
+        margin-bottom: 20px;
+      }
+      .dy {
+        background: var(--surface);
+        border: 1px solid var(--paper-3);
+        border-radius: 12px;
+        padding: 12px 8px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .dy:hover {
+        border-color: var(--ink);
+      }
+      .dy.today {
+        border-color: var(--red);
+        background: var(--red-s);
+      }
+      .dy.past {
+        opacity: 0.6;
+      }
+      .dy-name {
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 7px;
+      }
+      .dy-score {
+        font-family: var(--serif);
+        font-size: 22px;
+        letter-spacing: -0.02em;
+        margin-bottom: 5px;
+      }
+      .dy-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        margin: 0 auto;
+      }
+
+      /* insights */
+      .ins-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .ins {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 16px 18px;
+        background: var(--surface);
+        border: 1px solid var(--paper-3);
+        border-radius: 14px;
+      }
+      .ins-ico {
+        font-size: 18px;
+        flex-shrink: 0;
+      }
+      .ins-title {
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 3px;
+      }
+      .ins-text {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.6;
+        font-weight: 300;
+      }
+
+      /* check-in inside app */
+      .ci-wrap {
+        max-width: 540px;
+        margin: 0 auto;
+        padding: 20px 0;
+      }
+      .ci-step {
+        display: none;
+        animation: fadein-light 0.3s ease;
+      }
+      .ci-step.on {
+        display: block;
+      }
+      .ci-progress {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 28px;
+      }
+      .ci-pd {
+        height: 3px;
+        flex: 1;
+        border-radius: 2px;
+        background: var(--paper-3);
+        transition: background 0.3s;
+      }
+      .ci-pd.done {
+        background: var(--ink);
+      }
+      .ci-pd.cur {
+        background: var(--red);
+      }
+      .ci-q {
+        font-family: var(--serif);
+        font-size: 28px;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        margin-bottom: 6px;
+      }
+      .ci-sub {
+        font-size: 14px;
+        color: var(--muted);
+        margin-bottom: 26px;
+        font-weight: 300;
+      }
+      .ci-opts {
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+        margin-bottom: 26px;
+      }
+      .ci-opt {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        padding: 14px 18px;
+        background: var(--surface);
+        border: 1.5px solid var(--paper-3);
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.15s;
+        font-size: 15px;
+        color: var(--ink);
+      }
+      .ci-opt:hover {
+        border-color: var(--ink);
+        background: var(--paper);
+      }
+      .ci-opt.sel {
+        border-color: var(--ink);
+        background: var(--ink);
+        color: var(--paper);
+      }
+      .ci-opt-em {
+        font-size: 18px;
+        width: 28px;
+        text-align: center;
+      }
+      .ci-nav {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .btn-ci-n {
+        background: var(--ink);
+        color: var(--paper);
+        border: none;
+        padding: 11px 26px;
+        border-radius: 100px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: var(--sans);
+      }
+      .btn-ci-n:hover {
+        background: var(--red);
+      }
+      .btn-ci-n:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+      .btn-ci-b {
+        background: transparent;
+        border: none;
+        font-size: 14px;
+        color: var(--muted);
+        cursor: pointer;
+        font-family: var(--sans);
+      }
+      .btn-ci-b:hover {
+        color: var(--ink);
+      }
+      .ci-result {
+        text-align: center;
+        padding: 32px 0;
+      }
+      .cir-lbl {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted-2);
+        margin-bottom: 16px;
+      }
+      .cir-n {
+        font-family: var(--serif);
+        font-size: 100px;
+        letter-spacing: -0.05em;
+        line-height: 1;
+        transition: color 0.8s;
+      }
+      .cir-st {
+        font-size: 16px;
+        font-weight: 500;
+        margin-top: 6px;
+        transition: color 0.8s;
+      }
+      .cir-desc {
+        font-size: 15px;
+        color: var(--muted);
+        max-width: 380px;
+        margin: 14px auto 0;
+        line-height: 1.7;
+        font-weight: 300;
+      }
+      .cir-action {
+        margin-top: 28px;
+        padding: 16px 18px;
+        background: var(--red-s);
+        border: 1px solid var(--red-m);
+        border-radius: 12px;
+        max-width: 380px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .cir-action-lbl {
+        font-size: 12px;
+        color: var(--red);
+        font-weight: 500;
+        margin-bottom: 5px;
+      }
+      .cir-action-txt {
+        font-size: 13px;
+        color: var(--ink);
+        line-height: 1.55;
+      }
+
+      /* signal grid */
+      .sig-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+      .sig-c {
+        background: var(--paper);
+        border: 1px solid var(--paper-3);
+        border-radius: 12px;
+        padding: 13px 15px;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+      }
+      .sig-ico {
+        font-size: 18px;
+      }
+      .sig-name {
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .sig-val {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 1px;
+        font-family: var(--mono);
+      }
+      .sig-st {
+        margin-left: auto;
+        font-size: 10px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 100px;
+        white-space: nowrap;
+      }
+      .st-ok {
+        background: var(--green-s);
+        color: var(--green);
+        border: 1px solid var(--green-m);
+      }
+      .st-wa {
+        background: var(--amber-s);
+        color: var(--amber);
+        border: 1px solid var(--amber-m);
+      }
+      .st-cr {
+        background: var(--red-s);
+        color: var(--red);
+        border: 1px solid var(--red-m);
+      }
+
+      /* modal */
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(20, 18, 16, 0.55);
+        z-index: 999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(4px);
+      }
+      .overlay.open {
+        display: flex;
+      }
+      .modal {
+        background: var(--surface);
+        border: 1px solid var(--paper-3);
+        border-radius: 22px;
+        padding: 36px;
+        max-width: 460px;
+        width: 90%;
+        box-shadow: 0 28px 80px rgba(0, 0, 0, 0.18);
+        animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      @keyframes slide-up {
+        from {
+          transform: translateY(20px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+      .modal-icon {
+        font-size: 36px;
+        margin-bottom: 14px;
+      }
+      .modal-title {
+        font-family: var(--serif);
+        font-size: 24px;
+        letter-spacing: -0.02em;
+        margin-bottom: 8px;
+      }
+      .modal-body {
+        font-size: 14px;
+        color: var(--muted);
+        line-height: 1.7;
+        margin-bottom: 22px;
+        font-weight: 300;
+      }
+      .modal-body strong {
+        color: var(--ink);
+        font-weight: 500;
+      }
+      .modal-acts {
+        display: flex;
+        gap: 8px;
+      }
+      .mbtn-p {
+        flex: 1;
+        background: var(--ink);
+        color: var(--paper);
+        border: none;
+        padding: 12px;
+        border-radius: 100px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s;
+        font-family: var(--sans);
+      }
+      .mbtn-p:hover {
+        background: var(--red);
+      }
+      .mbtn-g {
+        flex: 1;
+        background: transparent;
+        border: 1.5px solid var(--paper-3);
+        color: var(--muted);
+        padding: 12px;
+        border-radius: 100px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.15s;
+        font-family: var(--sans);
+      }
+      .mbtn-g:hover {
+        border-color: var(--ink);
+        color: var(--ink);
+      }
+
+      /* toast */
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(70px);
+        background: var(--ink);
+        color: var(--paper);
+        padding: 11px 22px;
+        border-radius: 100px;
+        font-size: 13px;
+        font-weight: 500;
+        z-index: 9999;
+        transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        white-space: nowrap;
+      }
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+      }
+
+      @media (max-width: 900px) {
+        .story-nav {
+          display: none;
+        }
+        .sidebar {
+          display: none;
+        }
+        .g4 {
+          grid-template-columns: 1fr 1fr;
+        }
+        .g2,
+        .g2-3 {
+          grid-template-columns: 1fr;
+        }
+        .sig-grid,
+        .f7,
+        .day-grid {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ═══════════════════════════════════
+  ACT 0 — OPENING TITLE CARD
+═══════════════════════════════════ -->
+    <div class="act live" id="act0" onclick="goAct(1)">
+      <div class="a0-eyebrow">
+        <div class="a0-dot"></div>
+        Interactive Demo
+      </div>
+      <h1 class="a0-title">
+        You're about to watch<br />someone <em>burn out.</em><br />Then it's
+        your turn.
+      </h1>
+      <p class="a0-sub">
+        Follow Alex — a founder 12 days from a crash she doesn't know is coming.
+        Then find out where <em>you</em> stand today.
+      </p>
+      <div class="a0-cta">Start the demo &nbsp;→</div>
+      <div class="a0-hint">Click anywhere to begin</div>
+    </div>
+
+    <!-- ═══════════════════════════════════
+  STORY NOTIFICATION (floating)
+═══════════════════════════════════ -->
+    <div class="story-notif" id="storyNotif">
+      <div class="sn-head">
+        <div class="sn-app">Overload</div>
+        <div class="sn-time" id="sn-time">now</div>
+      </div>
+      <div class="sn-title" id="sn-title">CLI Score: 74 — High Strain</div>
+      <div class="sn-body" id="sn-body">
+        Sleep deficit critical. Defer high-stakes decisions today.
+      </div>
+      <div class="sn-actions">
+        <button class="sn-btn sn-btn-p" onclick="dismissNotif()">
+          View details
+        </button>
+        <button class="sn-btn sn-btn-s" onclick="dismissNotif()">
+          Dismiss
+        </button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════
+  ACT 1 — ALEX'S STORY
+═══════════════════════════════════ -->
+    <div class="act" id="act1">
+      <div class="story-shell">
+        <!-- Chapter nav -->
+        <div class="story-nav">
+          <div class="story-nav-top">
+            <div class="story-nav-logo">Over<em>load</em></div>
+            <div class="story-nav-user">Alex Chen · Feb 25 – Mar 8</div>
+          </div>
+
+          <div class="chap-item active" id="chap-nav-0" onclick="goChapter(0)">
+            <div class="chap-dot">1</div>
+            <div class="chap-info">
+              <div class="chap-day">Day 1–3</div>
+              <div class="chap-title">The sprint begins</div>
+            </div>
+          </div>
+          <div class="chap-item" id="chap-nav-1" onclick="goChapter(1)">
+            <div class="chap-dot">2</div>
+            <div class="chap-info">
+              <div class="chap-day">Day 4–7</div>
+              <div class="chap-title">Calendar fills up</div>
+            </div>
+          </div>
+          <div class="chap-item" id="chap-nav-2" onclick="goChapter(2)">
+            <div class="chap-dot">3</div>
+            <div class="chap-info">
+              <div class="chap-day">Day 8–11</div>
+              <div class="chap-title">Overload fires alerts</div>
+            </div>
+          </div>
+          <div class="chap-item" id="chap-nav-3" onclick="goChapter(3)">
+            <div class="chap-dot">4</div>
+            <div class="chap-info">
+              <div class="chap-day">Day 12–14</div>
+              <div class="chap-title">The crash</div>
+            </div>
+          </div>
+          <div class="chap-item" id="chap-nav-4" onclick="goChapter(4)">
+            <div class="chap-dot">5</div>
+            <div class="chap-info">
+              <div class="chap-day">Reflection</div>
+              <div class="chap-title">What Overload saw</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chapter content area -->
+        <div class="story-main">
+          <div class="story-topbar">
+            <div style="font-size: 13px; color: rgba(245, 241, 235, 0.3)">
+              Alex's story · <span id="chap-label">Chapter 1 of 5</span>
+            </div>
+            <div class="story-progress-track">
+              <div
+                class="story-progress-fill"
+                id="storyProgress"
+                style="width: 20%"
+              ></div>
+            </div>
+            <div class="story-progress-label" id="storyProgressLabel">
+              Day 1 of 14
+            </div>
+          </div>
+
+          <!-- CHAPTER 0: Day 1–3 -->
+          <div class="chapter active" id="chap-0">
+            <div class="ch-eyebrow">
+              📅 February 25 &nbsp;·&nbsp; Series A sprint kicks off
+            </div>
+            <h2 class="ch-title">
+              Everything's going great.<br /><em>For now.</em>
+            </h2>
+            <p class="ch-narrative">
+              Alex just closed a term sheet. The team is pumped. This week is
+              back-to-backs, late calls with investors, and catch-up work at
+              night. It doesn't feel like strain — it feels like
+              <strong>momentum</strong>.
+            </p>
+            <div class="ch-score-pill pill-amber">
+              CLI Score: 38 &nbsp;·&nbsp; Low-moderate
+            </div>
+            <div class="ch-snapshot">
+              <div class="ch-snap-header">
+                <div class="ch-snap-title">
+                  Alex's Overload Dashboard · Feb 25
+                </div>
+                <div class="ch-snap-score" style="color: #4ade80">38</div>
+              </div>
+              <div class="ch-bars">
+                <div class="ch-bar-row">
+                  <div class="ch-bar-label">Sleep</div>
+                  <div class="ch-bar-track">
+                    <div
+                      class="ch-bar-fill"
+                      style="width: 28%; background: var(--green)"
+                    ></div>
+                  </div>
+                  <div class="ch-bar-val">28</div>
+                </div>
+                <div class="ch-bar-row">
+                  <div class="ch-bar-label">Calendar</div>
+                  <div class="ch-bar-track">
+                    <div
+                      class="ch-bar-fill"
+                      style="width: 45%; background: var(--amber)"
+                    ></div>
+                  </div>
+                  <div class="ch-bar-val">45</div>
+                </div>
+                <div class="ch-bar-row">
+                  <div class="ch-bar-label">Work intensity</div>
+                  <div class="ch-bar-track">
+                    <div
+                      class="ch-bar-fill"
+                      style="width: 40%; background: var(--amber)"
+                    ></div>
+                  </div>
+                  <div class="ch-bar-val">40</div>
+                </div>
+                <div class="ch-bar-row">
+                  <div class="ch-bar-label">Deep work</div>
+                  <div class="ch-bar-track">
+                    <div
+                      class="ch-bar-fill"
+                      style="width: 60%; background: var(--green)"
+                    ></div>
+                  </div>
+                  <div class="ch-bar-val">60</div>
+                </div>
+              </div>
+            </div>
+            <div class="ch-alert green">
+              <div class="ch-alert-head">
+                <span>🟢</span>
+                <div class="ch-alert-badge badge-g">All clear</div>
+              </div>
+              <div class="ch-alert-text">
+                All signals within normal range. Sleep debt is low. Calendar
+                load elevated but manageable. Good window for important
+                decisions.
+              </div>
+            </div>
+            <div class="ch-nav">
+              <span></span>
+              <button class="btn-chap btn-chap-next" onclick="goChapter(1)">
+                Day 4–7: Calendar fills up →
+              </button>
+            </div>
+          </div>
+
+          <!-- CHAPTER 1: Day 4–7 -->
+          <div class="chapter" id="chap-1">
+            <div class="ch-eyebrow">
+              📅 March 1 &nbsp;·&nbsp; Week two begins
+            </div>
+            <h2 class="ch-title">
+              The meetings multiply.<br /><em>Deep work disappears.</em>
+            </h2>
+            <p class="ch-narrative">
+              The calendar is full. Investor updates, legal calls, team syncs.
+              Alex is going to bed 45 minutes later every night — not
+              dramatically, just <strong>a little later each time</strong>. She
+              feels tired but productive. She's not worried.
+            </p>
+            <div class="ch-score-pill pill-amber">
+              CLI Score: 58 &nbsp;·&nbsp; Elevated
+            </div>
+            <div class="ch-snapshot">
+              <div class="ch-snap-header">
+                <div class="ch-snap-title">
+                  Alex's Overload Dashboard · Mar 1
+                </div>
+                <div class="ch-snap-score" style="color: #fbbf24">58</div>
+              </div>
+              <div class="ch-bars">
+                <div class="ch-bar-row">
+                  <div class="ch-bar-label">Sleep</div>
+                  <div class="ch-bar-track">
+                    <div
+                      class="ch-bar-fill"
+                      style="width: 52%; background: var(--amber)"
+                    ></div>
+                  </div>
+                  <div class="ch-bar-val">52</div>
+                </div>
+                <div class="ch-bar-row">
+                  <div class="ch-bar-label">Calendar</div>
+                  <div class="ch-bar-track">
+                    <div
+                      class="ch-bar-fill"
+                      style="width: 72%; background: var(--red)"
+                    ></div>
+                  </div>
+                  <div class="ch-bar-val">72</div>
+                </div>
+                <div class="ch-bar-row">
+                  <div class="ch-bar-label">Work intensity</div>
+                  <div class="ch-bar-track">
+                    <div
+                      class="ch-bar-fill"
+                      style="width: 65%; background: var(--amber)"
+                    ></div>
+                  </div>
+                  <div class="ch-bar-val">65</div>
+                </div>
+                <div class="ch-bar-row">
+                  <div class="ch-bar-label">Deep work</div>
+                  <div class="ch-bar-track">
+                    <div
+                      class="ch-bar-fill"
+                      style="width: 35%; background: var(--red)"
+                    ></div>
+                  </div>
+                  <div class="ch-bar-val">35</div>
+                </div>
+              </div>
+            </div>
+            <div class="ch-alert amber">
+              <div class="ch-alert-head">
+                <span>⚠️</span>
+                <div class="ch-alert-badge badge-a">Warning</div>
+              </div>
+              <div class="ch-alert-text">
+                Sleep onset drifting later by ~45 min over 4 nights. Calendar at
+                72% load — deep work below baseline. Suggest blocking two
+                mornings this week before deficit compounds.
+              </div>
+            </div>
+            <div class="ch-nav">
+              <button class="btn-chap btn-chap-back" onclick="goChapter(0)">
+                ← Back
+              </button>
+              <button
+                class="btn-chap btn-chap-next"
+                onclick="
+                  goChapter(2);
+                  fireNotif();
+                "
+              >
+                Day 8–11: First real alerts →
+              </button>
+            </div>
+          </div>
+
+          <!-- CHAPTER 2: Day 8–11 -->
+          <div class="chapter" id="chap-2">
+            <div class="ch-eyebrow">
+              📅 March 4 &nbsp;·&nbsp; Today — Alex doesn't know
+            </div>
+            <h2 class="ch-title">
+              She still feels <em>okay.</em><br />She is not okay.
+            </h2>
+            <p class="ch-narrative">
+              Alex is irritable in the morning standup. She second-guesses a
+              vendor decision she'd normally make in two minutes. She chalks it
+              up to a bad night.
+              <strong
+                >Overload sees 11.2 hours of cumulative sleep debt, and fires a
+                critical alert.</strong
+              >
+            </p>
+            <div class="ch-score-pill pill-red">
+              CLI Score: 74 &nbsp;·&nbsp; High Strain
+            </div>
+            <div class="ch-snapshot">
+              <div class="ch-snap-header">
+                <div class="ch-snap-title">
+                  Alex's Overload Dashboard · Mar 4
+                </div>
+                <div class="ch-snap-score" style="color: #f87171">74</div>
+              </div>
+              <div class="ch-bars">
+                <div class="ch-bar-row">
+                  <div class="ch-bar-label">Sleep</div>
+                  <div class="ch-bar-track">
+                    <div
+                      class="ch-bar-fill"
+                      style="width: 78%; background: var(--red)"
+                    ></div>
+                  </div>
+                  <div class="ch-bar-val">78</div>
+                </div>
+                <div class="ch-bar-row">
+                  <div class="ch-bar-label">Calendar</div>
+                  <div class="ch-bar-track">
+                    <div
+                      class="ch-bar-fill"
+                      style="width: 68%; background: var(--amber)"
+                    ></div>
+                  </div>
+                  <div class="ch-bar-val">68</div>
+                </div>
+                <div class="ch-bar-row">
+                  <div class="ch-bar-label">Work intensity</div>
+                  <div class="ch-bar-track">
+                    <div
+                      class="ch-bar-fill"
+                      style="width: 62%; background: var(--amber)"
+                    ></div>
+                  </div>
+                  <div class="ch-bar-val">62</div>
+                </div>
+                <div class="ch-bar-row">
+                  <div class="ch-bar-label">Deep work</div>
+                  <div class="ch-bar-track">
+                    <div
+                      class="ch-bar-fill"
+                      style="width: 31%; background: var(--red)"
+                    ></div>
+                  </div>
+                  <div class="ch-bar-val">31</div>
+                </div>
+              </div>
+            </div>
+            <div class="ch-alert red">
+              <div class="ch-alert-head">
+                <span>🚨</span>
+                <div class="ch-alert-badge badge-r">Critical</div>
+              </div>
+              <div class="ch-alert-text">
+                Sleep deficit has crossed critical threshold (11.2h over 7
+                days). Decision quality estimated at ~72% of baseline. Do not
+                make irreversible decisions today. Crash window projected: ~9
+                days.
+              </div>
+            </div>
+            <p
+              style="
+                font-size: 13px;
+                color: rgba(245, 241, 235, 0.35);
+                margin-top: 16px;
+                font-style: italic;
+              "
+            >
+              Alex doesn't act on it. She's too busy.
+            </p>
+            <div class="ch-nav">
+              <button class="btn-chap btn-chap-back" onclick="goChapter(1)">
+                ← Back
+              </button>
+              <button class="btn-chap btn-chap-next" onclick="goChapter(3)">
+                Day 12–14: The crash →
+              </button>
+            </div>
+          </div>
+
+          <!-- CHAPTER 3: The crash -->
+          <div class="chapter" id="chap-3">
+            <div class="ch-eyebrow">
+              📅 March 13 &nbsp;·&nbsp; Nine days later
+            </div>
+            <h2 class="ch-title">
+              She can't focus.<br />The deadline <em>slides.</em>
+            </h2>
+            <p class="ch-narrative">
+              Alex cancels two meetings because she can't hold a thought. A
+              pitch deck that should take two hours takes six. She sleeps 11
+              hours on Saturday and
+              <strong>loses most of the following week to recovery</strong>.
+              Everyone says she burned out. Overload called it nine days ago.
+            </p>
+            <div class="ch-score-pill pill-crit">
+              CLI Score: 91 &nbsp;·&nbsp; Critical
+            </div>
+            <div class="ch-snapshot">
+              <div class="ch-snap-header">
+                <div class="ch-snap-title">
+                  Alex's Overload Dashboard · Mar 13
+                </div>
+                <div class="ch-snap-score" style="color: var(--red)">91</div>
+              </div>
+              <div class="ch-bars">
+                <div class="ch-bar-row">
+                  <div class="ch-bar-label">Sleep</div>
+                  <div class="ch-bar-track">
+                    <div
+                      class="ch-bar-fill"
+                      style="width: 94%; background: var(--red)"
+                    ></div>
+                  </div>
+                  <div class="ch-bar-val">94</div>
+                </div>
+                <div class="ch-bar-row">
+                  <div class="ch-bar-label">Calendar</div>
+                  <div class="ch-bar-track">
+                    <div
+                      class="ch-bar-fill"
+                      style="width: 88%; background: var(--red)"
+                    ></div>
+                  </div>
+                  <div class="ch-bar-val">88</div>
+                </div>
+                <div class="ch-bar-row">
+                  <div class="ch-bar-label">Work intensity</div>
+                  <div class="ch-bar-track">
+                    <div
+                      class="ch-bar-fill"
+                      style="width: 90%; background: var(--red)"
+                    ></div>
+                  </div>
+                  <div class="ch-bar-val">90</div>
+                </div>
+                <div class="ch-bar-row">
+                  <div class="ch-bar-label">Deep work</div>
+                  <div class="ch-bar-track">
+                    <div
+                      class="ch-bar-fill"
+                      style="width: 12%; background: var(--red)"
+                    ></div>
+                  </div>
+                  <div class="ch-bar-val">12</div>
+                </div>
+              </div>
+            </div>
+            <div class="ch-alert red">
+              <div class="ch-alert-head">
+                <span>💥</span>
+                <div class="ch-alert-badge badge-r">Crash active</div>
+              </div>
+              <div class="ch-alert-text">
+                Cognitive load index at 91 — functional impairment zone. Output
+                capacity estimated at 35% of baseline. Estimated recovery: 8–12
+                days with immediate load reduction and sleep prioritization.
+              </div>
+            </div>
+            <div class="ch-nav">
+              <button class="btn-chap btn-chap-back" onclick="goChapter(2)">
+                ← Back
+              </button>
+              <button class="btn-chap btn-chap-next" onclick="goChapter(4)">
+                What Overload saw →
+              </button>
+            </div>
+          </div>
+
+          <!-- CHAPTER 4: Reflection -->
+          <div class="chapter" id="chap-4">
+            <div class="ch-eyebrow">🔍 Looking back</div>
+            <h2 class="ch-title">
+              Overload saw it <em>nine days early.</em><br />Alex ignored it.
+            </h2>
+            <p class="ch-narrative">
+              The pattern was visible by Day 8. Three signals converging: sleep
+              deficit compounding, calendar at capacity, deep work gone. The
+              cascade multiplier kicked in.
+              <strong
+                >A single dismissed notification might have changed three weeks
+                of output.</strong
+              >
+            </p>
+
+            <div
+              style="
+                background: rgba(255, 255, 255, 0.04);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 16px;
+                padding: 24px;
+                max-width: 580px;
+                margin-bottom: 24px;
+              "
+            >
+              <div
+                style="
+                  font-size: 11px;
+                  font-weight: 500;
+                  letter-spacing: 0.1em;
+                  text-transform: uppercase;
+                  color: rgba(245, 241, 235, 0.3);
+                  margin-bottom: 16px;
+                "
+              >
+                Timeline · CLI Score over 14 days
+              </div>
+              <svg
+                viewBox="0 0 520 100"
+                xmlns="http://www.w3.org/2000/svg"
+                style="width: 100%; display: block"
+              >
+                <defs>
+                  <linearGradient id="timelineGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop
+                      offset="0%"
+                      stop-color="#C8391A"
+                      stop-opacity="0.15"
+                    />
+                    <stop offset="100%" stop-color="#C8391A" stop-opacity="0" />
+                  </linearGradient>
+                </defs>
+                <line
+                  x1="0"
+                  y1="20"
+                  x2="520"
+                  y2="20"
+                  stroke="rgba(255,255,255,0.05)"
+                  stroke-width="1"
+                />
+                <line
+                  x1="0"
+                  y1="50"
+                  x2="520"
+                  y2="50"
+                  stroke="rgba(255,255,255,0.05)"
+                  stroke-width="1"
+                />
+                <line
+                  x1="0"
+                  y1="80"
+                  x2="520"
+                  y2="80"
+                  stroke="rgba(255,255,255,0.05)"
+                  stroke-width="1"
+                />
+                <!-- Alert moment -->
+                <line
+                  x1="280"
+                  y1="10"
+                  x2="280"
+                  y2="90"
+                  stroke="rgba(200,57,26,0.4)"
+                  stroke-width="1"
+                  stroke-dasharray="3 3"
+                />
+                <text
+                  x="283"
+                  y="19"
+                  fill="rgba(200,57,26,0.5)"
+                  font-size="8"
+                  font-family="DM Mono"
+                >
+                  ALERT FIRED
+                </text>
+                <!-- Area -->
+                <polygon
+                  fill="url(#timelineGrad)"
+                  points="20,76 60,74 100,71 140,68 180,64 220,58 260,52 300,44 340,36 380,26 420,20 460,16 500,12 500,90 20,90"
+                />
+                <!-- Line -->
+                <polyline
+                  fill="none"
+                  stroke="#C8391A"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  points="20,76 60,74 100,71 140,68 180,64 220,58 260,52 300,44 340,36 380,26 420,20 460,16 500,12"
+                />
+                <!-- Points -->
+                <circle cx="20" cy="76" r="3.5" fill="#4ade80" />
+                <circle cx="180" cy="64" r="3.5" fill="#fbbf24" />
+                <circle cx="260" cy="52" r="3.5" fill="#f87171" />
+                <circle cx="500" cy="12" r="3.5" fill="#C8391A" />
+                <!-- Labels -->
+                <text
+                  x="10"
+                  y="90"
+                  fill="rgba(255,255,255,0.2)"
+                  font-size="8"
+                  font-family="DM Mono"
+                >
+                  Day 1
+                </text>
+                <text
+                  x="163"
+                  y="90"
+                  fill="rgba(255,255,255,0.2)"
+                  font-size="8"
+                  font-family="DM Mono"
+                >
+                  Day 5
+                </text>
+                <text
+                  x="243"
+                  y="90"
+                  fill="rgba(255,255,255,0.2)"
+                  font-size="8"
+                  font-family="DM Mono"
+                >
+                  Day 8
+                </text>
+                <text
+                  x="483"
+                  y="90"
+                  fill="rgba(255,255,255,0.2)"
+                  font-size="8"
+                  font-family="DM Mono"
+                >
+                  Day 14
+                </text>
+              </svg>
+            </div>
+
+            <div class="ch-alert amber" style="max-width: 580px">
+              <div class="ch-alert-head">
+                <span>💡</span>
+                <div class="ch-alert-badge badge-a">Key insight</div>
+              </div>
+              <div class="ch-alert-text">
+                If Alex had acted on the Day 8 warning — blocked two mornings,
+                slept 30 minutes earlier for 4 nights — the model estimates her
+                CLI would have peaked at 58, not 91. The crash was a choice, not
+                an inevitability.
+              </div>
+            </div>
+
+            <div class="ch-nav">
+              <button class="btn-chap btn-chap-back" onclick="goChapter(3)">
+                ← Back
+              </button>
+              <button class="btn-chap btn-chap-next cta" onclick="goAct(2)">
+                Now — what's your score? →
+              </button>
+            </div>
+          </div>
+        </div>
+        <!-- story-main -->
+      </div>
+      <!-- story-shell -->
+    </div>
+    <!-- act1 -->
+
+    <!-- ═══════════════════════════════════
+  ACT 2 — YOUR SCORE
+═══════════════════════════════════ -->
+    <div class="act" id="act2">
+      <div class="a2-inner">
+        <div
+          style="
+            font-family: var(--serif);
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 6px;
+          "
+        >
+          Now it's your turn
+        </div>
+        <div
+          style="
+            font-family: var(--serif);
+            font-size: clamp(28px, 5vw, 40px);
+            letter-spacing: -0.025em;
+            line-height: 1.15;
+            margin-bottom: 28px;
+          "
+        >
+          Three questions.<br /><em>Your real score.</em>
+        </div>
+
+        <div class="a2-progress" id="a2Progress">
+          <div class="a2p-dot cur" id="a2p0"></div>
+          <div class="a2p-dot" id="a2p1"></div>
+          <div class="a2p-dot" id="a2p2"></div>
+        </div>
+
+        <!-- Q1: Sleep -->
+        <div class="a2-step active" id="a2s0">
+          <div class="a2-q">How has your sleep been <em>this week?</em></div>
+          <div class="a2-sub">Be honest — no one's watching.</div>
+          <div class="a2-opts">
+            <div class="a2-opt" onclick="a2Pick(this, 0, 'sleep', 0)">
+              <span class="a2-opt-em">😴</span>Solid — 7+ hours, waking up
+              rested
+            </div>
+            <div class="a2-opt" onclick="a2Pick(this, 0, 'sleep', 1)">
+              <span class="a2-opt-em">😐</span>Okay — 6–7h, a bit groggy some
+              days
+            </div>
+            <div class="a2-opt" onclick="a2Pick(this, 0, 'sleep', 2)">
+              <span class="a2-opt-em">😓</span>Short — under 6h most nights
+            </div>
+            <div class="a2-opt" onclick="a2Pick(this, 0, 'sleep', 3)">
+              <span class="a2-opt-em">💀</span>What sleep — late nights all week
+            </div>
+          </div>
+          <div class="a2-nav">
+            <span></span
+            ><button class="btn-a2-next" id="a2n0" disabled onclick="a2Next(1)">
+              Next →
+            </button>
+          </div>
+        </div>
+
+        <!-- Q2: Calendar -->
+        <div class="a2-step" id="a2s1">
+          <div class="a2-q">
+            What does your calendar look <em>like this week?</em>
+          </div>
+          <div class="a2-sub">Meetings, calls, obligations.</div>
+          <div class="a2-opts">
+            <div class="a2-opt" onclick="a2Pick(this, 1, 'cal', 0)">
+              <span class="a2-opt-em">🌿</span>Light — mostly open time for deep
+              work
+            </div>
+            <div class="a2-opt" onclick="a2Pick(this, 1, 'cal', 1)">
+              <span class="a2-opt-em">📊</span>Moderate — a few meetings a day
+            </div>
+            <div class="a2-opt" onclick="a2Pick(this, 1, 'cal', 2)">
+              <span class="a2-opt-em">🌪️</span>Heavy — back-to-backs, barely any
+              breaks
+            </div>
+            <div class="a2-opt" onclick="a2Pick(this, 1, 'cal', 3)">
+              <span class="a2-opt-em">🔥</span>Slammed — no time to think or
+              focus
+            </div>
+          </div>
+          <div class="a2-nav">
+            <button class="btn-a2-back" onclick="a2Back(0)">← Back</button
+            ><button class="btn-a2-next" id="a2n1" disabled onclick="a2Next(2)">
+              Next →
+            </button>
+          </div>
+        </div>
+
+        <!-- Q3: Subjective -->
+        <div class="a2-step" id="a2s2">
+          <div class="a2-q">
+            Gut check — how <em>close to the edge</em> do you feel?
+          </div>
+          <div class="a2-sub">The number that first comes to mind.</div>
+          <div class="a2-opts">
+            <div class="a2-opt" onclick="a2Pick(this, 2, 'gut', 0)">
+              <span class="a2-opt-em">🧘</span>Far from it — I feel in control
+            </div>
+            <div class="a2-opt" onclick="a2Pick(this, 2, 'gut', 1)">
+              <span class="a2-opt-em">😑</span>Running a bit hot, but managing
+            </div>
+            <div class="a2-opt" onclick="a2Pick(this, 2, 'gut', 2)">
+              <span class="a2-opt-em">😬</span>Honestly? Closer than I'd like
+            </div>
+            <div class="a2-opt" onclick="a2Pick(this, 2, 'gut', 3)">
+              <span class="a2-opt-em">🆘</span>Very. I needed this tool
+              yesterday.
+            </div>
+          </div>
+          <div class="a2-nav">
+            <button class="btn-a2-back" onclick="a2Back(1)">← Back</button
+            ><button
+              class="btn-a2-next"
+              id="a2n2"
+              disabled
+              onclick="a2Reveal()"
+            >
+              See my score →
+            </button>
+          </div>
+        </div>
+
+        <!-- Score reveal -->
+        <div class="a2-step" id="a2s3">
+          <div class="a2-reveal">
+            <div class="a2r-pre">Your Cognitive Load Index — right now</div>
+            <div class="a2r-score" id="a2ScoreNum">—</div>
+            <div class="a2r-label" id="a2ScoreLabel"></div>
+            <div class="a2r-msg" id="a2ScoreMsg"></div>
+            <div class="a2r-bars" id="a2ScoreBars"></div>
+            <div class="a2r-cta">
+              <button class="btn-enter-app" onclick="goApp()">
+                Open your dashboard →
+              </button>
+              <div class="a2r-sub">Full app, your score loaded in</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════
+  ACT 3 — FULL APP
+═══════════════════════════════════ -->
+    <div class="act" id="act3">
+      <!-- Demo banner -->
+      <div
+        style="
+          background: var(--ink);
+          color: rgba(245, 241, 235, 0.4);
+          font-size: 11px;
+          text-align: center;
+          padding: 6px;
+          flex-shrink: 0;
+          letter-spacing: 0.03em;
+        "
+      >
+        <strong style="color: rgba(245, 241, 235, 0.7)">Demo mode</strong> — All
+        data is simulated &nbsp;·&nbsp;
+        <span
+          style="
+            cursor: pointer;
+            text-decoration: underline;
+            color: rgba(245, 241, 235, 0.4);
+          "
+          onclick="goAct(0)"
+          >Restart demo</span
+        >
+      </div>
+
+      <div class="app-shell">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+          <div class="sb-logo">Over<em>load</em></div>
+          <div class="sb-user">
+            <div class="sb-av" id="appAvatar">?</div>
+            <div>
+              <div class="sb-uname" id="appUserName">You</div>
+              <div class="sb-urole">Your session</div>
+            </div>
+          </div>
+          <div class="sb-score-box" onclick="appView('dashboard')">
+            <div class="sb-score-row">
+              <div class="sb-score-lbl">Today's CLI</div>
+              <div class="sb-score-n" id="appSbScore">—</div>
+            </div>
+            <div class="sb-score-bar">
+              <div class="sb-score-fill" id="appSbFill" style="width: 0%"></div>
+            </div>
+            <div class="sb-score-st" id="appSbStatus">Loading…</div>
+          </div>
+          <nav class="sb-nav">
+            <div
+              class="sb-item on"
+              data-av="dashboard"
+              onclick="appView('dashboard')"
+            >
+              <svg viewBox="0 0 16 16" fill="currentColor">
+                <rect x="1" y="1" width="6" height="6" rx="1" />
+                <rect x="9" y="1" width="6" height="6" rx="1" />
+                <rect x="1" y="9" width="6" height="6" rx="1" />
+                <rect x="9" y="9" width="6" height="6" rx="1" />
+              </svg>
+              Dashboard
+            </div>
+            <div class="sb-item" data-av="checkin" onclick="appView('checkin')">
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+              >
+                <circle cx="8" cy="8" r="6.5" />
+                <path d="M5 8l2 2 4-4" stroke-linecap="round" />
+              </svg>
+              Morning Check-in
+              <div class="sb-badge">!</div>
+            </div>
+            <div class="sb-item" data-av="weekly" onclick="appView('weekly')">
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+              >
+                <rect x="1" y="3" width="14" height="11" rx="1.5" />
+                <path d="M5 1v3M11 1v3M1 7h14" stroke-linecap="round" />
+              </svg>
+              Weekly Digest
+            </div>
+            <div class="sb-item" data-av="signals" onclick="appView('signals')">
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+              >
+                <circle cx="8" cy="8" r="2" />
+                <path
+                  d="M5 8a3 3 0 006 0M2.5 8a5.5 5.5 0 0011 0"
+                  stroke-linecap="round"
+                />
+              </svg>
+              Data Signals
+            </div>
+          </nav>
+          <div class="sb-foot">Overload · Demo v0.9</div>
+        </aside>
+
+        <!-- Main -->
+        <div
+          style="
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+          "
+        >
+          <div class="app-topbar">
+            <div class="app-topbar-title" id="appTopTitle">Dashboard</div>
+            <div style="display: flex; align-items: center; gap: 10px">
+              <div
+                style="
+                  font-size: 12px;
+                  color: var(--muted);
+                  font-family: var(--mono);
+                "
+              >
+                Wed, Mar 4
+              </div>
+              <div class="ap-pill" onclick="openModal('sleep')">
+                <div class="ap-dot"></div>
+                2 active alerts
+              </div>
+            </div>
+          </div>
+
+          <div class="app-scroll" id="appScroll">
+            <!-- DASHBOARD VIEW -->
+            <div class="app-view on" id="av-dashboard">
+              <div class="g4 mb-14" id="appStatsRow">
+                <div class="sc">
+                  <div class="sc-top">
+                    <div class="sc-lbl">CLI Score</div>
+                    <div class="sc-icon">🧠</div>
+                  </div>
+                  <div class="sc-val red" id="appDashScore">—</div>
+                  <div class="sc-sub">Cognitive Load Index</div>
+                  <div class="sc-delta red" id="appDashDelta">—</div>
+                </div>
+                <div class="sc">
+                  <div class="sc-top">
+                    <div class="sc-lbl">Sleep Debt</div>
+                    <div class="sc-icon">🌙</div>
+                  </div>
+                  <div class="sc-val red">−11.2h</div>
+                  <div class="sc-sub">Rolling 7-day deficit</div>
+                  <div class="sc-delta red">↑ 2.1h since Mon</div>
+                </div>
+                <div class="sc">
+                  <div class="sc-top">
+                    <div class="sc-lbl">Deep Work</div>
+                    <div class="sc-icon">🎯</div>
+                  </div>
+                  <div class="sc-val amber">31%</div>
+                  <div class="sc-sub">Of today's hours</div>
+                  <div class="sc-delta amber">↓ 24% from norm</div>
+                </div>
+                <div class="sc">
+                  <div class="sc-top">
+                    <div class="sc-lbl">Crash Window</div>
+                    <div class="sc-icon">📉</div>
+                  </div>
+                  <div class="sc-val red">~9d</div>
+                  <div class="sc-sub">Forecast confidence</div>
+                  <div class="sc-delta red">84% confidence</div>
+                </div>
+              </div>
+
+              <div class="g2-3 mb-14">
+                <div class="stk">
+                  <div class="sc">
+                    <div class="slbl mb-8">Score breakdown</div>
+                    <div style="text-align: center; padding: 10px 0 16px">
+                      <div
+                        class="sc-val red"
+                        id="appBreakdownScore"
+                        style="font-size: 52px"
+                      >
+                        —
+                      </div>
+                      <div
+                        style="
+                          font-size: 12px;
+                          color: var(--muted);
+                          margin-top: 4px;
+                        "
+                      >
+                        out of 100
+                      </div>
+                      <div
+                        style="
+                          font-size: 13px;
+                          font-weight: 500;
+                          color: var(--red);
+                          margin-top: 8px;
+                        "
+                        id="appBreakdownLabel"
+                      >
+                        High Strain
+                      </div>
+                    </div>
+                    <div class="mbr">
+                      <div class="mbr-item">
+                        <div class="mbr-hd">
+                          <span class="mbr-n">Sleep Debt</span
+                          ><span class="mbr-v red">78</span>
+                        </div>
+                        <div class="mbr-track">
+                          <div
+                            class="mbr-fill"
+                            style="width: 78%; background: var(--red)"
+                          ></div>
+                        </div>
+                      </div>
+                      <div class="mbr-item">
+                        <div class="mbr-hd">
+                          <span class="mbr-n">Calendar Load</span
+                          ><span class="mbr-v amber">68</span>
+                        </div>
+                        <div class="mbr-track">
+                          <div
+                            class="mbr-fill"
+                            style="width: 68%; background: var(--amber)"
+                          ></div>
+                        </div>
+                      </div>
+                      <div class="mbr-item">
+                        <div class="mbr-hd">
+                          <span class="mbr-n">Work Intensity</span
+                          ><span class="mbr-v amber">62</span>
+                        </div>
+                        <div class="mbr-track">
+                          <div
+                            class="mbr-fill"
+                            style="width: 62%; background: var(--amber)"
+                          ></div>
+                        </div>
+                      </div>
+                      <div class="mbr-item">
+                        <div class="mbr-hd">
+                          <span class="mbr-n">Deep Work</span
+                          ><span class="mbr-v red">45</span>
+                        </div>
+                        <div class="mbr-track">
+                          <div
+                            class="mbr-fill"
+                            style="width: 45%; background: var(--red)"
+                          ></div>
+                        </div>
+                      </div>
+                      <div class="mbr-item">
+                        <div class="mbr-hd">
+                          <span class="mbr-n">Mood / Energy</span
+                          ><span class="mbr-v amber" id="moodBar">55</span>
+                        </div>
+                        <div class="mbr-track">
+                          <div
+                            class="mbr-fill"
+                            id="moodBarFill"
+                            style="width: 55%; background: var(--amber)"
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="sc">
+                    <div class="slbl mb-10">Today's action</div>
+                    <div
+                      style="
+                        background: var(--red-s);
+                        border: 1px solid var(--red-m);
+                        border-radius: 11px;
+                        padding: 14px;
+                        margin-bottom: 10px;
+                      "
+                    >
+                      <div
+                        style="
+                          font-size: 12px;
+                          color: var(--red);
+                          font-weight: 500;
+                          margin-bottom: 5px;
+                        "
+                      >
+                        ⚡ Right now
+                      </div>
+                      <div
+                        style="
+                          font-size: 13px;
+                          color: var(--ink);
+                          line-height: 1.55;
+                        "
+                      >
+                        Block tomorrow 9–11am. Cancel the 3pm standup. Your best
+                        decisions happen before 11am.
+                      </div>
+                    </div>
+                    <div
+                      style="
+                        background: var(--amber-s);
+                        border: 1px solid var(--amber-m);
+                        border-radius: 11px;
+                        padding: 14px;
+                      "
+                    >
+                      <div
+                        style="
+                          font-size: 12px;
+                          color: var(--amber);
+                          font-weight: 500;
+                          margin-bottom: 5px;
+                        "
+                      >
+                        🌙 Tonight
+                      </div>
+                      <div
+                        style="
+                          font-size: 13px;
+                          color: var(--ink);
+                          line-height: 1.55;
+                        "
+                      >
+                        Aim for 10:45pm. Four nights at +30 min closes your
+                        sleep debt by Sunday.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="stk">
+                  <div class="sc">
+                    <div class="slbl mb-10">
+                      14-day forecast &nbsp;<span
+                        style="
+                          font-size: 11px;
+                          color: var(--muted);
+                          font-family: var(--mono);
+                          font-weight: 400;
+                        "
+                        >crash ~Mar 13</span
+                      >
+                    </div>
+                    <svg
+                      viewBox="0 0 480 140"
+                      xmlns="http://www.w3.org/2000/svg"
+                      style="width: 100%; display: block"
+                    >
+                      <defs>
+                        <linearGradient id="fg" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stop-color="#2A7A4A" />
+                          <stop offset="50%" stop-color="#C47D1A" />
+                          <stop offset="100%" stop-color="#C8391A" />
+                        </linearGradient>
+                        <linearGradient id="fa" x1="0" y1="0" x2="0" y2="1">
+                          <stop
+                            offset="0%"
+                            stop-color="#C8391A"
+                            stop-opacity="0.1"
+                          />
+                          <stop
+                            offset="100%"
+                            stop-color="#C8391A"
+                            stop-opacity="0"
+                          />
+                        </linearGradient>
+                      </defs>
+                      <line
+                        x1="0"
+                        y1="35"
+                        x2="480"
+                        y2="35"
+                        stroke="rgba(0,0,0,0.05)"
+                        stroke-width="1"
+                      />
+                      <line
+                        x1="0"
+                        y1="70"
+                        x2="480"
+                        y2="70"
+                        stroke="rgba(0,0,0,0.05)"
+                        stroke-width="1"
+                      />
+                      <line
+                        x1="0"
+                        y1="105"
+                        x2="480"
+                        y2="105"
+                        stroke="rgba(0,0,0,0.05)"
+                        stroke-width="1"
+                      />
+                      <rect
+                        x="240"
+                        y="10"
+                        width="240"
+                        height="120"
+                        fill="rgba(200,57,26,0.04)"
+                      />
+                      <line
+                        x1="240"
+                        y1="10"
+                        x2="240"
+                        y2="130"
+                        stroke="rgba(200,57,26,0.25)"
+                        stroke-width="1"
+                        stroke-dasharray="3 3"
+                      />
+                      <text
+                        x="244"
+                        y="20"
+                        fill="rgba(200,57,26,0.4)"
+                        font-size="7"
+                        font-family="DM Mono"
+                      >
+                        CRASH ZONE
+                      </text>
+                      <line
+                        x1="170"
+                        y1="10"
+                        x2="170"
+                        y2="130"
+                        stroke="rgba(0,0,0,0.12)"
+                        stroke-width="1"
+                        stroke-dasharray="3 3"
+                      />
+                      <text
+                        x="174"
+                        y="20"
+                        fill="rgba(0,0,0,0.25)"
+                        font-size="7"
+                        font-family="DM Mono"
+                      >
+                        TODAY
+                      </text>
+                      <polygon
+                        fill="url(#fa)"
+                        points="15,108 55,104 95,100 135,96 170,84 210,70 250,56 290,42 330,30 370,20 410,15 455,12 480,10 480,130 15,130"
+                      />
+                      <polyline
+                        fill="none"
+                        stroke="url(#fg)"
+                        stroke-width="2.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        points="15,108 55,104 95,100 135,96 170,84 210,70 250,56 290,42 330,30 370,20 410,15 455,12 480,10"
+                      />
+                      <circle cx="170" cy="84" r="4.5" fill="var(--red)" />
+                      <circle
+                        cx="170"
+                        cy="84"
+                        r="8"
+                        fill="none"
+                        stroke="var(--red)"
+                        stroke-width="1.5"
+                        opacity="0.4"
+                      />
+                      <text
+                        x="8"
+                        y="128"
+                        fill="#BEB5A8"
+                        font-size="8"
+                        font-family="DM Mono"
+                      >
+                        Feb 25
+                      </text>
+                      <text
+                        x="152"
+                        y="128"
+                        fill="#BEB5A8"
+                        font-size="8"
+                        font-family="DM Mono"
+                      >
+                        Mar 4
+                      </text>
+                      <text
+                        x="456"
+                        y="128"
+                        fill="#BEB5A8"
+                        font-size="8"
+                        font-family="DM Mono"
+                      >
+                        Mar 18
+                      </text>
+                    </svg>
+                  </div>
+
+                  <div class="sc">
+                    <div class="slbl mb-10">Active alerts</div>
+                    <div class="al-list">
+                      <div class="al-item cr" onclick="openModal('sleep')">
+                        <div class="al-ico">😴</div>
+                        <div>
+                          <div class="al-txt">
+                            Sleep deficit critical — decision quality at ~72% of
+                            your baseline. Defer irreversible choices today.
+                          </div>
+                          <div class="al-meta">2h ago · Sleep signal</div>
+                        </div>
+                        <div class="al-bdg bdg-r">Critical</div>
+                      </div>
+                      <div class="al-item wa" onclick="openModal('calendar')">
+                        <div class="al-ico">📅</div>
+                        <div>
+                          <div class="al-txt">
+                            Next week: 14 meetings projected. Deep work ratio
+                            will drop to 18%.
+                          </div>
+                          <div class="al-meta">6h ago · Calendar scan</div>
+                        </div>
+                        <div class="al-bdg bdg-a">Warning</div>
+                      </div>
+                      <div class="al-item ok">
+                        <div class="al-ico">💳</div>
+                        <div>
+                          <div class="al-txt">
+                            Financial stress stable. No anomalies this week.
+                          </div>
+                          <div class="al-meta">1h ago · Finance signal</div>
+                        </div>
+                        <div class="al-bdg bdg-g">Stable</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 7-day strip -->
+              <div class="sc mb-0">
+                <div class="slbl mb-12">7-day CLI forecast</div>
+                <div class="f7">
+                  <div class="fd">
+                    <div class="fd-name">Thu</div>
+                    <div class="fd-val amber">61</div>
+                    <div class="fd-bar">
+                      <div
+                        class="fd-fill"
+                        style="width: 61%; background: var(--amber)"
+                      ></div>
+                    </div>
+                    <div class="fd-note">Moderate</div>
+                  </div>
+                  <div class="fd">
+                    <div class="fd-name">Fri</div>
+                    <div class="fd-val amber">66</div>
+                    <div class="fd-bar">
+                      <div
+                        class="fd-fill"
+                        style="width: 66%; background: var(--amber)"
+                      ></div>
+                    </div>
+                    <div class="fd-note">Elevated</div>
+                  </div>
+                  <div class="fd">
+                    <div class="fd-name">Sat</div>
+                    <div class="fd-val green">38</div>
+                    <div class="fd-bar">
+                      <div
+                        class="fd-fill"
+                        style="width: 38%; background: var(--green)"
+                      ></div>
+                    </div>
+                    <div class="fd-note">Recovery</div>
+                  </div>
+                  <div class="fd">
+                    <div class="fd-name">Sun</div>
+                    <div class="fd-val green">34</div>
+                    <div class="fd-bar">
+                      <div
+                        class="fd-fill"
+                        style="width: 34%; background: var(--green)"
+                      ></div>
+                    </div>
+                    <div class="fd-note">Recovery</div>
+                  </div>
+                  <div class="fd">
+                    <div class="fd-name">Mon</div>
+                    <div class="fd-val amber">72</div>
+                    <div class="fd-bar">
+                      <div
+                        class="fd-fill"
+                        style="width: 72%; background: var(--amber)"
+                      ></div>
+                    </div>
+                    <div class="fd-note">High</div>
+                  </div>
+                  <div class="fd">
+                    <div class="fd-name">Tue</div>
+                    <div class="fd-val red">81</div>
+                    <div class="fd-bar">
+                      <div
+                        class="fd-fill"
+                        style="width: 81%; background: var(--red)"
+                      ></div>
+                    </div>
+                    <div class="fd-note">Danger</div>
+                  </div>
+                  <div class="fd">
+                    <div class="fd-name">Wed</div>
+                    <div class="fd-val red">87</div>
+                    <div class="fd-bar">
+                      <div
+                        class="fd-fill"
+                        style="width: 87%; background: var(--red)"
+                      ></div>
+                    </div>
+                    <div class="fd-note">Critical</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- CHECK-IN VIEW -->
+            <div class="app-view" id="av-checkin">
+              <div class="ci-wrap">
+                <div style="margin-bottom: 28px">
+                  <div
+                    style="
+                      font-family: var(--serif);
+                      font-size: 13px;
+                      color: var(--muted);
+                      margin-bottom: 4px;
+                    "
+                  >
+                    Good morning 👋
+                  </div>
+                  <div
+                    style="
+                      font-family: var(--serif);
+                      font-size: 28px;
+                      letter-spacing: -0.02em;
+                    "
+                  >
+                    Your 30-second check-in
+                  </div>
+                </div>
+                <div class="ci-progress" id="ciProg">
+                  <div class="ci-pd cur" id="cip0"></div>
+                  <div class="ci-pd" id="cip1"></div>
+                  <div class="ci-pd" id="cip2"></div>
+                </div>
+                <div class="ci-step on" id="cis0">
+                  <div class="ci-q">How's your energy right now?</div>
+                  <div class="ci-sub">First instinct.</div>
+                  <div class="ci-opts">
+                    <div class="ci-opt" onclick="ciPick(this, 0, 'e', 0)">
+                      <span class="ci-opt-em">🔋</span>Charged — ready to go
+                    </div>
+                    <div class="ci-opt" onclick="ciPick(this, 0, 'e', 1)">
+                      <span class="ci-opt-em">😐</span>Okay — not great, not bad
+                    </div>
+                    <div class="ci-opt" onclick="ciPick(this, 0, 'e', 2)">
+                      <span class="ci-opt-em">😓</span>Low — dragging a bit
+                    </div>
+                    <div class="ci-opt" onclick="ciPick(this, 0, 'e', 3)">
+                      <span class="ci-opt-em">💀</span>Empty — running on fumes
+                    </div>
+                  </div>
+                  <div class="ci-nav">
+                    <span></span
+                    ><button
+                      class="btn-ci-n"
+                      id="cin0"
+                      disabled
+                      onclick="ciNext(1)"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+                <div class="ci-step" id="cis1">
+                  <div class="ci-q">How easy is it to focus today?</div>
+                  <div class="ci-sub">Think about your last working hour.</div>
+                  <div class="ci-opts">
+                    <div class="ci-opt" onclick="ciPick(this, 1, 'f', 0)">
+                      <span class="ci-opt-em">🎯</span>Locked in — deep work
+                      feels natural
+                    </div>
+                    <div class="ci-opt" onclick="ciPick(this, 1, 'f', 1)">
+                      <span class="ci-opt-em">🌊</span>Okay — takes some effort
+                    </div>
+                    <div class="ci-opt" onclick="ciPick(this, 1, 'f', 2)">
+                      <span class="ci-opt-em">🌪️</span>Hard — lots of
+                      distractions
+                    </div>
+                    <div class="ci-opt" onclick="ciPick(this, 1, 'f', 3)">
+                      <span class="ci-opt-em">🤯</span>Impossible — can't hold a
+                      thought
+                    </div>
+                  </div>
+                  <div class="ci-nav">
+                    <button class="btn-ci-b" onclick="ciBack(0)">← Back</button
+                    ><button
+                      class="btn-ci-n"
+                      id="cin1"
+                      disabled
+                      onclick="ciNext(2)"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+                <div class="ci-step" id="cis2">
+                  <div class="ci-q">One word for your mood today?</div>
+                  <div class="ci-sub">Your emotional state is a signal.</div>
+                  <div class="ci-opts">
+                    <div class="ci-opt" onclick="ciPick(this, 2, 'm', 0)">
+                      <span class="ci-opt-em">😊</span>Motivated / Positive
+                    </div>
+                    <div class="ci-opt" onclick="ciPick(this, 2, 'm', 1)">
+                      <span class="ci-opt-em">😑</span>Neutral / Flat
+                    </div>
+                    <div class="ci-opt" onclick="ciPick(this, 2, 'm', 2)">
+                      <span class="ci-opt-em">😤</span>Frustrated / Irritable
+                    </div>
+                    <div class="ci-opt" onclick="ciPick(this, 2, 'm', 3)">
+                      <span class="ci-opt-em">😶</span>Detached / Numb
+                    </div>
+                  </div>
+                  <div class="ci-nav">
+                    <button class="btn-ci-b" onclick="ciBack(1)">← Back</button
+                    ><button
+                      class="btn-ci-n"
+                      id="cin2"
+                      disabled
+                      onclick="ciReveal()"
+                    >
+                      See update →
+                    </button>
+                  </div>
+                </div>
+                <div class="ci-step" id="cis3">
+                  <div class="ci-result">
+                    <div class="cir-lbl">Score updated</div>
+                    <div class="cir-n" id="cirN">—</div>
+                    <div class="cir-st" id="cirSt"></div>
+                    <div class="cir-desc" id="cirDesc"></div>
+                    <div
+                      class="cir-action"
+                      id="cirAction"
+                      style="display: none"
+                    >
+                      <div class="cir-action-lbl">Suggested action</div>
+                      <div class="cir-action-txt" id="cirActionTxt"></div>
+                    </div>
+                    <div style="margin-top: 24px">
+                      <button class="btn-ci-n" onclick="appView('dashboard')">
+                        Back to dashboard →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- WEEKLY VIEW -->
+            <div class="app-view" id="av-weekly">
+              <div style="margin-bottom: 20px">
+                <div class="slbl mb-4">Week of March 2–8, 2026</div>
+                <div
+                  style="
+                    font-family: var(--serif);
+                    font-size: 22px;
+                    letter-spacing: -0.02em;
+                  "
+                >
+                  Your week in review
+                </div>
+              </div>
+              <div class="day-grid mb-20">
+                <div class="dy past">
+                  <div class="dy-name">Sun</div>
+                  <div class="dy-score green">42</div>
+                  <div class="dy-dot" style="background: var(--green)"></div>
+                </div>
+                <div class="dy past">
+                  <div class="dy-name">Mon</div>
+                  <div class="dy-score amber">58</div>
+                  <div class="dy-dot" style="background: var(--amber)"></div>
+                </div>
+                <div class="dy past">
+                  <div class="dy-name">Tue</div>
+                  <div class="dy-score amber">66</div>
+                  <div class="dy-dot" style="background: var(--amber)"></div>
+                </div>
+                <div class="dy today">
+                  <div class="dy-name">Wed</div>
+                  <div class="dy-score red" id="weekToday">74</div>
+                  <div class="dy-dot" style="background: var(--red)"></div>
+                </div>
+                <div class="dy">
+                  <div class="dy-name">Thu</div>
+                  <div class="dy-score" style="color: var(--muted-2)">—</div>
+                  <div class="dy-dot" style="background: var(--paper-3)"></div>
+                </div>
+                <div class="dy">
+                  <div class="dy-name">Fri</div>
+                  <div class="dy-score" style="color: var(--muted-2)">—</div>
+                  <div class="dy-dot" style="background: var(--paper-3)"></div>
+                </div>
+                <div class="dy">
+                  <div class="dy-name">Sat</div>
+                  <div class="dy-score" style="color: var(--muted-2)">—</div>
+                  <div class="dy-dot" style="background: var(--paper-3)"></div>
+                </div>
+              </div>
+              <div class="sc mb-14">
+                <div class="slbl mb-10">CLI trend — last 30 days</div>
+                <svg
+                  viewBox="0 0 560 100"
+                  xmlns="http://www.w3.org/2000/svg"
+                  style="width: 100%; display: block"
+                >
+                  <line
+                    x1="0"
+                    y1="25"
+                    x2="560"
+                    y2="25"
+                    stroke="rgba(0,0,0,0.05)"
+                    stroke-width="1"
+                  />
+                  <line
+                    x1="0"
+                    y1="55"
+                    x2="560"
+                    y2="55"
+                    stroke="rgba(0,0,0,0.05)"
+                    stroke-width="1"
+                  />
+                  <line
+                    x1="0"
+                    y1="85"
+                    x2="560"
+                    y2="85"
+                    stroke="rgba(0,0,0,0.05)"
+                    stroke-width="1"
+                  />
+                  <defs>
+                    <linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">
+                      <stop
+                        offset="0%"
+                        stop-color="#C8391A"
+                        stop-opacity="0.1"
+                      />
+                      <stop
+                        offset="100%"
+                        stop-color="#C8391A"
+                        stop-opacity="0"
+                      />
+                    </linearGradient>
+                  </defs>
+                  <polygon
+                    fill="url(#tg)"
+                    points="15,82 50,79 90,76 130,75 165,71 200,66 235,68 265,62 300,55 330,50 365,52 395,48 430,54 460,58 495,62 530,66 555,70 555,95 15,95"
+                  />
+                  <polyline
+                    fill="none"
+                    stroke="#C8391A"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    points="15,82 50,79 90,76 130,75 165,71 200,66 235,68 265,62 300,55 330,50 365,52 395,48 430,54 460,58 495,62 530,66 555,70"
+                  />
+                  <circle cx="530" cy="66" r="4" fill="var(--red)" />
+                </svg>
+              </div>
+              <div class="slbl mb-10">This week's insights</div>
+              <div class="ins-list">
+                <div class="ins">
+                  <div class="ins-ico">📈</div>
+                  <div>
+                    <div class="ins-title">CLI rose 32 points in 7 days</div>
+                    <div class="ins-text">
+                      Sleep deficit combined with a 40% jump in meeting load.
+                      This pattern matches your trajectory from October — which
+                      ended in two lost weeks.
+                    </div>
+                  </div>
+                </div>
+                <div class="ins">
+                  <div class="ins-ico">🎯</div>
+                  <div>
+                    <div class="ins-title">
+                      Deep work dropped to a 6-week low (31%)
+                    </div>
+                    <div class="ins-text">
+                      Your baseline is 55%. Back-to-backs on Tuesday and
+                      Wednesday are the main cause. Three morning blocks next
+                      week would recover this.
+                    </div>
+                  </div>
+                </div>
+                <div class="ins">
+                  <div class="ins-ico">😴</div>
+                  <div>
+                    <div class="ins-title">
+                      Sleep timing shifting later by ~45 min
+                    </div>
+                    <div class="ins-text">
+                      Average sleep onset has drifted from 10:30pm to 11:15pm
+                      over 10 days. Correcting now takes 4 nights. Waiting takes
+                      2 weeks.
+                    </div>
+                  </div>
+                </div>
+                <div class="ins" style="border-left: 3px solid var(--green)">
+                  <div class="ins-ico">✅</div>
+                  <div>
+                    <div class="ins-title">
+                      Financial stress — stable all week
+                    </div>
+                    <div class="ins-text">
+                      No spending anomalies, no bill clustering. This signal is
+                      not contributing to your current CLI elevation.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SIGNALS VIEW -->
+            <div class="app-view" id="av-signals">
+              <div class="slbl mb-10">Connected data sources</div>
+              <div class="sig-grid mb-20">
+                <div class="sig-c">
+                  <div class="sig-ico">📅</div>
+                  <div>
+                    <div class="sig-name">Google Calendar</div>
+                    <div class="sig-val">Last sync: 12 min ago</div>
+                  </div>
+                  <div class="sig-st st-ok">Live</div>
+                </div>
+                <div class="sig-c">
+                  <div class="sig-ico">💍</div>
+                  <div>
+                    <div class="sig-name">Oura Ring</div>
+                    <div class="sig-val">HRV · sleep stages · recovery</div>
+                  </div>
+                  <div class="sig-st st-cr">−11.2h debt</div>
+                </div>
+                <div class="sig-c">
+                  <div class="sig-ico">⌚</div>
+                  <div>
+                    <div class="sig-name">Apple Health</div>
+                    <div class="sig-val">Activity · resting HR</div>
+                  </div>
+                  <div class="sig-st st-ok">Live</div>
+                </div>
+                <div class="sig-c">
+                  <div class="sig-ico">🖥️</div>
+                  <div>
+                    <div class="sig-name">Browser Extension</div>
+                    <div class="sig-val">Focus sessions · tab rate</div>
+                  </div>
+                  <div class="sig-st st-wa">31% deep</div>
+                </div>
+                <div class="sig-c">
+                  <div class="sig-ico">✍️</div>
+                  <div>
+                    <div class="sig-name">Daily Check-in</div>
+                    <div class="sig-val">Energy · focus · mood</div>
+                  </div>
+                  <div class="sig-st st-ok">Done today</div>
+                </div>
+                <div class="sig-c">
+                  <div class="sig-ico">🏦</div>
+                  <div>
+                    <div class="sig-name">Plaid (Finance)</div>
+                    <div class="sig-val">Spending · bill clustering</div>
+                  </div>
+                  <div class="sig-st st-ok">Stable</div>
+                </div>
+              </div>
+              <div class="slbl mb-10">Signal weights (your calibration)</div>
+              <div class="sc">
+                <div class="mbr">
+                  <div class="mbr-item">
+                    <div class="mbr-hd">
+                      <span class="mbr-n">Sleep Debt</span
+                      ><span class="mbr-v">28%</span>
+                    </div>
+                    <div class="mbr-track">
+                      <div
+                        class="mbr-fill"
+                        style="width: 100%; background: var(--red)"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="mbr-item">
+                    <div class="mbr-hd">
+                      <span class="mbr-n">Calendar Load</span
+                      ><span class="mbr-v">22%</span>
+                    </div>
+                    <div class="mbr-track">
+                      <div
+                        class="mbr-fill"
+                        style="width: 79%; background: var(--red)"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="mbr-item">
+                    <div class="mbr-hd">
+                      <span class="mbr-n">Work Intensity</span
+                      ><span class="mbr-v">18%</span>
+                    </div>
+                    <div class="mbr-track">
+                      <div
+                        class="mbr-fill"
+                        style="width: 64%; background: var(--amber)"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="mbr-item">
+                    <div class="mbr-hd">
+                      <span class="mbr-n">Deep Work Ratio</span
+                      ><span class="mbr-v">16%</span>
+                    </div>
+                    <div class="mbr-track">
+                      <div
+                        class="mbr-fill"
+                        style="width: 57%; background: var(--amber)"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="mbr-item">
+                    <div class="mbr-hd">
+                      <span class="mbr-n">Daily Journal</span
+                      ><span class="mbr-v">10%</span>
+                    </div>
+                    <div class="mbr-track">
+                      <div
+                        class="mbr-fill"
+                        style="width: 36%; background: var(--blue, #1a6fc8)"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="mbr-item">
+                    <div class="mbr-hd">
+                      <span class="mbr-n">Financial Stress</span
+                      ><span class="mbr-v">6%</span>
+                    </div>
+                    <div class="mbr-track">
+                      <div
+                        class="mbr-fill"
+                        style="width: 21%; background: var(--muted-2)"
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  style="
+                    margin-top: 14px;
+                    padding: 13px;
+                    background: var(--paper);
+                    border-radius: 10px;
+                    font-size: 12px;
+                    color: var(--muted);
+                    line-height: 1.6;
+                  "
+                >
+                  ℹ️ Weights auto-calibrate to your patterns over 30 days. Your
+                  sleep sensitivity is rated
+                  <strong style="color: var(--ink)">High</strong> — one bad
+                  night moves your score more than average.
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- app-scroll -->
+        </div>
+        <!-- main -->
+      </div>
+      <!-- app-shell -->
+    </div>
+    <!-- act3 -->
+
+    <!-- MODALS -->
+    <div class="overlay" id="ov-sleep" onclick="closeModal('sleep')">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-icon">😴</div>
+        <div class="modal-title">Decision quality alert</div>
+        <div class="modal-body">
+          Your sleep deficit has crossed a critical threshold — 11.2 hours over
+          7 days. Research shows this level reduces working memory by ~20% and
+          increases risk-seeking behavior by 30%.<br /><br /><strong
+            >Recommendation:</strong
+          >
+          Defer any irreversible decisions until your CLI drops below 55. If you
+          must decide today, write down your reasoning first.<br /><br /><span
+            style="font-family: var(--mono); font-size: 11px"
+            >Recovery: 4 nights at +45 min/night closes this deficit.</span
+          >
+        </div>
+        <div class="modal-acts">
+          <button
+            class="mbtn-p"
+            onclick="
+              closeModal('sleep');
+              showToast('✓ Suggestion added to tonight');
+            "
+          >
+            Got it
+          </button>
+          <button class="mbtn-g" onclick="closeModal('sleep')">Dismiss</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="ov-calendar" onclick="closeModal('calendar')">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-icon">📅</div>
+        <div class="modal-title">Meeting overload next week</div>
+        <div class="modal-body">
+          14 meetings projected — 6 above your sustainable baseline. Deep work
+          will drop from 55% to an estimated 18%.<br /><br /><strong
+            >Suggested actions:</strong
+          ><br />→ Block Mon/Wed/Fri 9–11am as focus time<br />→ Cancel or
+          delegate the Thu 4pm status call<br />→ Move Tue 1-on-1 to async
+          Loom<br /><br /><span
+            style="font-family: var(--mono); font-size: 11px"
+            >Implementing these brings deep work back to ~42%.</span
+          >
+        </div>
+        <div class="modal-acts">
+          <button
+            class="mbtn-p"
+            onclick="
+              closeModal('calendar');
+              showToast('📅 Calendar blocks added for Mon/Wed/Fri 9–11am');
+            "
+          >
+            Add blocks
+          </button>
+          <button class="mbtn-g" onclick="closeModal('calendar')">
+            I'll handle it
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+      // ── STATE ──
+      const state = { userScore: null, userAnswers: {} };
+
+      // ── ACT TRANSITIONS ──
+      function goAct(n) {
+        document
+          .querySelectorAll(".act")
+          .forEach((a) => a.classList.remove("live"));
+        document.getElementById("act" + n).classList.add("live");
+        if (n === 2) {
+          resetA2();
+        }
+      }
+
+      // ── ACT 1: STORY ──
+      let currentChapter = 0;
+      const chapterCount = 5;
+      const chapterDays = [
+        "Day 1–3",
+        "Day 4–7",
+        "Day 8–11",
+        "Day 12–14",
+        "Reflection",
+      ];
+      const chapterProgress = [20, 40, 60, 80, 100];
+      const chapterDayLabel = [
+        "Day 1 of 14",
+        "Day 4 of 14",
+        "Day 8 of 14",
+        "Day 12 of 14",
+        "Day 14",
+      ];
+
+      function goChapter(n) {
+        // update chapters
+        document
+          .querySelectorAll(".chapter")
+          .forEach((c) => c.classList.remove("active"));
+        document.getElementById("chap-" + n).classList.add("active");
+        // update nav
+        document.querySelectorAll(".chap-item").forEach((el, i) => {
+          el.classList.remove("active", "done");
+          if (i < n) el.classList.add("done");
+          else if (i === n) el.classList.add("active");
+        });
+        // progress bar
+        document.getElementById("storyProgress").style.width =
+          chapterProgress[n] + "%";
+        document.getElementById("storyProgressLabel").textContent =
+          chapterDayLabel[n];
+        document.getElementById("chap-label").textContent =
+          "Chapter " + (n + 1) + " of 5";
+        currentChapter = n;
+        // scroll to top
+        document.querySelector(".chapter.active").scrollTop = 0;
+      }
+
+      // Notification toast in story
+      function fireNotif() {
+        const notif = document.getElementById("storyNotif");
+        notif.classList.add("show");
+        setTimeout(() => notif.classList.remove("show"), 5000);
+      }
+      function dismissNotif() {
+        document.getElementById("storyNotif").classList.remove("show");
+      }
+
+      // ── ACT 2: YOUR SCORE ──
+      const a2Answers = {};
+
+      function resetA2() {
+        document
+          .querySelectorAll(".a2-step")
+          .forEach((s) => s.classList.remove("active"));
+        document.getElementById("a2s0").classList.add("active");
+        document
+          .querySelectorAll(".a2-opt")
+          .forEach((o) => o.classList.remove("sel"));
+        ["a2n0", "a2n1", "a2n2"].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.disabled = true;
+        });
+        ["a2p0", "a2p1", "a2p2"].forEach((id, i) => {
+          const el = document.getElementById(id);
+          el.classList.remove("done", "cur");
+          if (i === 0) el.classList.add("cur");
+        });
+      }
+
+      function a2Pick(el, step, key, val) {
+        el.closest(".a2-opts")
+          .querySelectorAll(".a2-opt")
+          .forEach((o) => o.classList.remove("sel"));
+        el.classList.add("sel");
+        a2Answers[key] = val;
+        document.getElementById("a2n" + step).disabled = false;
+      }
+
+      function a2Next(to) {
+        document
+          .querySelectorAll(".a2-step")
+          .forEach((s) => s.classList.remove("active"));
+        document.getElementById("a2s" + to).classList.add("active");
+        ["a2p0", "a2p1", "a2p2"].forEach((id, i) => {
+          const el = document.getElementById(id);
+          el.classList.remove("done", "cur");
+          if (i < to) el.classList.add("done");
+          else if (i === to) el.classList.add("cur");
+        });
+      }
+
+      function a2Back(to) {
+        document
+          .querySelectorAll(".a2-step")
+          .forEach((s) => s.classList.remove("active"));
+        document.getElementById("a2s" + to).classList.add("active");
+        ["a2p0", "a2p1", "a2p2"].forEach((id, i) => {
+          const el = document.getElementById(id);
+          el.classList.remove("done", "cur");
+          if (i < to) el.classList.add("done");
+          else if (i === to) el.classList.add("cur");
+        });
+      }
+
+      function a2Reveal() {
+        // sleep: 0=good(base 25), 1=ok(38), 2=short(58), 3=late(72)
+        // cal: 0=light(15), 1=moderate(35), 2=heavy(58), 3=slammed(75)
+        // gut: 0=far(10), 1=hot(28), 2=close(55), 3=edge(80)
+        const sleepBase = [25, 38, 58, 72][a2Answers.sleep || 0];
+        const calBase = [15, 35, 58, 75][a2Answers.cal || 0];
+        const gutBase = [10, 28, 55, 80][a2Answers.gut || 0];
+        const cascadeBonus = sleepBase > 55 && calBase > 50 ? 8 : 0;
+        const raw = Math.round(
+          sleepBase * 0.35 +
+            calBase * 0.3 +
+            gutBase * 0.25 +
+            cascadeBonus * 0.1,
+        );
+        const score = Math.min(98, Math.max(12, raw));
+        state.userScore = score;
+
+        const el = document.getElementById("a2ScoreNum");
+        const labelEl = document.getElementById("a2ScoreLabel");
+        const msgEl = document.getElementById("a2ScoreMsg");
+        const barsEl = document.getElementById("a2ScoreBars");
+
+        let color, label, msg;
+        if (score < 35) {
+          color = "var(--green)";
+          label = "Low strain — you're in a good place";
+          msg =
+            "You have capacity right now. Good window for important decisions and strategic thinking. Keep the signals stable.";
+        } else if (score < 55) {
+          color = "var(--amber)";
+          label = "Moderate strain — watch the signals";
+          msg =
+            "You're carrying some load but it's manageable. Pay attention to your sleep this week and protect morning focus time.";
+        } else if (score < 72) {
+          color = "var(--amber)";
+          label = "Elevated — a few things to address";
+          msg =
+            "Your load is meaningfully above baseline. Defer high-stakes decisions where possible. A couple of good nights of sleep changes the trajectory.";
+        } else if (score < 85) {
+          color = "var(--red)";
+          label = "High strain — action needed";
+          msg =
+            "You're on a path toward a crash. This is the zone where most people say \"I'm fine\" and end up losing two weeks later. Now is the time.";
+        } else {
+          color = "var(--red)";
+          label = "Critical — this is Alex's story";
+          msg =
+            "You're running at near-max load. Today is not a day for irreversible decisions. One good night is not enough — you need a sustained recovery plan.";
+        }
+
+        el.style.color = color;
+        labelEl.style.color = color;
+        labelEl.textContent = label;
+        msgEl.textContent = msg;
+
+        // bars
+        const sleepBarW = Math.min(95, sleepBase + 5);
+        const calBarW = Math.min(95, calBase + 5);
+        const gutBarW = Math.min(95, gutBase + 5);
+        const barColor =
+          score > 65
+            ? "var(--red)"
+            : score > 45
+              ? "var(--amber)"
+              : "var(--green)";
+        barsEl.innerHTML = `
+    <div class="a2r-bar-row"><div class="a2r-bar-name">Sleep</div><div class="a2r-bar-track"><div class="a2r-bar-fill" style="width:${sleepBarW}%;background:${barColor}"></div></div></div>
+    <div class="a2r-bar-row"><div class="a2r-bar-name">Calendar load</div><div class="a2r-bar-track"><div class="a2r-bar-fill" style="width:${calBarW}%;background:${barColor}"></div></div></div>
+    <div class="a2r-bar-row"><div class="a2r-bar-name">Gut / energy</div><div class="a2r-bar-track"><div class="a2r-bar-fill" style="width:${gutBarW}%;background:${barColor}"></div></div></div>
+  `;
+
+        document
+          .querySelectorAll(".a2-step")
+          .forEach((s) => s.classList.remove("active"));
+        document.getElementById("a2s3").classList.add("active");
+
+        // animate number
+        let n = 0;
+        const step = () => {
+          n = Math.min(n + Math.ceil(score / 30), score);
+          el.textContent = n;
+          if (n < score) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }
+
+      // ── ACT 3: APP ──
+      function goApp() {
+        const score = state.userScore || 74;
+        // Update app with user's score
+        document.getElementById("appSbScore").textContent = score;
+        document.getElementById("appSbFill").style.width = score + "%";
+        document.getElementById("appDashScore").textContent = score;
+        document.getElementById("appBreakdownScore").textContent = score;
+        document.getElementById("weekToday").textContent = score;
+
+        let status, color, delta;
+        if (score < 40) {
+          status = "Low strain";
+          color = "var(--green)";
+          delta = "↓ 3 from yesterday";
+        } else if (score < 65) {
+          status = "Moderate";
+          color = "var(--amber)";
+          delta = "↑ 5 from yesterday";
+        } else if (score < 80) {
+          status = "High strain";
+          color = "var(--red)";
+          delta = "↑ 12 from yesterday";
+        } else {
+          status = "Critical";
+          color = "var(--red)";
+          delta = "↑ 18 from yesterday";
+        }
+
+        document.getElementById("appSbStatus").textContent = "⚠ " + status;
+        document.getElementById("appBreakdownLabel").textContent = status;
+        const scoreEls = [
+          document.getElementById("appDashScore"),
+          document.getElementById("appBreakdownScore"),
+        ];
+        scoreEls.forEach((el) => {
+          if (el) el.style.color = color;
+        });
+        const deltaEl = document.getElementById("appDashDelta");
+        if (deltaEl) {
+          deltaEl.textContent = delta;
+          deltaEl.style.color = color;
+        }
+
+        const initials = "?";
+        document.getElementById("appAvatar").textContent = initials;
+
+        goAct(3);
+        appView("dashboard");
+      }
+
+      // App view switcher
+      function appView(name) {
+        document
+          .querySelectorAll(".app-view")
+          .forEach((v) => v.classList.remove("on"));
+        document.getElementById("av-" + name).classList.add("on");
+        document.querySelectorAll(".sb-item").forEach((el) => {
+          el.classList.toggle("on", el.dataset.av === name);
+        });
+        const titles = {
+          dashboard: "Dashboard",
+          checkin: "Morning Check-in",
+          weekly: "Weekly Digest",
+          signals: "Data Signals",
+        };
+        document.getElementById("appTopTitle").textContent =
+          titles[name] || name;
+        document.getElementById("appScroll").scrollTop = 0;
+        if (name === "checkin") resetCi();
+      }
+
+      // In-app check-in
+      const ciAnswers = {};
+      function resetCi() {
+        document
+          .querySelectorAll(".ci-step")
+          .forEach((s) => s.classList.remove("on"));
+        document.getElementById("cis0").classList.add("on");
+        document
+          .querySelectorAll(".ci-opt")
+          .forEach((o) => o.classList.remove("sel"));
+        ["cin0", "cin1", "cin2"].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.disabled = true;
+        });
+        ["cip0", "cip1", "cip2"].forEach((id, i) => {
+          const el = document.getElementById(id);
+          el.classList.remove("done", "cur");
+          if (i === 0) el.classList.add("cur");
+        });
+      }
+
+      function ciPick(el, step, key, val) {
+        el.closest(".ci-opts")
+          .querySelectorAll(".ci-opt")
+          .forEach((o) => o.classList.remove("sel"));
+        el.classList.add("sel");
+        ciAnswers[key] = val;
+        document.getElementById("cin" + step).disabled = false;
+      }
+
+      function ciNext(to) {
+        document
+          .querySelectorAll(".ci-step")
+          .forEach((s) => s.classList.remove("on"));
+        document.getElementById("cis" + to).classList.add("on");
+        ["cip0", "cip1", "cip2"].forEach((id, i) => {
+          const el = document.getElementById(id);
+          el.classList.remove("done", "cur");
+          if (i < to) el.classList.add("done");
+          else if (i === to) el.classList.add("cur");
+        });
+      }
+      function ciBack(to) {
+        ciNext(to);
+      }
+
+      function ciReveal() {
+        const eAdj = [0, 6, 12, 18][ciAnswers.e || 0];
+        const fAdj = [0, 5, 10, 16][ciAnswers.f || 0];
+        const mAdj = [0, 4, 10, 14][ciAnswers.m || 0];
+        const base = state.userScore || 74;
+        const final = Math.min(
+          99,
+          base + Math.round((eAdj + fAdj + mAdj) * 0.28) - 4,
+        );
+
+        const el = document.getElementById("cirN");
+        const stEl = document.getElementById("cirSt");
+        const descEl = document.getElementById("cirDesc");
+        const actDiv = document.getElementById("cirAction");
+        const actTxt = document.getElementById("cirActionTxt");
+
+        let color, status, desc, action;
+        if (final < 40) {
+          color = "var(--green)";
+          status = "Low strain";
+          desc =
+            "You're running well today. Good window for complex decisions.";
+          action = null;
+        } else if (final < 65) {
+          color = "var(--amber)";
+          status = "Moderate strain";
+          desc = "Some load but manageable. Protect your focus windows.";
+          action = "Aim to leave by 6pm and avoid screens after 10pm tonight.";
+        } else {
+          color = "var(--red)";
+          status = "High strain";
+          desc = "Elevated load. Defer irreversible decisions where you can.";
+          action =
+            "Block tomorrow 9–11am. Sleep target: 30 minutes earlier tonight for 4 nights.";
+        }
+
+        el.style.color = color;
+        stEl.style.color = color;
+        stEl.textContent = status;
+        descEl.textContent = desc;
+        if (action) {
+          actDiv.style.display = "block";
+          actTxt.textContent = action;
+        } else {
+          actDiv.style.display = "none";
+        }
+
+        // Sync to sidebar/dashboard
+        document.getElementById("appSbScore").textContent = final;
+        document.getElementById("appSbFill").style.width = final + "%";
+        document.getElementById("appDashScore").textContent = final;
+        document.getElementById("appBreakdownScore").textContent = final;
+
+        // Animate
+        let n = Math.max(0, final - 40);
+        const step = () => {
+          n = Math.min(n + 2, final);
+          el.textContent = n;
+          if (n < final) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+
+        document
+          .querySelectorAll(".ci-step")
+          .forEach((s) => s.classList.remove("on"));
+        document.getElementById("cis3").classList.add("on");
+      }
+
+      // Modals
+      function openModal(id) {
+        document.getElementById("ov-" + id).classList.add("open");
+      }
+      function closeModal(id) {
+        document.getElementById("ov-" + id).classList.remove("open");
+      }
+
+      // Toast
+      function showToast(msg) {
+        const t = document.getElementById("toast");
+        t.textContent = msg;
+        t.classList.add("show");
+        setTimeout(() => t.classList.remove("show"), 3200);
+      }
+
+      // Keyboard
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape")
+          document
+            .querySelectorAll(".overlay")
+            .forEach((o) => o.classList.remove("open"));
+      });
+    </script>
+  </body>
+</html>
