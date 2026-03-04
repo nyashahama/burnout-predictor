@@ -1,3 +1,5 @@
+"use client";
+
 export default function Hero() {
   return (
     <section className="hero">
@@ -13,10 +15,9 @@ export default function Hero() {
         <em>Now you&apos;ll know when.</em>
       </h1>
       <p className="hero-subtitle">
-        Overload watches your sleep, work, and calendar — and tells you
-        <strong> 14 days in advance </strong>
-        when you&apos;re heading toward a wall. Not a wellness app. A
-        performance early warning system.
+        Overload watches your sleep, work, and calendar — and tells you{" "}
+        <strong>14 days in advance</strong> when you&apos;re heading toward a
+        wall. Not a wellness app. A performance early warning system.
       </p>
       <div className="hero-cta-group">
         <button className="btn-big">Start for free →</button>
