@@ -4,10 +4,46 @@ import { useState } from "react";
 
 export default function FinalCta() {
   const [email, setEmail] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [status, setStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const handleSubmit = () => {
-    if (email.trim()) setSubmitted(true);
+  const handleSubmit = async () => {
+    const trimmed = email.trim();
+    if (!trimmed || status === "loading") return;
+
+    // Basic email format check before hitting the server
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setErrorMsg("That doesn't look like a valid email.");
+      return;
+    }
+
+    setStatus("loading");
+    setErrorMsg("");
+
+    try {
+      const res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmed, source: "final_cta" }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        // Duplicate email — treat as success so user isn't confused
+        if (res.status === 409) {
+          setStatus("success");
+          return;
+        }
+        throw new Error(data.error || "Something went wrong.");
+      }
+
+      setStatus("success");
+    } catch (err: any) {
+      setStatus("error");
+      setErrorMsg(err.message || "Couldn't save your email. Try again.");
+    }
   };
 
   return (
@@ -23,7 +59,7 @@ export default function FinalCta() {
         more than it should.
       </p>
 
-      {submitted ? (
+      {status === "success" ? (
         <div
           style={{
             color: "rgba(245,241,235,0.7)",
@@ -36,19 +72,43 @@ export default function FinalCta() {
           You&apos;re on the list. We&apos;ll be in touch.
         </div>
       ) : (
-        <div className="final-email-row">
-          <input
-            className="final-email-input"
-            type="email"
-            placeholder="your@email.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-          />
-          <button className="final-email-btn" onClick={handleSubmit}>
-            Get started →
-          </button>
-        </div>
+        <>
+          <div className="final-email-row">
+            <input
+              className="final-email-input"
+              type="email"
+              placeholder="your@email.com"
+              value={email}
+              disabled={status === "loading"}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setErrorMsg("");
+              }}
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+            />
+            <button
+              className="final-email-btn"
+              onClick={handleSubmit}
+              disabled={status === "loading"}
+              style={{ opacity: status === "loading" ? 0.6 : 1 }}
+            >
+              {status === "loading" ? "Saving…" : "Get started →"}
+            </button>
+          </div>
+
+          {errorMsg && (
+            <div
+              style={{
+                marginTop: "10px",
+                fontSize: "13px",
+                color: "rgba(200,57,26,0.8)",
+                fontFamily: "var(--font-sans)",
+              }}
+            >
+              {errorMsg}
+            </div>
+          )}
+        </>
       )}
 
       <div className="final-fine">
