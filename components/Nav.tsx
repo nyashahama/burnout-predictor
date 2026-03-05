@@ -20,7 +20,16 @@ export default function Nav() {
           <a href="#pricing">Pricing</a>
         </li>
       </ul>
-      <button className="nav-cta">Get early access</button>
+      <button
+        className="nav-cta"
+        onClick={() =>
+          document
+            .querySelector(".final-cta")
+            ?.scrollIntoView({ behavior: "smooth" })
+        }
+      >
+        Get early access
+      </button>{" "}
     </nav>
   );
 }
