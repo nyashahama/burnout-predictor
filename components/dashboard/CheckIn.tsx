@@ -1,19 +1,75 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const stressLevels = [
-  { value: 1, label: "Very calm", level: "ok" },
-  { value: 2, label: "Relaxed",   level: "ok" },
-  { value: 3, label: "Moderate",  level: "warning" },
-  { value: 4, label: "Stressed",  level: "warning" },
+  { value: 1, label: "Very calm",   level: "ok" },
+  { value: 2, label: "Relaxed",     level: "ok" },
+  { value: 3, label: "Moderate",    level: "warning" },
+  { value: 4, label: "Stressed",    level: "warning" },
   { value: 5, label: "Overwhelmed", level: "danger" },
 ];
+
+const tips: Record<number, { icon: string; text: string }> = {
+  1: { icon: "✅", text: "Your calm state is helping your recovery. Protect tonight's sleep and you'll see your score improve tomorrow." },
+  2: { icon: "✅", text: "A relaxed day is valuable. Keep protecting your focus time and make sure you get a full night's sleep." },
+  3: { icon: "💡", text: "Moderate stress is manageable. One 10-minute screen break now will help more than you expect." },
+  4: { icon: "💡", text: "Step away from your screen for 10 minutes. A brief pause measurably reduces cortisol — and leave your phone at your desk." },
+  5: { icon: "🛑", text: "Close 3 browser tabs right now. Take 5 slow breaths. Then work on one thing only — the most important, not the most urgent." },
+};
+
+function todayKey() {
+  return `checkin-${new Date().toISOString().split("T")[0]}`;
+}
 
 export default function CheckIn() {
   const [stress, setStress] = useState<number | null>(null);
   const [note, setNote] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [submittedStress, setSubmittedStress] = useState<number | null>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(todayKey());
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setSubmittedStress(parsed.stress ?? null);
+      } catch {}
+      setSubmitted(true);
+    }
+  }, []);
+
+  function handleSubmit() {
+    if (!stress) return;
+    localStorage.setItem(
+      todayKey(),
+      JSON.stringify({ stress, note, ts: Date.now() })
+    );
+    setSubmittedStress(stress);
+    setSubmitted(true);
+  }
+
+  if (submitted && submittedStress) {
+    const level = stressLevels.find((s) => s.value === submittedStress);
+    const tip = tips[submittedStress];
+    return (
+      <div className="dash-card checkin checkin--done checkin--feedback">
+        <div className="checkin-feedback-top">
+          <div className="checkin-done-icon">✓</div>
+          <div>
+            <div className="checkin-done-text">Check-in logged</div>
+            <div className="checkin-done-sub">
+              Stress level {submittedStress} — {level?.label} — factored into your score
+            </div>
+          </div>
+        </div>
+        <div className="checkin-tip">
+          <span className="checkin-tip-icon">{tip.icon}</span>
+          <span className="checkin-tip-text">{tip.text}</span>
+        </div>
+      </div>
+    );
+  }
 
   if (submitted) {
     return (
@@ -66,7 +122,7 @@ export default function CheckIn() {
       <button
         className="checkin-submit"
         disabled={!stress}
-        onClick={() => setSubmitted(true)}
+        onClick={handleSubmit}
       >
         Log check-in
       </button>
