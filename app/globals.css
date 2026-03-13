@@ -1396,7 +1396,7 @@ footer {
   overflow: hidden;
   background: #141210;
   /* Fixed height with scroll so demo doesn't push page */
-  height: 680px;
+  height: 720px;
   position: relative;
 }
 
@@ -1504,7 +1504,7 @@ footer {
     padding-right: 24px;
   }
   .demo-frame-wrap {
-    height: 520px;
+    height: 620px;
   }
   .demo-chrome-url {
     display: none;

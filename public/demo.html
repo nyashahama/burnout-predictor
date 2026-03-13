@@ -882,7 +882,9 @@
         background: var(--paper);
         color: var(--ink);
         align-items: center;
-        justify-content: center;
+        justify-content: flex-start;
+        overflow-y: auto;
+        padding: 32px 20px;
         position: relative;
       }
       #act2::before {
@@ -899,6 +901,7 @@
       .a2-card {
         max-width: 520px;
         width: 90%;
+        margin: auto;
         position: relative;
         z-index: 1;
         background: var(--surface);
@@ -2064,10 +2067,60 @@
         transform: translateX(-50%) translateY(0);
       }
 
+      /* ─── MOBILE CHAPTER NAV ─── */
+      .story-mob-nav {
+        display: none;
+        align-items: center;
+        gap: 14px;
+        padding: 10px 20px;
+        background: rgba(255, 255, 255, 0.03);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        flex-shrink: 0;
+      }
+      .smn-dots {
+        display: flex;
+        gap: 5px;
+      }
+      .smn-dot {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 1.5px solid rgba(255, 255, 255, 0.12);
+        background: transparent;
+        cursor: pointer;
+        font-size: 10px;
+        font-family: var(--mono);
+        color: rgba(245, 241, 235, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+      }
+      .smn-dot.active {
+        border-color: var(--red);
+        background: rgba(200, 57, 26, 0.1);
+        color: rgba(200, 57, 26, 0.9);
+      }
+      .smn-dot.done {
+        border-color: rgba(255, 255, 255, 0.25);
+        background: rgba(255, 255, 255, 0.06);
+        color: rgba(245, 241, 235, 0.6);
+      }
+      .smn-label {
+        font-size: 12px;
+        color: rgba(245, 241, 235, 0.45);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
       /* ─── RESPONSIVE ─── */
       @media (max-width: 900px) {
         .story-nav {
           display: none;
+        }
+        .story-mob-nav {
+          display: flex;
         }
         .sidebar {
           display: none;
@@ -2256,6 +2309,18 @@
               </div>
               <div class="stb-day" id="storyProgressLabel">Day 1 of 14</div>
             </div>
+          </div>
+
+          <!-- Mobile chapter nav -->
+          <div class="story-mob-nav" id="storyMobNav">
+            <div class="smn-dots">
+              <button class="smn-dot active" onclick="goChapter(0)">1</button>
+              <button class="smn-dot" onclick="goChapter(1)">2</button>
+              <button class="smn-dot" onclick="goChapter(2)">3</button>
+              <button class="smn-dot" onclick="goChapter(3)">4</button>
+              <button class="smn-dot" onclick="goChapter(4)">5</button>
+            </div>
+            <div class="smn-label" id="smnLabel">Day 1–3 · The sprint begins</div>
           </div>
 
           <!-- CHAPTER 0: Day 1–3 -->
@@ -4180,6 +4245,22 @@
         document.getElementById("storyProgressLabel").textContent = chapDays[n];
         document.getElementById("chap-label").textContent = chapLabels[n];
         currentChapter = n;
+
+        // Sync mobile chapter nav
+        const chapTitles = [
+          "Day 1–3 · The sprint begins",
+          "Day 4–7 · Calendar fills up",
+          "Day 8–11 · Overload fires alerts",
+          "Day 12–14 · The crash",
+          "Reflection · What Overload saw",
+        ];
+        document.querySelectorAll(".smn-dot").forEach((d, i) => {
+          d.classList.remove("active", "done");
+          if (i < n) d.classList.add("done");
+          else if (i === n) d.classList.add("active");
+        });
+        const smnLabel = document.getElementById("smnLabel");
+        if (smnLabel) smnLabel.textContent = chapTitles[n];
 
         // Fire notification on chapter 2
         if (n === 2) {
