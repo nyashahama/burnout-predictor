@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 export default function Nav() {
   return (
     <nav>
@@ -20,16 +22,14 @@ export default function Nav() {
           <a href="#pricing">Pricing</a>
         </li>
       </ul>
-      <button
-        className="nav-cta"
-        onClick={() =>
-          document
-            .querySelector(".final-cta")
-            ?.scrollIntoView({ behavior: "smooth" })
-        }
-      >
-        Get early access
-      </button>{" "}
+      <div className="nav-actions">
+        <Link href="/login" className="nav-signin">
+          Sign in
+        </Link>
+        <Link href="/login" className="nav-cta">
+          Get started free
+        </Link>
+      </div>
     </nav>
   );
 }

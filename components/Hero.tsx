@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 export default function Hero() {
   return (
     <section className="hero">
@@ -20,7 +22,9 @@ export default function Hero() {
         wall. Not a wellness app. A performance early warning system.
       </p>
       <div className="hero-cta-group">
-        <button className="btn-big">Start for free →</button>
+        <Link href="/login" className="btn-big">
+          Start for free →
+        </Link>
         <div className="hero-fine">No credit card. 14-day full access.</div>
       </div>
     </section>
