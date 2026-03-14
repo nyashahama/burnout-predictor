@@ -10,16 +10,78 @@ const stressLevels = [
   { value: 5, label: "Overwhelmed", level: "danger"   },
 ];
 
-const tips: Record<number, { icon: string; text: string }> = {
-  1: { icon: "✅", text: "Your calm state is helping your recovery. Protect tonight's sleep and you'll see your score improve tomorrow." },
-  2: { icon: "✅", text: "A relaxed day is valuable. Keep protecting your focus time and make sure you get a full night's sleep." },
-  3: { icon: "💡", text: "Moderate stress is manageable. One 10-minute screen break now will help more than you expect." },
-  4: { icon: "💡", text: "Step away from your screen for 10 minutes. A brief pause measurably reduces cortisol — leave your phone at your desk." },
-  5: { icon: "🛑", text: "Close 3 browser tabs right now. Take 5 slow breaths. Then work on one thing only — the most important, not the most urgent." },
-};
-
 function todayKey() {
   return `checkin-${new Date().toISOString().split("T")[0]}`;
+}
+
+/** How many consecutive past days (not including today) had stress ≥ 4 */
+function getConsecutiveHighStress(): number {
+  let count = 0;
+  const now = new Date();
+  for (let i = 1; i <= 30; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const raw = localStorage.getItem(`checkin-${d.toISOString().split("T")[0]}`);
+    if (!raw) break;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed.stress >= 4) count++;
+      else break;
+    } catch { break; }
+  }
+  return count;
+}
+
+/** Check-in streak — consecutive days with any check-in, including today */
+function getStreak(): number {
+  let s = 0;
+  const now = new Date();
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    if (localStorage.getItem(`checkin-${d.toISOString().split("T")[0]}`)) s++;
+    else break;
+  }
+  return s;
+}
+
+function getPersonalizedResponse(
+  stress: number,
+  priorHighDays: number,
+  streak: number,
+): string {
+  const totalHighDays = priorHighDays + 1;
+
+  if (stress >= 5) {
+    if (priorHighDays >= 3)
+      return `${totalHighDays} days running at overwhelm. This isn't sustainable — something needs to come off your plate today, not tomorrow. Pick one thing and move it.`;
+    if (priorHighDays === 2)
+      return "Third consecutive high day. Your body is absorbing debt your mind is ignoring. Tonight: laptop closed by 9, no screens after 10. Sleep is the only thing that helps now.";
+    if (priorHighDays === 1)
+      return "Back-to-back overwhelm. Your nervous system tracks consecutive strain even when you don't notice it. Protect tonight's sleep — that's your fastest recovery lever.";
+    return "A hard day. Before you close the laptop, remove one thing from tomorrow's list. Then step away — the work will still be there.";
+  }
+
+  if (stress === 4) {
+    if (priorHighDays >= 2)
+      return `${totalHighDays} elevated days in a row. The pressure is compounding. One thing needs to give this week — a meeting converted to async, a deadline pushed, something.`;
+    if (priorHighDays === 1)
+      return "Two elevated days. Your system is tracking this. A 10-minute walk before dinner and 8 hours of sleep tonight will measurably change tomorrow's score.";
+    return "Elevated today. A walk before dinner will do more than another hour at your desk tonight.";
+  }
+
+  if (stress === 3) {
+    if (priorHighDays >= 1)
+      return "Better than yesterday. Moderate is recoverable. Protect one uninterrupted focus block this afternoon and don't start anything new after 6 PM.";
+    return "Moderate — you're in manageable territory. Protect one 90-minute block and get to bed at a reasonable time.";
+  }
+
+  // stress 1 or 2 — calm/relaxed
+  if (streak >= 5)
+    return `Calm — and a ${streak}-day streak. This is what consistent self-awareness looks like. Keep protecting whatever made today work.`;
+  if (streak >= 2)
+    return `A relaxed day and ${streak} days checked in straight. The habit is forming. Protect tonight's sleep and carry this into tomorrow.`;
+  return "A genuinely calm day. These are rarer than they should be. Notice what made it work — then do that again.";
 }
 
 export default function CheckIn({
@@ -27,18 +89,28 @@ export default function CheckIn({
 }: {
   onCheckin?: (stress: number) => void;
 }) {
-  const [stress, setStress]               = useState<number | null>(null);
-  const [note, setNote]                   = useState("");
-  const [submitted, setSubmitted]         = useState(false);
+  const [stress, setStress]                   = useState<number | null>(null);
+  const [note, setNote]                       = useState("");
+  const [submitted, setSubmitted]             = useState(false);
   const [submittedStress, setSubmittedStress] = useState<number | null>(null);
-  const [updating, setUpdating]           = useState(false);
+  const [updating, setUpdating]               = useState(false);
+  const [response, setResponse]               = useState("");
 
   useEffect(() => {
     const saved = localStorage.getItem(todayKey());
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (typeof parsed.stress === "number") setSubmittedStress(parsed.stress);
+        if (typeof parsed.stress === "number") {
+          setSubmittedStress(parsed.stress);
+          setResponse(
+            getPersonalizedResponse(
+              parsed.stress,
+              getConsecutiveHighStress(),
+              getStreak(),
+            ),
+          );
+        }
       } catch {}
       setSubmitted(true);
     }
@@ -46,61 +118,45 @@ export default function CheckIn({
 
   function handleSubmit() {
     if (!stress) return;
+    const priorHigh = getConsecutiveHighStress();
+    const streak    = getStreak();
+
     localStorage.setItem(todayKey(), JSON.stringify({ stress, note, ts: Date.now() }));
     setSubmittedStress(stress);
+    setResponse(getPersonalizedResponse(stress, priorHigh, streak));
 
-    // Brief "updating score" moment so the user sees the transition
+    // The "beat" — a pause before the response appears
     setUpdating(true);
     setTimeout(() => {
       setSubmitted(true);
       setUpdating(false);
       onCheckin?.(stress);
-    }, 600);
+    }, 900);
   }
 
-  // Submitted confirmation state
+  // Submitted state
   if (submitted && submittedStress) {
     const level = stressLevels.find((s) => s.value === submittedStress);
-    const tip   = tips[submittedStress];
     return (
-      <div className="dash-card checkin checkin--done checkin--feedback">
-        <div className="checkin-feedback-top">
+      <div className="dash-card checkin checkin--done checkin--responded">
+        <div className="checkin-response-header">
           <div className="checkin-done-icon">✓</div>
           <div>
-            <div className="checkin-done-text">Check-in logged</div>
-            <div className="checkin-done-sub">
-              Stress level {submittedStress} — {level?.label} — factored into your score
-            </div>
+            <div className="checkin-done-text">{level?.label} — logged</div>
+            <div className="checkin-done-sub">Factored into your score</div>
           </div>
         </div>
-        <div className="checkin-tip">
-          <span className="checkin-tip-icon">{tip.icon}</span>
-          <span className="checkin-tip-text">{tip.text}</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (submitted) {
-    return (
-      <div className="dash-card checkin checkin--done">
-        <div className="checkin-done-icon">✓</div>
-        <div className="checkin-done-text">Check-in logged for today</div>
+        {response && (
+          <p className="checkin-response-text">{response}</p>
+        )}
       </div>
     );
   }
 
   return (
     <div className="dash-card checkin">
-      <div className="checkin-header">
-        <div className="checkin-title">Daily check-in</div>
-        <div className="checkin-sub">
-          Takes 30 seconds. Updates your score in real time.
-        </div>
-      </div>
-
       <div className="checkin-question">
-        How&apos;s your stress level right now?
+        How are you carrying it today?
       </div>
 
       <div className="checkin-stress">
@@ -120,11 +176,11 @@ export default function CheckIn({
 
       <div className="checkin-note-wrap">
         <label className="checkin-note-label">
-          Anything on your mind? (optional)
+          Anything behind it? <span className="checkin-note-optional">(optional)</span>
         </label>
         <textarea
           className="checkin-textarea"
-          placeholder="e.g. Big presentation tomorrow, didn't sleep well…"
+          placeholder="e.g. Big deadline tomorrow, didn't sleep well…"
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={2}
@@ -136,7 +192,7 @@ export default function CheckIn({
         disabled={!stress || updating}
         onClick={handleSubmit}
       >
-        {updating ? "Updating your score…" : "Log check-in"}
+        {updating ? "Noted…" : "Log check-in"}
       </button>
     </div>
   );
