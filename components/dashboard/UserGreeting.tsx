@@ -186,6 +186,49 @@ function getMonthlyArc(): string | null {
   return `Running a bit hotter than ${lastMonthName}. The trend is worth watching.`;
 }
 
+/**
+ * Checks if the user completed recovery plan items yesterday and today's
+ * score moved in the right direction — closing the feedback loop.
+ */
+function getPlanOutcomeFeedback(todayScore: number): string | null {
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+  const recoveryKey = `recovery-checked-${yesterdayStr}`;
+  const checkedRaw  = localStorage.getItem(recoveryKey);
+  if (!checkedRaw) return null;
+
+  let checkedCount = 0;
+  try {
+    const parsed = JSON.parse(checkedRaw);
+    if (Array.isArray(parsed)) checkedCount = parsed.length;
+    else if (typeof parsed === "number") checkedCount = parsed;
+  } catch { return null; }
+
+  if (checkedCount < 2) return null;
+
+  // Compare to yesterday's score
+  const yKey = `checkin-${yesterdayStr}`;
+  const yRaw = localStorage.getItem(yKey);
+  if (!yRaw) return null;
+
+  try {
+    const parsed = JSON.parse(yRaw);
+    const baseMap: Record<number, number> = { 1: 22, 2: 35, 3: 50, 4: 64, 5: 76 };
+    const yesterdayScore = baseMap[parsed.stress] ?? 50;
+    const delta = todayScore - yesterdayScore;
+
+    if (delta <= -8)
+      return `You worked the plan yesterday. The score moved. That's not a coincidence.`;
+    if (delta <= -4)
+      return `You checked off the plan yesterday. Today's a bit lighter. Keep it.`;
+  } catch {}
+
+  return null;
+}
+
 export default function UserGreeting({ liveScore }: { liveScore?: number }) {
   const [name,    setName]    = useState(mockUser.name);
   const [streak,  setStreak]  = useState<number | null>(null);
@@ -196,7 +239,14 @@ export default function UserGreeting({ liveScore }: { liveScore?: number }) {
     if (stored) setName(stored);
     setStreak(computeStreak());
 
-    // Priority: session context > earned pattern discovery > monthly arc
+    // Priority: plan outcome > session context > earned pattern discovery > monthly arc
+    if (liveScore !== undefined) {
+      const planFeedback = getPlanOutcomeFeedback(liveScore);
+      if (planFeedback) {
+        setInsight(planFeedback);
+        return;
+      }
+    }
     const sessionCtx = liveScore !== undefined ? getSessionContext(liveScore) : null;
     if (sessionCtx) {
       setInsight(sessionCtx);

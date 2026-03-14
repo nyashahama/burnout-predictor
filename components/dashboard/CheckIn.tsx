@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { stressToScore } from "@/app/dashboard/data";
 
 const stressLevels = [
   { value: 1, label: "Very calm",   level: "ok"      },
@@ -199,47 +200,134 @@ function getStreak(): number {
   return s;
 }
 
+/** The note label question that responds to the selected stress level. */
+function getFollowUpQuestion(stress: number | null): string {
+  switch (stress) {
+    case 5: return "How long has it been building?";
+    case 4: return "What's driving it today?";
+    case 3: return "What's making it feel moderate?";
+    case 2: return "What's keeping you steady?";
+    case 1: return "What made today work?";
+    default: return "Anything behind it?";
+  }
+}
+
+/** Textarea placeholder that matches the stress level selected. */
+function getNotePlaceholder(stress: number | null): string {
+  switch (stress) {
+    case 5: return "e.g. Third day of back-to-back pressure, deadline on Friday…";
+    case 4: return "e.g. Two heavy calls + a deadline I'm nervous about…";
+    case 3: return "e.g. A lot in motion but nothing overwhelming yet…";
+    case 2: return "e.g. Lighter calendar, clear head this morning…";
+    case 1: return "e.g. Good sleep, protected morning, nothing urgent…";
+    default: return "e.g. Big deadline tomorrow, didn't sleep well…";
+  }
+}
+
+/**
+ * Searches past check-ins (7–90 days ago) for a similar stress level
+ * and returns what happened the next day — closing the loop on advice.
+ */
+function findPreviousOutcome(
+  stress: number,
+  role: string,
+  sleepBaseline: string,
+): string | null {
+  const now = new Date();
+  for (let i = 7; i <= 90; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const key = `checkin-${d.toISOString().split("T")[0]}`;
+    const raw = localStorage.getItem(key);
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed.stress !== "number") continue;
+      if (Math.abs(parsed.stress - stress) > 1) continue;
+
+      // Check the following day
+      const nextDay = new Date(d);
+      nextDay.setDate(nextDay.getDate() + 1);
+      const nextRaw = localStorage.getItem(`checkin-${nextDay.toISOString().split("T")[0]}`);
+      if (!nextRaw) continue;
+
+      const nextParsed = JSON.parse(nextRaw);
+      const thisScore  = stressToScore(parsed.stress, role, sleepBaseline);
+      const nextScore  = stressToScore(nextParsed.stress ?? 3, role, sleepBaseline);
+      const delta      = thisScore - nextScore;
+
+      const dateLabel = d.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+
+      if (delta >= 12) {
+        return `Last time you were here (${dateLabel}), your score dropped ${delta} points the next day. You know what to do.`;
+      }
+      if (delta <= -12) {
+        return `Last time you were at this level (${dateLabel}), it climbed the next day. Tonight matters.`;
+      }
+    } catch {}
+  }
+  return null;
+}
+
+/** Role-aware sentence appended to the personalized response at elevated stress. */
+function getRoleContext(stress: number, role: string): string {
+  if (stress < 4) return "";
+  if (role === "founder")
+    return " Founders carry ambient pressure that doesn't clock out. The physical basics matter more for you, not less.";
+  if (role === "manager")
+    return " Managing people adds invisible overhead. You can't lead well from an empty tank.";
+  if (role === "engineer" && stress >= 5)
+    return " Deep work and high stress don't mix — your best thinking requires recovery first.";
+  if (role === "pm" && stress >= 4)
+    return " Coordination load adds up in ways that don't show on a calendar. Protect the transitions.";
+  return "";
+}
+
 function getPersonalizedResponse(
   stress: number,
   priorHighDays: number,
   streak: number,
+  role: string = "engineer",
 ): string {
   const totalHighDays = priorHighDays + 1;
+  let base = "";
 
   if (stress >= 5) {
     if (priorHighDays >= 3)
-      return `${totalHighDays} days running at overwhelm. This isn't sustainable — something needs to come off your plate today, not tomorrow. Pick one thing and move it.`;
-    if (priorHighDays === 2)
-      return "Third consecutive high day. Your body is absorbing debt your mind is ignoring. Tonight: laptop closed by 9, no screens after 10. Sleep is the only thing that helps now.";
-    if (priorHighDays === 1)
-      return "Back-to-back overwhelm. Your nervous system tracks consecutive strain even when you don't notice it. Protect tonight's sleep — that's your fastest recovery lever.";
-    return "A hard day. Before you close the laptop, remove one thing from tomorrow's list. Then step away — the work will still be there.";
-  }
-
-  if (stress === 4) {
+      base = `${totalHighDays} days running at overwhelm. This isn't sustainable — something needs to come off your plate today, not tomorrow. Pick one thing and move it.`;
+    else if (priorHighDays === 2)
+      base = "Third consecutive high day. Your body is absorbing debt your mind is ignoring. Tonight: laptop closed by 9, no screens after 10. Sleep is the only thing that helps now.";
+    else if (priorHighDays === 1)
+      base = "Back-to-back overwhelm. Your nervous system tracks consecutive strain even when you don't notice it. Protect tonight's sleep — that's your fastest recovery lever.";
+    else
+      base = "A hard day. Before you close the laptop, remove one thing from tomorrow's list. Then step away — the work will still be there.";
+  } else if (stress === 4) {
     if (priorHighDays >= 2)
-      return `${totalHighDays} elevated days in a row. The pressure is compounding. One thing needs to give this week — a meeting converted to async, a deadline pushed, something.`;
-    if (priorHighDays === 1)
-      return "Two elevated days. Your system is tracking this. A 10-minute walk before dinner and 8 hours of sleep tonight will measurably change tomorrow's score.";
-    return "Elevated today. A walk before dinner will do more than another hour at your desk tonight.";
-  }
-
-  if (stress === 3) {
+      base = `${totalHighDays} elevated days in a row. The pressure is compounding. One thing needs to give this week — a meeting converted to async, a deadline pushed, something.`;
+    else if (priorHighDays === 1)
+      base = "Two elevated days. Your system is tracking this. A 10-minute walk before dinner and 8 hours of sleep tonight will measurably change tomorrow's score.";
+    else
+      base = "Elevated today. A walk before dinner will do more than another hour at your desk tonight.";
+  } else if (stress === 3) {
     if (priorHighDays >= 1)
-      return "Better than yesterday. Moderate is recoverable. Protect one uninterrupted focus block this afternoon and don't start anything new after 6 PM.";
-    return "Moderate — you're in manageable territory. Protect one 90-minute block and get to bed at a reasonable time.";
+      base = "Better than yesterday. Moderate is recoverable. Protect one uninterrupted focus block this afternoon and don't start anything new after 6 PM.";
+    else
+      base = "Moderate — you're in manageable territory. Protect one 90-minute block and get to bed at a reasonable time.";
+  } else {
+    // stress 1 or 2 — calm/relaxed
+    if (streak >= 14)
+      base = `${streak} days straight. That's not a streak — that's a practice. You've given the app enough real data to actually know you. Keep protecting what's working.`;
+    else if (streak >= 7)
+      base = `Seven days in a row — and a calm one. The habit is real now. Your score is more accurate today than it's ever been. Keep going.`;
+    else if (priorHighDays >= 2)
+      base = `Better. After a run of hard days, a calm one matters more than it looks. Your nervous system is starting to recover. Protect tonight — don't let the relief become an excuse to push.`;
+    else if (streak >= 3)
+      base = `A calm day and ${streak} days checked in straight. The habit is forming. Keep protecting what made today easy.`;
+    else
+      base = "A genuinely calm day. Notice what made it work — protect that tonight, and do it again.";
   }
 
-  // stress 1 or 2 — calm/relaxed
-  if (streak >= 14)
-    return `${streak} days straight. That's not a streak — that's a practice. You've given the app enough real data to actually know you. Keep protecting what's working.`;
-  if (streak >= 7)
-    return `Seven days in a row — and a calm one. The habit is real now. Your score is more accurate today than it's ever been. Keep going.`;
-  if (priorHighDays >= 2)
-    return `Better. After a run of hard days, a calm one matters more than it looks. Your nervous system is starting to recover. Protect tonight — don't let the relief become an excuse to push.`;
-  if (streak >= 3)
-    return `A calm day and ${streak} days checked in straight. The habit is forming. Keep protecting what made today easy.`;
-  return "A genuinely calm day. Notice what made it work — protect that tonight, and do it again.";
+  return base + getRoleContext(stress, role);
 }
 
 export default function CheckIn({
@@ -257,8 +345,16 @@ export default function CheckIn({
   const [yesterdayCtx, setYesterdayCtx]       = useState<{ question: string; context: string | null }>({ question: "How are you carrying it today?", context: null });
   const [memoryNote, setMemoryNote]           = useState<{ dateLabel: string; note: string } | null>(null);
   const [echoPattern, setEchoPattern]         = useState<string | null>(null);
+  const [previousOutcome, setPreviousOutcome] = useState<string | null>(null);
+  const [role, setRole]                       = useState("engineer");
+  const [sleepBaseline, setSleepBaseline]     = useState("8");
 
   useEffect(() => {
+    const savedRole  = localStorage.getItem("overload-role")  || "engineer";
+    const savedSleep = localStorage.getItem("overload-sleep") || "8";
+    setRole(savedRole);
+    setSleepBaseline(savedSleep);
+
     setYesterdayCtx(getYesterdayContext());
     setDayHint(getDayPatternHint());
     const saved = localStorage.getItem(todayKey());
@@ -272,8 +368,10 @@ export default function CheckIn({
               parsed.stress,
               getConsecutiveHighStress(),
               getStreak(),
+              savedRole,
             ),
           );
+          setPreviousOutcome(findPreviousOutcome(parsed.stress, savedRole, savedSleep));
         }
       } catch {}
       setSubmitted(true);
@@ -292,7 +390,8 @@ export default function CheckIn({
 
     localStorage.setItem(todayKey(), JSON.stringify({ stress, note, ts: Date.now() }));
     setSubmittedStress(stress);
-    setResponse(getPersonalizedResponse(stress, priorHigh, streak));
+    setResponse(getPersonalizedResponse(stress, priorHigh, streak, role));
+    setPreviousOutcome(findPreviousOutcome(stress, role, sleepBaseline));
 
     // Find echo pattern if user wrote a note
     if (note.trim()) {
@@ -325,6 +424,9 @@ export default function CheckIn({
         )}
         {echoPattern && (
           <p className="checkin-echo">{echoPattern}</p>
+        )}
+        {previousOutcome && (
+          <p className="checkin-previous-outcome">{previousOutcome}</p>
         )}
       </div>
     );
@@ -368,11 +470,12 @@ export default function CheckIn({
 
       <div className="checkin-note-wrap">
         <label className="checkin-note-label">
-          Anything behind it? <span className="checkin-note-optional">(optional)</span>
+          {stress ? getFollowUpQuestion(stress) : "Anything behind it?"}{" "}
+          <span className="checkin-note-optional">(optional)</span>
         </label>
         <textarea
           className="checkin-textarea"
-          placeholder="e.g. Big deadline tomorrow, didn't sleep well…"
+          placeholder={getNotePlaceholder(stress)}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={2}

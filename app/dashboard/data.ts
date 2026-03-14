@@ -834,3 +834,110 @@ export function computePersonalSignature(): SignatureData | null {
     trend,
   };
 }
+
+// ─── Signature narrative ──────────────────────────────────────────────────────
+
+/**
+ * Turns the personal signature data into a fluent prose paragraph —
+ * the same caring voice as the check-in, not a dashboard table.
+ */
+export function buildSignatureNarrative(sig: SignatureData): string {
+  const sentences: string[] = [];
+
+  if (sig.topTrigger && sig.triggerLift >= 0.5) {
+    const triggerMap: Record<string, string> = {
+      deadline:  `Deadlines are what break you — not meetings, not your calendar. When they appear in your notes, your stress climbs every time.`,
+      meeting:   `Heavy meeting days are your main stress driver. It's not the work itself — it's the fragmentation.`,
+      sleep:     `Sleep is the variable that moves your score more than anything else. When you're rested, the same week looks different.`,
+      tired:     `Fatigue compounds everything for you. When you note that you're tired, the days that follow are reliably harder.`,
+      travel:    `Travel disrupts your baseline more than most. Your score is almost always elevated on those weeks.`,
+      overwhelm: `Overwhelm isn't occasional for you — it's a pattern the data has seen enough times to call out.`,
+      pressure:  `Pressure — the ambient kind — is what drives your load more than specific events.`,
+      project:   `Project complexity is your main stressor. The bigger the scope, the higher the score.`,
+    };
+    sentences.push(
+      triggerMap[sig.topTrigger] ??
+        `When "${sig.topTrigger}" appears in your notes, your stress reads ${sig.triggerLift.toFixed(1)} points above your baseline. Consistently.`
+    );
+  }
+
+  if (sig.hardestDay && sig.easiestDay && sig.hardestDay !== sig.easiestDay) {
+    sentences.push(
+      `Your ${sig.hardestDay}s tend to run hot. Your ${sig.easiestDay}s almost always bring you back.`
+    );
+  } else if (sig.hardestDay) {
+    sentences.push(`Your ${sig.hardestDay}s are consistently your hardest day of the week.`);
+  }
+
+  if (sig.recoveryDays !== null) {
+    if (sig.recoveryDays <= 1) {
+      sentences.push(`You recover fast — usually back to calm within a day after a hard stretch.`);
+    } else if (sig.recoveryDays === 2) {
+      sentences.push(`It takes you about two days to fully reset after a hard period.`);
+    } else {
+      sentences.push(
+        `Recovery takes you ${sig.recoveryDays} days on average after a hard stretch — plan for it.`
+      );
+    }
+  }
+
+  if (sig.trend === "improving") {
+    sentences.push(`Your load has been coming down. Whatever you've changed — it's showing up in the data.`);
+  } else if (sig.trend === "worsening") {
+    sentences.push(`The trend is climbing. This is the kind of thing that doesn't reverse on its own.`);
+  }
+
+  if (sentences.length === 0) return "Keep checking in. The app is still learning your pattern.";
+  return sentences.join(" ");
+}
+
+// ─── Contextual notification text ────────────────────────────────────────────
+
+/**
+ * Builds a notification title + body that responds to the user's actual state.
+ * Sounds like the check-in voice, not a calendar reminder.
+ */
+export function buildNotificationText({
+  streak,
+  consecutiveDangerDays,
+  name,
+}: {
+  streak: number;
+  consecutiveDangerDays: number;
+  name?: string;
+}): { title: string; body: string } {
+  if (consecutiveDangerDays >= 3) {
+    return {
+      title: "Check in tonight",
+      body: `${consecutiveDangerDays} days in the danger zone. Tonight's check-in matters more than usual.`,
+    };
+  }
+  if (consecutiveDangerDays >= 1) {
+    return {
+      title: "How's today landing?",
+      body: "Yesterday was hard. See if today feels different — it only takes 30 seconds.",
+    };
+  }
+  if (streak >= 7) {
+    return {
+      title: `${streak}-day streak`,
+      body: "You've checked in every day this week. Don't break it tonight.",
+    };
+  }
+  if (streak >= 3) {
+    return {
+      title: "Keep the streak going",
+      body: `${streak} days in a row. One more tonight.`,
+    };
+  }
+  if (name) {
+    return {
+      title: `How are you carrying it, ${name}?`,
+      body: "Take 30 seconds. The data gets smarter every time you check in.",
+    };
+  }
+  return {
+    title: "How are you carrying it?",
+    body: "Take 30 seconds. The data gets smarter every time you check in.",
+  };
+}

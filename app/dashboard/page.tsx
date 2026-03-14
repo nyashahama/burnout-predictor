@@ -14,7 +14,10 @@ import {
   stressToScore,
   buildScoreExplanation,
   buildTrajectoryInsight,
+  buildNotificationText,
   type HistoryDay,
+  type ForecastDay,
+  type SignalLevel,
 } from "./data";
 import ScoreCard from "@/components/dashboard/ScoreCard";
 import ForecastChart from "@/components/dashboard/ForecastChart";
@@ -27,12 +30,12 @@ import MondayDebrief from "@/components/dashboard/MondayDebrief";
 import ComebackCard from "@/components/dashboard/ComebackCard";
 import MilestoneInsight from "@/components/dashboard/MilestoneInsight";
 
-// Forecast stats derived from static forecast data
-const dangerDaysAhead = Math.max(
-  0,
-  forecast.filter((d) => d.score > 65).length - 1,
-);
-const firstRecoveryDay = forecast.find((d, i) => i > 0 && d.score <= 40);
+// Forecast stats derived from live forecast (updated after check-in)
+function getForecastStats(data: ForecastDay[]) {
+  const dangerDaysAhead = Math.max(0, data.filter((d) => d.score > 65).length - 1);
+  const firstRecoveryDay = data.find((d, i) => i > 0 && d.score <= 40);
+  return { dangerDaysAhead, firstRecoveryDay };
+}
 
 function todayKey() {
   return `checkin-${new Date().toISOString().split("T")[0]}`;
@@ -56,11 +59,6 @@ function getRecentStresses(): number[] {
   return stresses;
 }
 
-/**
- * Builds a 30-day history from real localStorage check-ins.
- * Days without a check-in are marked ghost:true so the chart
- * renders them as placeholder bars instead of Alex's mock data.
- */
 function buildRealHistory(): HistoryDay[] {
   const role  = localStorage.getItem("overload-role")  || "engineer";
   const sleep = localStorage.getItem("overload-sleep") || "8";
@@ -100,21 +98,156 @@ function computeStreak(): number {
   return s;
 }
 
-export default function DashboardPage() {
-  const [role, setRole]                           = useState("engineer");
-  const [sleepBaseline, setSleepBaseline]         = useState("8");
-  const [estimatedScore, setEstimatedScore]       = useState<number | null>(null);
-  const [todayStress, setTodayStress]             = useState<number | null>(null);
-  const [todayNote, setTodayNote]                 = useState<string | undefined>(undefined);
-  const [liveScore, setLiveScore]                 = useState(55);
-  const [ready, setReady]                         = useState(false);
-  const [checkinCount, setCheckinCount]           = useState(0);
-  const [calendarConnected, setCalendarConnected] = useState(false);
-  const [streak, setStreak]                       = useState(0);
-  const [realHistory, setRealHistory]             = useState<HistoryDay[]>([]);
-  const [consecutiveDangerReal, setConsecutiveDangerReal] = useState(0);
+/**
+ * Generates a 7-day forecast anchored to today's real score.
+ * Uses personal day-of-week stress averages when ≥2 samples exist,
+ * otherwise regresses toward the user's equilibrium score with
+ * generic weekend relief.
+ */
+function buildLiveForecast(
+  todayScore: number,
+  role: string,
+  sleepBaseline: string,
+): ForecastDay[] {
+  const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const now = new Date();
+  const equilibrium = stressToScore(3, role, sleepBaseline);
 
-  // Ambient danger mode — paint the whole interface with the score's urgency
+  // Build personal DOW stress averages from all past check-ins
+  const dowStresses: Record<number, number[]> = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k?.startsWith("checkin-")) continue;
+    const dateStr = k.replace("checkin-", "");
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) continue;
+    try {
+      const raw = localStorage.getItem(k);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      if (typeof parsed.stress !== "number") continue;
+      const dow = d.getDay();
+      if (!dowStresses[dow]) dowStresses[dow] = [];
+      dowStresses[dow].push(parsed.stress);
+    } catch {}
+  }
+
+  // Convert DOW stress averages to score targets
+  const dowTargets: Record<number, number> = {};
+  for (const [dow, stresses] of Object.entries(dowStresses)) {
+    if (stresses.length >= 2) {
+      const avg = stresses.reduce((a, b) => a + b, 0) / stresses.length;
+      dowTargets[Number(dow)] = stressToScore(avg, role, sleepBaseline);
+    }
+  }
+
+  // Generic weekend/weekday modifier (when no personal data)
+  const genericMod: Record<number, number> = {
+    0: -15, // Sunday
+    6: -10, // Saturday
+    1:   4, // Monday re-entry
+  };
+
+  const days: ForecastDay[] = [];
+  let projected = todayScore;
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + i);
+    const dow = d.getDay();
+
+    let score: number;
+    if (i === 0) {
+      score = todayScore;
+    } else {
+      const hasPersonalData = dow in dowTargets;
+      const target = hasPersonalData
+        ? dowTargets[dow]
+        : equilibrium + (genericMod[dow] ?? 0);
+      projected = Math.round(projected + (target - projected) * 0.28);
+      projected = Math.max(12, Math.min(88, projected));
+      score = projected;
+    }
+
+    const level: SignalLevel = score > 65 ? "danger" : score > 40 ? "warning" : "ok";
+    const isToday  = i === 0;
+    const dateLabel = isToday
+      ? "Today"
+      : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+    days.push({ day: DAY_SHORT[dow], date: dateLabel, score, level });
+  }
+
+  return days;
+}
+
+/**
+ * Checks if today's score is a personal low record across recent check-ins.
+ * Only fires once per day via localStorage key.
+ */
+function detectPersonalBest(
+  currentScore: number,
+  todayStress: number | null,
+  role: string,
+  sleepBaseline: string,
+  checkinCount: number,
+): string | null {
+  if (!todayStress) return null;
+  if (checkinCount < 7) return null;
+
+  const seenKey = `personal-best-seen-${new Date().toISOString().split("T")[0]}`;
+  if (localStorage.getItem(seenKey)) return null;
+
+  const now = new Date();
+  const pastScores: number[] = [];
+
+  for (let i = 1; i <= 60; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const raw = localStorage.getItem(`checkin-${d.toISOString().split("T")[0]}`);
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed.stress === "number") {
+        pastScores.push(stressToScore(parsed.stress, role, sleepBaseline));
+      }
+    } catch {}
+    if (pastScores.length >= 30) break;
+  }
+
+  if (pastScores.length < 7) return null;
+
+  const allHigher30 = pastScores.length >= 14 && pastScores.slice(0, 30).every((s) => s > currentScore);
+  const allHigher14 = pastScores.length >= 7  && pastScores.slice(0, 14).every((s) => s > currentScore);
+
+  if (allHigher30) {
+    localStorage.setItem(seenKey, "1");
+    return `Your lowest score in ${Math.min(pastScores.length, 30)} check-ins. Whatever you protected — it worked.`;
+  }
+  if (allHigher14 && currentScore <= 40) {
+    localStorage.setItem(seenKey, "1");
+    return `Your best score in two weeks. Something is working — name it and keep it.`;
+  }
+  return null;
+}
+
+export default function DashboardPage() {
+  const [role, setRole]                                   = useState("engineer");
+  const [sleepBaseline, setSleepBaseline]                 = useState("8");
+  const [estimatedScore, setEstimatedScore]               = useState<number | null>(null);
+  const [todayStress, setTodayStress]                     = useState<number | null>(null);
+  const [todayNote, setTodayNote]                         = useState<string | undefined>(undefined);
+  const [liveScore, setLiveScore]                         = useState(55);
+  const [ready, setReady]                                 = useState(false);
+  const [checkinCount, setCheckinCount]                   = useState(0);
+  const [calendarConnected, setCalendarConnected]         = useState(false);
+  const [streak, setStreak]                               = useState(0);
+  const [realHistory, setRealHistory]                     = useState<HistoryDay[]>([]);
+  const [consecutiveDangerReal, setConsecutiveDangerReal] = useState(0);
+  const [liveForecast, setLiveForecast]                   = useState<ForecastDay[]>(forecast);
+  const [personalBest, setPersonalBest]                   = useState<string | null>(null);
+
+  // Ambient danger mode
   useEffect(() => {
     const lvl = liveScore > 65 ? "danger" : liveScore > 40 ? "warning" : "ok";
     document.body.dataset.scoreLevel = lvl;
@@ -124,6 +257,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const savedRole   = localStorage.getItem("overload-role")  || "engineer";
     const savedSleep  = localStorage.getItem("overload-sleep") || "8";
+    const savedName   = localStorage.getItem("overload-name")  || "";
     const rawEstimate = localStorage.getItem("overload-estimated-score");
     const estimate    = rawEstimate ? parseInt(rawEstimate, 10) : null;
     const gcal        = localStorage.getItem("overload-gcal-connected") === "1";
@@ -132,8 +266,10 @@ export default function DashboardPage() {
     for (let i = 0; i < localStorage.length; i++) {
       if (localStorage.key(i)?.startsWith("checkin-")) count++;
     }
+
+    const currentStreak = computeStreak();
     setCheckinCount(count);
-    setStreak(computeStreak());
+    setStreak(currentStreak);
     setRealHistory(buildRealHistory());
     setCalendarConnected(gcal);
     setRole(savedRole);
@@ -154,7 +290,7 @@ export default function DashboardPage() {
     setTodayStress(stress);
     setTodayNote(note);
 
-    // Compute consecutive danger days from real check-ins
+    // Consecutive danger days from real check-ins
     let dangerCount = 0;
     const nowRef = new Date();
     for (let i = 1; i <= 30; i++) {
@@ -179,13 +315,54 @@ export default function DashboardPage() {
       calendarConnected: gcal,
     });
     setLiveScore(score);
+
+    // Live forecast — replaces static mock data
+    setLiveForecast(buildLiveForecast(score, savedRole, savedSleep));
+
+    // Personal best — only meaningful after a real check-in
+    if (stress !== null) {
+      setPersonalBest(detectPersonalBest(score, stress, savedRole, savedSleep, count));
+    }
+
     setReady(true);
+
+    // Contextual notification — fires when past reminder time, not yet checked in, not sent today
+    try {
+      if (
+        "Notification" in window &&
+        Notification.permission === "granted" &&
+        localStorage.getItem("overload-notif-enabled") === "1" &&
+        stress === null // not checked in today
+      ) {
+        const timeStr = localStorage.getItem("overload-notif-time") || "17:30";
+        const [hh, mm] = timeStr.split(":").map(Number);
+        const nowTime = new Date();
+        const isAfterTime =
+          nowTime.getHours() > hh ||
+          (nowTime.getHours() === hh && nowTime.getMinutes() >= mm);
+        const notifKey = `notif-sent-${nowTime.toISOString().split("T")[0]}`;
+
+        if (isAfterTime && !localStorage.getItem(notifKey)) {
+          const { title, body } = buildNotificationText({
+            streak: currentStreak,
+            consecutiveDangerDays: dangerCount,
+            name: savedName || undefined,
+          });
+          new Notification(title, { body, icon: "/favicon.ico" });
+          localStorage.setItem(notifKey, "1");
+        }
+      }
+    } catch {}
   }, []);
 
   const handleCheckin = useCallback(
     (stress: number) => {
       setTodayStress(stress);
-      setStreak(computeStreak());
+      const newStreak = computeStreak();
+      setStreak(newStreak);
+      const newCount = checkinCount + 1;
+      setCheckinCount(newCount);
+
       const newScore = calculateLiveScore({
         todayStress: stress,
         role,
@@ -195,14 +372,16 @@ export default function DashboardPage() {
         calendarConnected,
       });
       setLiveScore(newScore);
+      setLiveForecast(buildLiveForecast(newScore, role, sleepBaseline));
+      setPersonalBest(detectPersonalBest(newScore, stress, role, sleepBaseline, newCount));
     },
-    [role, sleepBaseline, estimatedScore, calendarConnected],
+    [role, sleepBaseline, estimatedScore, calendarConnected, checkinCount],
   );
 
-  const hasCheckedIn     = todayStress !== null;
-  const signals          = getLiveSignals(todayStress, role, sleepBaseline, calendarConnected);
-  const suggestion       = getLiveSuggestion(liveScore, hasCheckedIn);
-  const level            = liveScore > 65 ? "danger" : liveScore > 40 ? "warning" : "ok";
+  const hasCheckedIn      = todayStress !== null;
+  const signals           = getLiveSignals(todayStress, role, sleepBaseline, calendarConnected);
+  const suggestion        = getLiveSuggestion(liveScore, hasCheckedIn);
+  const level             = liveScore > 65 ? "danger" : liveScore > 40 ? "warning" : "ok";
   const recentStressesNow = getRecentStresses();
   const scoreExplanation  = buildScoreExplanation({
     score: liveScore,
@@ -211,6 +390,8 @@ export default function DashboardPage() {
     recentStresses: recentStressesNow,
   });
   const trajectoryInsight = buildTrajectoryInsight(liveScore, recentStressesNow, consecutiveDangerReal);
+
+  const { dangerDaysAhead, firstRecoveryDay } = getForecastStats(liveForecast);
 
   const scoreData = {
     score: liveScore,
@@ -231,11 +412,6 @@ export default function DashboardPage() {
         recoveryDate={firstRecoveryDay?.date ?? "this weekend"}
       />
 
-      {/*
-        dash-hero wraps greeting + grid together.
-        On mobile, CSS gives the grid order:-1 so the score card
-        appears before the text greeting — score dominates immediately.
-      */}
       <div className="dash-hero">
         <UserGreeting liveScore={liveScore} />
         <ComebackCard currentScore={liveScore} />
@@ -251,8 +427,9 @@ export default function DashboardPage() {
             checkinCount={checkinCount}
             explanation={scoreExplanation}
             trajectory={trajectoryInsight ?? undefined}
+            personalBest={personalBest ?? undefined}
           />
-          <ForecastChart data={forecast} />
+          <ForecastChart data={liveForecast} />
           <CheckIn onCheckin={handleCheckin} />
         </div>
       </div>

@@ -242,7 +242,7 @@ export default function WeeklyPage() {
   return (
     <div className="dash-content">
       <header className="dash-header">
-        <h1 className="dash-greeting">Last 7 days</h1>
+        <h1 className="dash-greeting">This week</h1>
         <p className="dash-subheading">
           {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
         </p>
@@ -257,7 +257,7 @@ export default function WeeklyPage() {
       {thisReal.length > 0 && (
         <div className="weekly-stats-row">
           <StatCard
-            label="Avg load"
+            label="Your average"
             value={thisAvg}
             sub={lastReal.length ? (trend !== 0 ? `${trend > 0 ? "+" : ""}${trend} vs last week` : "Same as last week") : undefined}
             accent={trendLevel}
@@ -275,7 +275,7 @@ export default function WeeklyPage() {
             accent={low <= 40 ? "ok" : "warning"}
           />
           <StatCard
-            label="High-strain days"
+            label="Hard days"
             value={highStrainDays}
             sub={`${inZoneDays} day${inZoneDays !== 1 ? "s" : ""} in the green`}
             accent={highStrainDays >= 3 ? "danger" : highStrainDays >= 1 ? "warning" : "ok"}
@@ -358,7 +358,7 @@ export default function WeeklyPage() {
       {/* ── Week-over-week comparison ── */}
       {thisReal.length > 0 && lastReal.length > 0 && (
         <div className="dash-card weekly-compare-card">
-          <div className="weekly-section-title">Week over week</div>
+          <div className="weekly-section-title">How it compares</div>
           <div className="weekly-compare-row">
             <div className="weekly-compare-week">
               <div className="weekly-compare-label">Last week</div>

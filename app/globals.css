@@ -5615,3 +5615,39 @@ body {
 .hist-sig-trend--improving { color: var(--green); }
 .hist-sig-trend--worsening { color: var(--red); }
 .hist-sig-trend--stable    { color: var(--muted); }
+
+/* ─── ScoreCard: personal best ───────────────────────────────────────────── */
+.scorecard-personal-best {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--green) 10%, var(--paper-2));
+  border-left: 3px solid var(--green);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+
+/* ─── CheckIn: previous outcome feedback loop ────────────────────────────── */
+.checkin-previous-outcome {
+  margin: 10px 0 0;
+  padding: 10px 14px;
+  background: var(--paper-2);
+  border-left: 3px solid var(--muted-2);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.55;
+  font-style: italic;
+}
+
+/* ─── History: signature prose ───────────────────────────────────────────── */
+.hist-signature-prose {
+  background: var(--paper-2);
+  border-radius: 12px;
+  padding: 16px 20px;
+  font-size: 14px;
+  color: var(--ink-2);
+  line-height: 1.7;
+  margin: 0;
+}

@@ -7,9 +7,9 @@ import {
   detectPatterns,
   stressToScore,
   computePersonalSignature,
+  buildSignatureNarrative,
   type HistoryDay,
   type CheckInEntry,
-  type SignatureData,
 } from "../data";
 import HistoryChart from "@/components/dashboard/HistoryChart";
 
@@ -86,7 +86,7 @@ function levelClass(score: number) {
 export default function HistoryPage() {
   const [realHistory, setRealHistory]   = useState<HistoryDay[]>([]);
   const [entries,     setEntries]       = useState<CheckInEntry[]>([]);
-  const [signature,   setSignature]     = useState<SignatureData | null>(null);
+  const [signature,   setSignature]     = useState<ReturnType<typeof computePersonalSignature>>(null);
 
   useEffect(() => {
     setRealHistory(buildRealHistory());
@@ -139,48 +139,7 @@ export default function HistoryPage() {
       {signature && (
         <div className="hist-signature">
           <div className="hist-signature-label">Your signature</div>
-          <div className="hist-signature-items">
-            {signature.hardestDay && (
-              <div className="hist-signature-item">
-                <span className="hist-sig-key">Hardest day</span>
-                <span className="hist-sig-val">{signature.hardestDay}s</span>
-              </div>
-            )}
-            {signature.easiestDay && signature.easiestDay !== signature.hardestDay && (
-              <div className="hist-signature-item">
-                <span className="hist-sig-key">Easiest day</span>
-                <span className="hist-sig-val">{signature.easiestDay}s</span>
-              </div>
-            )}
-            {signature.topTrigger && signature.triggerLift >= 0.5 && (
-              <div className="hist-signature-item">
-                <span className="hist-sig-key">Biggest trigger</span>
-                <span className="hist-sig-val">
-                  "{signature.topTrigger}" (+{signature.triggerLift.toFixed(1)} stress)
-                </span>
-              </div>
-            )}
-            {signature.recoveryDays !== null && (
-              <div className="hist-signature-item">
-                <span className="hist-sig-key">Recovery speed</span>
-                <span className="hist-sig-val">
-                  {signature.recoveryDays === 1
-                    ? "1 day after a hard period"
-                    : `${signature.recoveryDays} days after a hard period`}
-                </span>
-              </div>
-            )}
-            <div className="hist-signature-item">
-              <span className="hist-sig-key">Trend</span>
-              <span className={`hist-sig-val hist-sig-trend--${signature.trend}`}>
-                {signature.trend === "improving"
-                  ? "Load coming down"
-                  : signature.trend === "worsening"
-                  ? "Load climbing"
-                  : "Holding steady"}
-              </span>
-            </div>
-          </div>
+          <p className="hist-signature-prose">{buildSignatureNarrative(signature)}</p>
         </div>
       )}
 

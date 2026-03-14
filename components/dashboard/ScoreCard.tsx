@@ -135,6 +135,7 @@ export default function ScoreCard({
   checkinCount,
   explanation,
   trajectory,
+  personalBest,
 }: {
   data: ScoreCardData;
   trend: number;
@@ -144,6 +145,7 @@ export default function ScoreCard({
   checkinCount?: number;
   explanation?: string;
   trajectory?: string;
+  personalBest?: string;
 }) {
   const color      = scoreColor(data.score);
   const trendUp    = trend > 0;
@@ -207,6 +209,11 @@ export default function ScoreCard({
           })()}
         </div>
       </div>
+
+      {/* Personal best — only shows on record days */}
+      {personalBest && (
+        <p className="scorecard-personal-best">{personalBest}</p>
+      )}
 
       {/* Score explanation + trajectory */}
       {explanation && (
