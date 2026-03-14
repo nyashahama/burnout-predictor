@@ -177,10 +177,9 @@ export default function DashboardPage() {
             streak={streak}
           />
           <ForecastChart data={forecast} />
+          <CheckIn onCheckin={handleCheckin} />
         </div>
       </div>
-
-      <CheckIn onCheckin={handleCheckin} />
 
       <RecoveryPlan plan={recoveryPlan} score={liveScore} />
 

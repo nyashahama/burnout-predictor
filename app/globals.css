@@ -1833,6 +1833,12 @@ body {
   margin-bottom: 16px;
 }
 
+/* Check-in spans full width as a second row on desktop */
+.dash-grid .checkin {
+  grid-column: 1 / -1;
+  margin-bottom: 0;
+}
+
 /* Common card */
 .dash-card {
   background: var(--paper);
@@ -3025,6 +3031,11 @@ body {
   .dash-grid {
     grid-template-columns: 1fr;
   }
+
+  /* Mobile order: score → check-in → forecast */
+  .dash-grid .scorecard { order: 1; }
+  .dash-grid .checkin   { order: 2; grid-column: 1; }
+  .dash-grid .forecast  { order: 3; }
 
   /* Hero gauge — much bigger on mobile, score dominates the screen */
   .scorecard-gauge-wrap {
