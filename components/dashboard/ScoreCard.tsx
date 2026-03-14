@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { scoreColor, type Signal } from "@/app/dashboard/data";
+import { scoreColor, getAccuracyLabel, type Signal } from "@/app/dashboard/data";
 
 type ScoreCardData = {
   score: number;
@@ -132,15 +132,18 @@ export default function ScoreCard({
   dangerStreak,
   animate,
   streak,
+  checkinCount,
 }: {
   data: ScoreCardData;
   trend: number;
   dangerStreak: number;
   animate: boolean;
   streak?: number;
+  checkinCount?: number;
 }) {
-  const color   = scoreColor(data.score);
-  const trendUp = trend > 0;
+  const color      = scoreColor(data.score);
+  const trendUp    = trend > 0;
+  const isRecovery = data.level === "ok" && dangerStreak === 0 && trend < -5;
 
   // Human badge labels — what a person would say, not a clinical category
   const badgeLabel = {
@@ -182,11 +185,22 @@ export default function ScoreCard({
               consecutive day in the danger zone
             </div>
           )}
+          {isRecovery && (
+            <div className="scorecard-recovery">
+              Back in the green — the work paid off
+            </div>
+          )}
           {data.isPending && (
             <div className="scorecard-pending">
               Check in below — this number refines when you do
             </div>
           )}
+          {!data.isPending && checkinCount !== undefined && (() => {
+            const label = getAccuracyLabel(checkinCount);
+            return label ? (
+              <div className="scorecard-accuracy">{label}</div>
+            ) : null;
+          })()}
         </div>
       </div>
 

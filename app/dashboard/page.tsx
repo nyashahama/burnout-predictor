@@ -11,6 +11,8 @@ import {
   getLiveSignals,
   getLiveSuggestion,
   scoreLabel,
+  stressToScore,
+  type HistoryDay,
 } from "./data";
 import ScoreCard from "@/components/dashboard/ScoreCard";
 import ForecastChart from "@/components/dashboard/ForecastChart";
@@ -49,6 +51,38 @@ function getRecentStresses(): number[] {
   return stresses;
 }
 
+/**
+ * Builds a 30-day history from real localStorage check-ins.
+ * Days without a check-in are marked ghost:true so the chart
+ * renders them as placeholder bars instead of Alex's mock data.
+ */
+function buildRealHistory(): HistoryDay[] {
+  const role  = localStorage.getItem("overload-role")  || "engineer";
+  const sleep = localStorage.getItem("overload-sleep") || "8";
+  const days: HistoryDay[] = [];
+  const now = new Date();
+
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const key     = `checkin-${d.toISOString().split("T")[0]}`;
+    const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const raw     = localStorage.getItem(key);
+
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        days.push({ date: dateStr, score: stressToScore(parsed.stress, role, sleep) });
+      } catch {
+        days.push({ date: dateStr, score: 0, ghost: true });
+      }
+    } else {
+      days.push({ date: dateStr, score: 0, ghost: true });
+    }
+  }
+  return days;
+}
+
 function computeStreak(): number {
   let s = 0;
   const now = new Date();
@@ -71,6 +105,7 @@ export default function DashboardPage() {
   const [checkinCount, setCheckinCount]           = useState(0);
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [streak, setStreak]                       = useState(0);
+  const [realHistory, setRealHistory]             = useState<HistoryDay[]>([]);
 
   // Ambient danger mode — paint the whole interface with the score's urgency
   useEffect(() => {
@@ -92,6 +127,7 @@ export default function DashboardPage() {
     }
     setCheckinCount(count);
     setStreak(computeStreak());
+    setRealHistory(buildRealHistory());
     setCalendarConnected(gcal);
     setRole(savedRole);
     setSleepBaseline(savedSleep);
@@ -175,6 +211,7 @@ export default function DashboardPage() {
             dangerStreak={consecutiveDangerDays}
             animate={ready}
             streak={streak}
+            checkinCount={checkinCount}
           />
           <ForecastChart data={forecast} />
           <CheckIn onCheckin={handleCheckin} />
@@ -183,7 +220,7 @@ export default function DashboardPage() {
 
       <RecoveryPlan plan={recoveryPlan} score={liveScore} />
 
-      <HistoryChart data={history} checkinCount={checkinCount} />
+      <HistoryChart data={realHistory.length ? realHistory : history} checkinCount={checkinCount} />
     </div>
   );
 }

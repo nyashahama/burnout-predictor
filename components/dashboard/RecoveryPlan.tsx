@@ -54,9 +54,9 @@ export default function RecoveryPlan({
     <div className="dash-card recovery">
       <div className="recovery-header">
         <div>
-          <div className="recovery-title">Your 3-day recovery plan</div>
+          <div className="recovery-title">How to pull back</div>
           <div className="recovery-sub">
-            Complete these to drop your score below 60 by the weekend.
+            Small moves. Real difference by the weekend.
           </div>
         </div>
         <div className="recovery-progress-wrap">
@@ -97,7 +97,7 @@ export default function RecoveryPlan({
 
       {done === total && (
         <div className="recovery-complete">
-          ✓ All done. Your score should improve significantly by tomorrow.
+          ✓ Done. Sleep and space are the most effective tools you have. Check in tomorrow — your score should show it.
         </div>
       )}
     </div>

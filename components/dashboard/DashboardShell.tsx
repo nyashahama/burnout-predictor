@@ -18,8 +18,63 @@ function clearCookie(name: string) {
 
 // ── Notification Manager ──────────────────────────────────────────────────────
 
+/** Counts consecutive past days (not today) with stress ≥ 4 from localStorage. */
+function getConsecutiveDanger(): number {
+  let n = 0;
+  const now = new Date();
+  for (let i = 1; i <= 10; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const raw = localStorage.getItem(`checkin-${d.toISOString().split("T")[0]}`);
+    if (!raw) break;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed.stress >= 4) n++;
+      else break;
+    } catch { break; }
+  }
+  return n;
+}
+
+/** Builds a context-aware notification body based on recent state. */
+function buildNotifBody(): { title: string; body: string } {
+  const now = new Date();
+  const dow = now.getDay();
+  const danger = getConsecutiveDanger();
+
+  if (danger >= 3) {
+    return {
+      title: "Day 4 running high — Overload",
+      body:  `${danger + 1} days in a row. You already know how you feel — 10 seconds to log it.`,
+    };
+  }
+  if (danger >= 1) {
+    return {
+      title: "How are you carrying it today? — Overload",
+      body:  "Yesterday was rough. Check in now — takes 10 seconds.",
+    };
+  }
+  if (dow === 1) {
+    return {
+      title: "New week — Overload",
+      body:  "Log today's read before the week gets away from you.",
+    };
+  }
+  if (dow === 5) {
+    return {
+      title: "Last day of the week — Overload",
+      body:  "Log today and protect the weekend.",
+    };
+  }
+  return {
+    title: "Time to check in — Overload",
+    body:  "How are you carrying it today? Takes 10 seconds.",
+  };
+}
+
 function NotificationManager({ hasCheckedIn }: { hasCheckedIn: boolean }) {
   const [showBanner, setShowBanner] = useState(false);
+  const [bannerText, setBannerText] = useState("How are you carrying it today?");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -36,20 +91,18 @@ function NotificationManager({ hasCheckedIn }: { hasCheckedIn: boolean }) {
     target.setHours(h, m, 0, 0);
 
     const msUntil = target.getTime() - now.getTime();
-    if (msUntil < 0 || msUntil > 24 * 60 * 60 * 1000) return; // not today or already passed
+    if (msUntil < 0 || msUntil > 24 * 60 * 60 * 1000) return;
 
     timerRef.current = setTimeout(() => {
-      if (hasCheckedIn) return; // already checked in — skip
+      if (hasCheckedIn) return;
 
-      // Browser notification
+      const { title, body } = buildNotifBody();
+
       if ("Notification" in window && Notification.permission === "granted") {
-        new Notification("Time to check in — Overload", {
-          body: "How's your stress level today? Log it now to keep your streak.",
-          icon: "/favicon.ico",
-        });
+        new Notification(title, { body, icon: "/favicon.ico" });
       }
 
-      // In-app banner
+      setBannerText(body);
       setShowBanner(true);
     }, msUntil);
 
@@ -63,9 +116,7 @@ function NotificationManager({ hasCheckedIn }: { hasCheckedIn: boolean }) {
   return (
     <div className="notif-banner">
       <span className="notif-banner-icon">🔔</span>
-      <span className="notif-banner-text">
-        Time to check in — how&apos;s your stress level today?
-      </span>
+      <span className="notif-banner-text">{bannerText}</span>
       <Link href="/dashboard" className="notif-banner-action">Check in</Link>
       <button className="notif-banner-close" onClick={() => setShowBanner(false)}>✕</button>
     </div>

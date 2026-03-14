@@ -32,6 +32,39 @@ function getConsecutiveHighStress(): number {
   return count;
 }
 
+/**
+ * Reads past check-ins for the same day of week and returns a short
+ * context line if there's a clear pattern (≥2 data points).
+ */
+function getDayPatternHint(): string | null {
+  const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const now = new Date();
+  const todayDow = now.getDay();
+  const dayName  = DAY_NAMES[todayDow];
+  const stresses: number[] = [];
+
+  for (let week = 1; week <= 6; week++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - week * 7);
+    if (d.getDay() !== todayDow) continue;
+    const raw = localStorage.getItem(`checkin-${d.toISOString().split("T")[0]}`);
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed.stress === "number") stresses.push(parsed.stress);
+    } catch {}
+  }
+
+  if (stresses.length < 2) return null;
+  const avg = stresses.reduce((a, b) => a + b, 0) / stresses.length;
+
+  if (avg >= 4.2) return `Your ${dayName}s have been consistently hard. Take that into account.`;
+  if (avg >= 3.6) return `${dayName}s tend to run heavier for you. Head's up.`;
+  if (avg <= 1.8) return `${dayName}s are usually good to you. Let's see if that holds.`;
+  if (avg <= 2.4) return `${dayName}s tend to be easy. Let's keep it that way.`;
+  return null;
+}
+
 /** Check-in streak — consecutive days with any check-in, including today */
 function getStreak(): number {
   let s = 0;
@@ -77,11 +110,15 @@ function getPersonalizedResponse(
   }
 
   // stress 1 or 2 — calm/relaxed
-  if (streak >= 5)
-    return `Calm — and a ${streak}-day streak. This is what consistent self-awareness looks like. Keep protecting whatever made today work.`;
-  if (streak >= 2)
-    return `A relaxed day and ${streak} days checked in straight. The habit is forming. Protect tonight's sleep and carry this into tomorrow.`;
-  return "A genuinely calm day. These are rarer than they should be. Notice what made it work — then do that again.";
+  if (streak >= 14)
+    return `${streak} days straight. That's not a streak — that's a practice. You've given the app enough real data to actually know you. Keep protecting what's working.`;
+  if (streak >= 7)
+    return `Seven days in a row — and a calm one. The habit is real now. Your score is more accurate today than it's ever been. Keep going.`;
+  if (priorHighDays >= 2)
+    return `Better. After a run of hard days, a calm one matters more than it looks. Your nervous system is starting to recover. Protect tonight — don't let the relief become an excuse to push.`;
+  if (streak >= 3)
+    return `A calm day and ${streak} days checked in straight. The habit is forming. Keep protecting what made today easy.`;
+  return "A genuinely calm day. Notice what made it work — protect that tonight, and do it again.";
 }
 
 export default function CheckIn({
@@ -95,8 +132,10 @@ export default function CheckIn({
   const [submittedStress, setSubmittedStress] = useState<number | null>(null);
   const [updating, setUpdating]               = useState(false);
   const [response, setResponse]               = useState("");
+  const [dayHint, setDayHint]                 = useState<string | null>(null);
 
   useEffect(() => {
+    setDayHint(getDayPatternHint());
     const saved = localStorage.getItem(todayKey());
     if (saved) {
       try {
@@ -158,6 +197,10 @@ export default function CheckIn({
       <div className="checkin-question">
         How are you carrying it today?
       </div>
+
+      {dayHint && (
+        <p className="checkin-day-hint">{dayHint}</p>
+      )}
 
       <div className="checkin-stress">
         {stressLevels.map((s) => (

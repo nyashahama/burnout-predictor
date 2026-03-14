@@ -8,8 +8,6 @@ import {
   detectPatterns,
 } from "@/app/dashboard/data";
 
-const PATTERN_ICONS = ["📈", "🗓", "⚡"];
-
 export default function HistoryChart({
   data,
   checkinCount = 0,
@@ -24,9 +22,13 @@ export default function HistoryChart({
     day: HistoryDay;
   } | null>(null);
 
-  const isEmpty  = checkinCount === 0;
-  const isEarly  = checkinCount > 0 && checkinCount < 7;
-  const patterns = showPatterns && data.length >= 7 ? detectPatterns(data) : [];
+  const realDays = data.filter((d) => !d.ghost);
+  const isEmpty  = realDays.length === 0;
+
+  // Only run pattern detection on real (non-ghost) entries
+  const patterns = showPatterns && realDays.length >= 7 ? detectPatterns(realDays) : [];
+
+  const PATTERN_ICONS = ["📈", "🗓", "⚡"];
 
   return (
     <div className="dash-card history">
@@ -34,14 +36,14 @@ export default function HistoryChart({
         <div className="history-title">30-day history</div>
         <div className="history-sub">
           {isEmpty
-            ? "Your history will build up as you check in each day"
-            : isEarly
-            ? `${checkinCount} of 7 check-ins to unlock your first patterns`
-            : "Your cognitive load over the past month"}
+            ? "Your history will build as you check in each day"
+            : realDays.length < 7
+            ? `${realDays.length} of 7 check-ins to unlock your patterns`
+            : "Your load over the past month — your data, not a demo"}
         </div>
       </div>
 
-      {/* Pattern callouts — shown when there's enough data */}
+      {/* Pattern callouts — shown when there's enough real data */}
       {patterns.length > 0 && (
         <div className="pattern-callouts">
           {patterns.map((p, i) => (
@@ -53,99 +55,76 @@ export default function HistoryChart({
         </div>
       )}
 
-      {/* Empty state */}
       {isEmpty ? (
         <div className="history-empty">
           <div className="history-empty-icon">📊</div>
           <div className="history-empty-title">Your history starts here</div>
           <div className="history-empty-sub">
-            Check in daily to build your 30-day view. Patterns become visible
-            after your first week.
-          </div>
-        </div>
-      ) : isEarly ? (
-        <div className="history-early-wrap">
-          {/* Ghost bars for days not yet tracked + real bars where we have data */}
-          <div className="history-chart">
-            {Array.from({ length: 30 }).map((_, i) => {
-              const realIndex = data.length - 1 - (29 - i);
-              const real = realIndex >= 0 ? data[realIndex] : null;
-              return (
-                <div key={i} className="history-col">
-                  <div className="history-bar-wrap">
-                    <div
-                      className={`history-bar${real ? "" : " history-bar--ghost"}`}
-                      style={
-                        real
-                          ? {
-                              height: `${real.score}%`,
-                              background: scoreColor(real.score),
-                              ["--bar-delay" as string]: `${i * 12}ms`,
-                            } as React.CSSProperties
-                          : { height: `${20 + Math.random() * 30}%` }
-                      }
-                    />
-                  </div>
-                  <div className="history-date history-date--hidden">—</div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="history-early-note">
-            {checkinCount} {checkinCount === 1 ? "day" : "days"} tracked —
-            keep going to reveal your patterns
+            Check in daily and this chart fills with your real data.
+            Patterns surface after your first week.
           </div>
         </div>
       ) : (
-        /* Full chart */
         <div className="history-chart">
-          {data.map((d, i) => (
-            <div
-              key={i}
-              className="history-col"
-              onMouseEnter={() => setTooltip({ index: i, day: d })}
-              onMouseLeave={() => setTooltip(null)}
-            >
-              {tooltip?.index === i && (
-                <div className="history-tooltip">
-                  <div className="history-tooltip-date">{d.date}</div>
-                  <div
-                    className="history-tooltip-score"
-                    style={{ color: scoreColor(d.score) }}
-                  >
-                    {d.score}
-                  </div>
-                  <div className="history-tooltip-label">
-                    {scoreLabel(d.score)}
-                  </div>
-                </div>
-              )}
-              <div className="history-bar-wrap">
-                <div
-                  className={`history-bar${
-                    i === data.length - 1 ? " history-bar--today" : ""
-                  }`}
-                  style={
-                    {
-                      height: `${d.score}%`,
-                      background: scoreColor(d.score),
-                      opacity: i === data.length - 1 ? 1 : 0.65,
-                      ["--bar-delay" as string]: `${i * 12}ms`,
-                    } as React.CSSProperties
-                  }
-                />
-              </div>
+          {data.map((d, i) => {
+            const isToday  = i === data.length - 1;
+            const isGhost  = !!d.ghost;
+            const isHovered = tooltip?.index === i && !isGhost;
+
+            return (
               <div
-                className={`history-date${
-                  i % 7 === 0 || i === data.length - 1
-                    ? ""
-                    : " history-date--hidden"
-                }`}
+                key={i}
+                className="history-col"
+                onMouseEnter={() => !isGhost && setTooltip({ index: i, day: d })}
+                onMouseLeave={() => setTooltip(null)}
               >
-                {d.date}
+                {isHovered && (
+                  <div className="history-tooltip">
+                    <div className="history-tooltip-date">{d.date}</div>
+                    <div
+                      className="history-tooltip-score"
+                      style={{ color: scoreColor(d.score) }}
+                    >
+                      {d.score}
+                    </div>
+                    <div className="history-tooltip-label">
+                      {scoreLabel(d.score)}
+                    </div>
+                  </div>
+                )}
+
+                <div className="history-bar-wrap">
+                  <div
+                    className={`history-bar${
+                      isGhost
+                        ? " history-bar--ghost"
+                        : isToday
+                        ? " history-bar--today"
+                        : ""
+                    }`}
+                    style={
+                      isGhost
+                        ? { height: `${18 + (i % 4) * 8}%` }
+                        : ({
+                            height: `${d.score}%`,
+                            background: scoreColor(d.score),
+                            opacity: isToday ? 1 : 0.65,
+                            ["--bar-delay" as string]: `${i * 12}ms`,
+                          } as React.CSSProperties)
+                    }
+                  />
+                </div>
+
+                <div
+                  className={`history-date${
+                    i % 7 === 0 || isToday ? "" : " history-date--hidden"
+                  }`}
+                >
+                  {isGhost ? "" : d.date}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -163,6 +142,12 @@ export default function HistoryChart({
             <span className="history-legend-dot" style={{ background: "var(--red)" }} />
             <span>High strain (&gt;65)</span>
           </div>
+          {data.some(d => d.ghost) && (
+            <div className="history-legend-item">
+              <span className="history-legend-dot" style={{ background: "var(--paper-3)" }} />
+              <span>No check-in</span>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -58,7 +58,7 @@ export const forecast: ForecastDay[] = [
   { day: "Wed", date: "Mar 19", score: 33, level: "ok" },
 ];
 
-export type HistoryDay = { date: string; score: number };
+export type HistoryDay = { date: string; score: number; ghost?: boolean };
 
 export const history: HistoryDay[] = [
   { date: "Feb 12", score: 58 },
@@ -349,15 +349,13 @@ export function detectPatterns(data: HistoryDay[]): string[] {
   });
 
   if (highDay >= 0) {
-    const delta = highAvg - overallAvg;
     patterns.push(
-      `${DAY_NAMES[highDay]}s hit hardest — avg ${highAvg} (+${delta} vs your mean)`
+      `${DAY_NAMES[highDay]}s tend to run harder than the rest of your week. Whatever that day looks like — it's worth changing something about it.`
     );
   }
   if (lowDay >= 0) {
-    const delta = lowAvg - overallAvg;
     patterns.push(
-      `${DAY_NAMES[lowDay]}s are your recovery anchor — avg ${lowAvg} (${delta} vs your mean)`
+      `${DAY_NAMES[lowDay]}s bring you back reliably. Don't let meetings creep in — they're working.`
     );
   }
 
@@ -371,8 +369,8 @@ export function detectPatterns(data: HistoryDay[]): string[] {
     if (Math.abs(delta) >= 4) {
       patterns.push(
         delta > 0
-          ? `Load climbed ${delta} pts over the past week — this trend needs attention`
-          : `Load eased ${Math.abs(delta)} pts this week — recovery is working`
+          ? `Your load has been climbing for two weeks straight. That trajectory doesn't reverse on its own.`
+          : `Your load dropped this week. Whatever changed — do it again.`
       );
     }
   }
@@ -382,13 +380,46 @@ export function detectPatterns(data: HistoryDay[]): string[] {
     const highStrainCount = data.filter((d) => d.score > 65).length;
     const pct = Math.round((highStrainCount / data.length) * 100);
     if (pct >= 25) {
-      patterns.push(`${pct}% of your days this month were high-strain — above the healthy threshold`);
+      patterns.push(`More than ${pct}% of your days this month hit the danger zone. That pace isn't sustainable.`);
     } else if (pct <= 10 && data.length >= 14) {
-      patterns.push(`Only ${pct}% of days in high strain this month — you're managing load well`);
+      patterns.push(`Only ${pct}% of your days in the danger zone this month. You're managing the load.`);
     }
   }
 
   return patterns.slice(0, 3);
+}
+
+/**
+ * Converts a raw stress rating (1–5) to an estimated cognitive load score,
+ * optionally blending in the user's role and sleep baseline. Used to build
+ * real history from localStorage check-ins.
+ */
+export function stressToScore(
+  stress: number,
+  role: string = "engineer",
+  sleepBaseline: string = "8",
+): number {
+  const base: Record<number, number> = { 1: 22, 2: 35, 3: 50, 4: 64, 5: 76 };
+  const roleMod: Record<string, number> = {
+    founder: 6, manager: 3, pm: 2, engineer: 0, designer: -2, other: 0,
+  };
+  const sleepMod: Record<string, number> = { "6": 10, "7": 5, "8": 0, "9": -4 };
+  let score = base[stress] ?? 50;
+  score += roleMod[role] ?? 0;
+  score += sleepMod[sleepBaseline] ?? 0;
+  return Math.max(8, Math.min(92, Math.round(score)));
+}
+
+/**
+ * Returns a short string surfacing how much the score has been refined by
+ * real check-ins. Returns null when there's not enough data to say anything.
+ */
+export function getAccuracyLabel(count: number): string | null {
+  if (count >= 30) return `${count} check-ins in — as accurate as it gets`;
+  if (count >= 14) return `${count} check-ins in — your most accurate reading yet`;
+  if (count >= 7)  return `Based on ${count} real check-ins`;
+  if (count >= 3)  return `${count} check-ins in — getting smarter`;
+  return null;
 }
 
 /** Returns a personalised suggestion based on the live score + check-in state. */
@@ -406,7 +437,7 @@ export function getLiveSuggestion(score: number, hasCheckedIn: boolean): string 
     return "You're in the moderate zone. Protect your focus blocks and don't let meetings creep into mornings. A 15-minute walk today will measurably lower tomorrow's score.";
   }
   if (score > 40) {
-    return "You're running sustainably. Build the habit here — consistent sleep and protected focus time will keep you in this zone.";
+    return "You're running sustainably. Build the habit here — consistent sleep and protected focus blocks will keep you in this zone.";
   }
-  return "You're in your zone. Your cognitive capacity is at its best today. Do the deep work that matters, and protect tonight's sleep to carry this forward.";
+  return "You're in the green. Cognitive capacity at its best — do the deep work that actually matters today. Protect tonight's sleep and this carries into tomorrow.";
 }

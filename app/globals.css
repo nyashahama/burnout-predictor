@@ -5225,3 +5225,122 @@ body {
     font-size: 36px;
   }
 }
+
+/* ─── GAP FIXES ──────────────────────────────────────────────────────────────── */
+
+/* UserGreeting — day-of-week pattern insight */
+.greeting-insight {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 10px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+}
+
+/* CheckIn — day-of-week context hint above stress buttons */
+.checkin-day-hint {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 14px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  border-left: 2px solid var(--paper-3);
+  padding-left: 10px;
+}
+
+/* ScoreCard — accuracy badge (grows with check-in count) */
+.scorecard-accuracy {
+  font-size: 11px;
+  color: var(--green);
+  background: rgba(42, 122, 74, 0.08);
+  border: 1px solid rgba(42, 122, 74, 0.2);
+  border-radius: 100px;
+  padding: 3px 10px;
+  margin-top: 6px;
+  display: inline-block;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* ScoreCard — recovery callout (back in the green after a rough patch) */
+.scorecard-recovery {
+  font-size: 12px;
+  color: var(--green);
+  font-weight: 500;
+  margin-top: 6px;
+}
+
+/* Weekly narrative card */
+.weekly-narrative-card {
+  padding: 20px 24px;
+  border-radius: 16px;
+  border: 1px solid;
+  margin-bottom: 16px;
+}
+
+.weekly-narrative-card--danger {
+  background: rgba(200, 57, 26, 0.05);
+  border-color: var(--red-mid);
+}
+
+.weekly-narrative-card--warning {
+  background: rgba(196, 125, 26, 0.05);
+  border-color: rgba(196, 125, 26, 0.2);
+}
+
+.weekly-narrative-card--ok {
+  background: rgba(42, 122, 74, 0.05);
+  border-color: rgba(42, 122, 74, 0.18);
+}
+
+.weekly-narrative {
+  font-size: 15px;
+  color: var(--ink);
+  line-height: 1.7;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+/* Weekly peak day callout */
+.weekly-peak-card {
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+
+.weekly-peak-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.weekly-peak-quote {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  color: var(--ink);
+  line-height: 1.6;
+  margin: 0;
+  padding-left: 14px;
+  border-left: 2px solid var(--red-mid);
+  font-style: italic;
+}
+
+.weekly-peak-no-note {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Weekly mini bar — ghost state */
+.weekly-mini-bar--ghost {
+  opacity: 0.25;
+}
+
+/* HistoryChart — legend ghost dot */
+.history-bar--ghost {
+  background: var(--paper-3) !important;
+  opacity: 0.5;
+}
