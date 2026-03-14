@@ -7,23 +7,69 @@ const BAR_H = 120;
 const THRESHOLD = 65;
 const thresholdTopPct = (1 - THRESHOLD / 100) * 100; // 35%
 
+/**
+ * Generates one sentence that reads the week like a forecast, not a data
+ * summary. The goal: tell the user the one thing they need to know about
+ * their week before their first meeting.
+ */
+function buildNarrative(data: ForecastDay[]): string {
+  const today       = data[0];
+  const rest        = data.slice(1);
+  const dangerRest  = rest.filter((d) => d.score > 65);
+  const firstEaseIdx = rest.findIndex((d) => d.score < 65);
+  const firstEase   = firstEaseIdx >= 0 ? rest[firstEaseIdx] : null;
+  const firstRecover = rest.find((d) => d.score <= 40);
+
+  // Today is in the green
+  if (today.score <= 40) {
+    if (dangerRest.length === 0)
+      return "A clean week ahead. Protect the habits that got you here.";
+    return `Clear today, but ${dangerRest[0].day} spikes. Don't add anything before then.`;
+  }
+
+  // Today is moderate
+  if (today.score <= 65) {
+    if (dangerRest.length === 0)
+      return "Manageable load this week. Keep your focus blocks defended.";
+    return `${dangerRest[0].day} is your pressure point this week. Everything else is navigable.`;
+  }
+
+  // Today is in danger (> 65)
+  if (!firstEase) {
+    return "No natural break this week. Something needs to move off your plate — today, not later.";
+  }
+
+  if (firstEaseIdx === 0) {
+    // Tomorrow it breaks
+    return firstRecover
+      ? `Tomorrow it lightens — ${firstRecover.day} is full recovery. Hold through today.`
+      : "One more hard push today, then it opens. Don't add anything tonight.";
+  }
+
+  if (dangerRest.length === 1) {
+    // Today + one more danger day, then break
+    return firstRecover
+      ? `Heavy today and ${dangerRest[0].day}. It breaks ${firstEase.day} — ${firstRecover.day} is full recovery. Protect tonight's sleep.`
+      : `Heavy today and ${dangerRest[0].day}, then it eases ${firstEase.day}. Don't push tonight.`;
+  }
+
+  // Multiple hard days ahead before any break
+  const lastDanger = dangerRest[dangerRest.length - 1];
+  return firstRecover
+    ? `Pressure holds through ${lastDanger.day}. ${firstRecover.day} is your recovery window — protect sleep every night until then.`
+    : `Heavy through ${lastDanger.day}, then it opens. Protect sleep every night until the break.`;
+}
+
 export default function ForecastChart({ data }: { data: ForecastDay[] }) {
   const [hovered, setHovered] = useState<number | null>(null);
 
-  const dangerDays   = data.filter((d) => d.score > 65).length;
-  const firstRecovery = data.find((d) => d.score <= 40);
+  const narrative = buildNarrative(data);
 
   return (
     <div className="dash-card forecast">
       <div className="forecast-header">
         <div className="forecast-title">7-day forecast</div>
-        <div className="forecast-sub">
-          {dangerDays > 0
-            ? `${dangerDays} high-strain ${dangerDays === 1 ? "day" : "days"} ahead — recovery ${
-                firstRecovery ? `from ${firstRecovery.date}` : "needs action"
-              }`
-            : "Load trending down — you're in recovery"}
-        </div>
+        <div className="forecast-narrative">{narrative}</div>
       </div>
 
       <div className="forecast-chart-wrap">
@@ -39,7 +85,6 @@ export default function ForecastChart({ data }: { data: ForecastDay[] }) {
           {data.map((d, i) => {
             const isToday   = i === 0;
             const isHovered = hovered === i;
-            // Pin tooltip left/right for edge bars so it doesn't overflow the card
             const tooltipAlign =
               i === 0 ? "left" : i === data.length - 1 ? "right" : "center";
 
@@ -50,7 +95,6 @@ export default function ForecastChart({ data }: { data: ForecastDay[] }) {
                 onMouseEnter={() => setHovered(i)}
                 onMouseLeave={() => setHovered(null)}
               >
-                {/* Hover tooltip */}
                 {isHovered && (
                   <div
                     className={`forecast-tooltip forecast-tooltip--${tooltipAlign}`}
@@ -71,7 +115,6 @@ export default function ForecastChart({ data }: { data: ForecastDay[] }) {
                   </div>
                 )}
 
-                {/* Score number above bar — hidden while tooltip shows */}
                 <div
                   className="forecast-score"
                   style={{
@@ -83,7 +126,6 @@ export default function ForecastChart({ data }: { data: ForecastDay[] }) {
                   {d.score}
                 </div>
 
-                {/* Bar */}
                 <div className="forecast-bar-wrap" style={{ height: BAR_H }}>
                   <div
                     className="forecast-bar"
