@@ -1141,3 +1141,186 @@ export function findWhatWorksForYou(): string | null {
 
   return `When ${activity}, your next-day score drops an average of ${delta} points. That's not generic advice — that's your data.`;
 }
+
+// ─── Forward-looking memory ───────────────────────────────────────────────────
+
+const FOLLOW_UP_EVENTS: Array<{ regex: RegExp; event: string; question: string }> = [
+  { regex: /\b(deadline|due|deliver|submit|hand.?in)\b/i,        event: "deadline",     question: "The deadline you mentioned — how did it land?" },
+  { regex: /\b(presentation|present|presenting)\b/i,             event: "presentation", question: "The presentation — how did it go?" },
+  { regex: /\b(demo|demoing)\b/i,                                event: "demo",         question: "The demo — how did it turn out?" },
+  { regex: /\b(interview)\b/i,                                   event: "interview",    question: "The interview — how do you feel about it now?" },
+  { regex: /\b(launch|go.?live|shipping)\b/i,                    event: "launch",       question: "The launch — did it go the way you hoped?" },
+  { regex: /\b(travel|trip|flight|flying)\b/i,                   event: "travel",       question: "You were traveling — how did that treat you?" },
+  { regex: /\b(big meeting|important call|performance review)\b/i, event: "meeting",    question: "That meeting you had — how did it go?" },
+];
+
+const DOW_OFFSETS: Record<string, number> = {
+  sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
+  thursday: 4, friday: 5, saturday: 6,
+};
+
+function resolveFollowUpDate(note: string, fromDateStr: string): string | null {
+  const n    = note.toLowerCase();
+  const base = new Date(fromDateStr + "T12:00:00");
+
+  if (/\btomorrow\b/.test(n)) {
+    const d = new Date(base);
+    d.setDate(d.getDate() + 2); // fire day AFTER tomorrow
+    return d.toISOString().split("T")[0];
+  }
+  if (/\bnext week\b/.test(n)) {
+    const d = new Date(base);
+    d.setDate(d.getDate() + 8);
+    return d.toISOString().split("T")[0];
+  }
+  for (const [dayName, targetDow] of Object.entries(DOW_OFFSETS)) {
+    if (new RegExp(`\\b(next\\s+)?${dayName}\\b`, "i").test(n)) {
+      const d   = new Date(base);
+      const cur = d.getDay();
+      let ahead = (targetDow - cur + 7) % 7;
+      if (ahead === 0) ahead = 7;
+      d.setDate(d.getDate() + ahead + 1); // fire day AFTER the event
+      return d.toISOString().split("T")[0];
+    }
+  }
+  return null;
+}
+
+/**
+ * Parses a check-in note for future-tense events and stores a follow-up
+ * that will surface on the day after the mentioned event.
+ */
+export function parseFollowUpSignals(note: string, checkInDateStr: string): void {
+  if (!note || typeof window === "undefined") return;
+  for (const { regex, event, question } of FOLLOW_UP_EVENTS) {
+    if (!regex.test(note)) continue;
+    const followUpDate = resolveFollowUpDate(note, checkInDateStr);
+    if (!followUpDate) continue;
+    const key = `followup-${followUpDate}`;
+    if (localStorage.getItem(key)) continue; // don't overwrite
+    const snippet = note.length > 60 ? note.slice(0, 60) + "…" : note;
+    localStorage.setItem(key, JSON.stringify({ event, question, snippet }));
+    break; // one follow-up per note
+  }
+}
+
+/** Returns today's pending follow-up, if one exists. */
+export function getFollowUpForToday(): { event: string; question: string; snippet: string } | null {
+  if (typeof window === "undefined") return null;
+  const today = new Date().toISOString().split("T")[0];
+  try {
+    const raw = localStorage.getItem(`followup-${today}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+/** Clears today's follow-up after it has been surfaced. */
+export function clearFollowUpForToday(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(`followup-${new Date().toISOString().split("T")[0]}`);
+}
+
+// ─── Personal baseline context ────────────────────────────────────────────────
+
+/**
+ * Returns a one-liner comparing today's score to the user's personal average.
+ * Fires only when ≥21 check-ins exist and the delta is meaningful (≥7 pts).
+ */
+export function buildPersonalBaselineContext(currentScore: number): string | null {
+  if (typeof window === "undefined") return null;
+  const role  = localStorage.getItem("overload-role")  || "engineer";
+  const sleep = localStorage.getItem("overload-sleep") || "8";
+
+  const keys: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k?.startsWith("checkin-")) keys.push(k);
+  }
+  if (keys.length < 21) return null;
+  keys.sort();
+
+  const scores: number[] = [];
+  for (const key of keys.slice(-30)) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const p = JSON.parse(raw);
+      scores.push(stressToScore(p.stress ?? 3, role, sleep));
+    } catch {}
+  }
+  if (scores.length < 14) return null;
+
+  const avg   = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  const delta = currentScore - avg;
+  if (Math.abs(delta) < 7) return null;
+
+  if (delta <= -12) return `Your personal average is ${avg} — today is ${Math.abs(delta)} points lighter than your usual.`;
+  if (delta <   -7) return `Your personal average is ${avg} — today is running below your usual.`;
+  if (delta >=  12) return `Your personal average is ${avg} — today is ${delta} points above your usual.`;
+  return `Your personal average is ${avg} — today is running a bit above your usual.`;
+}
+
+// ─── Recovery milestone ───────────────────────────────────────────────────────
+
+/**
+ * Detects milestone moments in the user's recovery arc — things the streak
+ * counter doesn't catch. Fires each milestone only once.
+ */
+export function detectRecoveryMilestone(): { type: string; message: string } | null {
+  if (typeof window === "undefined") return null;
+  const role  = localStorage.getItem("overload-role")  || "engineer";
+  const sleep = localStorage.getItem("overload-sleep") || "8";
+
+  const keys: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k?.startsWith("checkin-")) keys.push(k);
+  }
+  if (keys.length < 7) return null;
+  keys.sort();
+
+  const entries: Array<{ score: number }> = [];
+  for (const key of keys) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const p = JSON.parse(raw);
+      entries.push({ score: stressToScore(p.stress ?? 3, role, sleep) });
+    } catch {}
+  }
+  if (entries.length < 7) return null;
+
+  // Milestone 1: first 7 consecutive days all below 65
+  const key7 = "recovery-milestone-clean7";
+  if (!localStorage.getItem(key7)) {
+    const last7 = entries.slice(-7);
+    if (last7.every(e => e.score < 65)) {
+      localStorage.setItem(key7, "1");
+      if (last7.every(e => e.score <= 40)) {
+        return { type: "clean7green", message: "Seven straight days fully in the green. That's not a good run — that's a new baseline." };
+      }
+      return { type: "clean7", message: "Seven days without hitting the danger zone. That's the first clean week. Hold this." };
+    }
+  }
+
+  // Milestone 2: best 7-day rolling average ever (only after 14+ entries)
+  if (entries.length >= 14) {
+    const last7Avg   = entries.slice(-7).reduce((a, e) => a + e.score, 0) / 7;
+    const seenBest   = localStorage.getItem("recovery-milestone-best7avg");
+    const seenBestVal = seenBest ? parseFloat(seenBest) : Infinity;
+    let prevBest = Infinity;
+    for (let i = 0; i <= entries.length - 14; i++) {
+      const w = entries.slice(i, i + 7).reduce((a, e) => a + e.score, 0) / 7;
+      if (w < prevBest) prevBest = w;
+    }
+    if (last7Avg < prevBest && last7Avg < seenBestVal) {
+      localStorage.setItem("recovery-milestone-best7avg", String(last7Avg));
+      return {
+        type: "best7avg",
+        message: `Your lightest week in this dataset — ${Math.round(last7Avg)} average. Whatever you protected this week, name it and keep it.`,
+      };
+    }
+  }
+
+  return null;
+}

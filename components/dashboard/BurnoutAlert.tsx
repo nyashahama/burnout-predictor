@@ -12,21 +12,23 @@ function buildAlertBody(
   recoveryDate: string,
 ): string {
   const streakPhrase =
-    dangerStreak <= 1
-      ? "Today is your first day in the red."
-      : `${dangerStreak} consecutive days in the red.`;
+    dangerStreak >= 4
+      ? `${dangerStreak} days running at high load. That's not a rough day — it's a sustained period.`
+      : dangerStreak >= 2
+      ? `${dangerStreak} days in a row above the threshold.`
+      : "You're in the red today.";
 
-  const trendPhrase =
-    trend > 0
-      ? ` Your score climbed ${trend} points this week — the trend is moving in the wrong direction.`
-      : ` Your score sits at ${score}.`;
+  const contextPhrase =
+    trend > 5
+      ? ` The load has been climbing — up ${trend} points this week.`
+      : ` Score is at ${score}.`;
 
   const forecastPhrase =
     dangerDaysAhead > 0
-      ? ` The forecast doesn't ease until ${recoveryDate}. That means you have a window right now to make it shorter.`
-      : ` The forecast clears soon — but only if you act on it today.`;
+      ? ` The forecast doesn't clear until ${recoveryDate}. There's a window right now to shorten that — but only if something changes today.`
+      : ` The forecast starts to ease soon. Tonight matters.`;
 
-  return streakPhrase + trendPhrase + forecastPhrase;
+  return streakPhrase + contextPhrase + forecastPhrase;
 }
 
 export default function BurnoutAlert({
@@ -62,7 +64,7 @@ export default function BurnoutAlert({
       <div className="burnout-alert-top">
         <div className="burnout-alert-icon">⚠</div>
         <div className="burnout-alert-body">
-          <div className="burnout-alert-heading">You need to pull back</div>
+          <div className="burnout-alert-heading">Something&apos;s building.</div>
           <p className="burnout-alert-text">{body}</p>
           <div className="burnout-alert-actions">
             <div className="burnout-alert-action">

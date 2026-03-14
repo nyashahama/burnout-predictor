@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { stressToScore } from "@/app/dashboard/data";
+import {
+  stressToScore,
+  parseFollowUpSignals,
+  getFollowUpForToday,
+  clearFollowUpForToday,
+} from "@/app/dashboard/data";
 
 const stressLevels = [
   { value: 1, label: "Very calm",   level: "ok"      },
@@ -283,12 +288,47 @@ function getRoleContext(stress: number, role: string): string {
   return "";
 }
 
+/** Counts all check-in keys in localStorage — used to detect first-ever submission. */
+function getTotalCheckinCount(): number {
+  let count = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    if (localStorage.key(i)?.startsWith("checkin-")) count++;
+  }
+  return count;
+}
+
 function getPersonalizedResponse(
   stress: number,
   priorHighDays: number,
   streak: number,
   role: string = "engineer",
+  isFirst: boolean = false,
 ): string {
+  // First-ever check-in: use onboarding role to personalize from the very start
+  if (isFirst) {
+    const roleLabel =
+      role === "founder" ? "founder" :
+      role === "manager" ? "manager" :
+      role === "engineer" ? "engineer" :
+      role === "pm" ? "PM" : null;
+
+    if (stress >= 5) {
+      return roleLabel
+        ? `Overwhelm on day one as a ${roleLabel}. That's a real starting point — let's see what's driving it. Come back tomorrow.`
+        : "Overwhelm on your first check-in. That's data. Come back tomorrow and we'll see if it holds.";
+    }
+    if (stress === 4) {
+      const roleCtx =
+        role === "founder" ? "Founders carry ambient pressure that doesn't clock out." :
+        role === "manager" ? "Managers absorb invisible overhead that doesn't show on anyone's calendar." :
+        role === "engineer" ? "Engineers often carry more context-switching burden than shows up in meetings." : "";
+      return `Elevated on day one${roleLabel ? ` as a ${roleLabel}` : ""}. ${roleCtx} Let's track whether this is your baseline or a hard week.`;
+    }
+    if (stress === 3) {
+      return "A moderate start. Good baseline to work from. Come back tomorrow — two data points is where it starts to mean something.";
+    }
+    return "A calm first check-in. Let's see if this is your baseline. Come back tomorrow.";
+  }
   const totalHighDays = priorHighDays + 1;
   let base = "";
 
@@ -350,6 +390,7 @@ export default function CheckIn({
   const [submittedNote, setSubmittedNote]     = useState(false);
   const [role, setRole]                       = useState("engineer");
   const [sleepBaseline, setSleepBaseline]     = useState("8");
+  const [followUp, setFollowUp]               = useState<{ event: string; question: string; snippet: string } | null>(null);
 
   useEffect(() => {
     const savedRole  = localStorage.getItem("overload-role")  || "engineer";
@@ -357,6 +398,7 @@ export default function CheckIn({
     setRole(savedRole);
     setSleepBaseline(savedSleep);
 
+    setFollowUp(getFollowUpForToday());
     setYesterdayCtx(getYesterdayContext());
     setDayHint(getDayPatternHint());
     const saved = localStorage.getItem(todayKey());
@@ -387,14 +429,20 @@ export default function CheckIn({
 
   function handleSubmit() {
     if (!stress) return;
-    const priorHigh = getConsecutiveHighStress();
-    const streak    = getStreak();
+    const priorHigh    = getConsecutiveHighStress();
+    const streak       = getStreak();
+    const isFirst      = getTotalCheckinCount() === 0;
+    const todayDateStr = new Date().toISOString().split("T")[0];
 
     localStorage.setItem(todayKey(), JSON.stringify({ stress, note, ts: Date.now() }));
     setSubmittedStress(stress);
     setSubmittedNote(!!note.trim());
-    setResponse(getPersonalizedResponse(stress, priorHigh, streak, role));
+    setResponse(getPersonalizedResponse(stress, priorHigh, streak, role, isFirst));
     setPreviousOutcome(findPreviousOutcome(stress, role, sleepBaseline));
+
+    // Parse note for future events and clear any surfaced follow-up
+    if (note.trim()) parseFollowUpSignals(note, todayDateStr);
+    if (followUp) clearFollowUpForToday();
 
     // Find echo pattern if user wrote a note
     if (note.trim()) {
@@ -440,15 +488,21 @@ export default function CheckIn({
 
   return (
     <div className="dash-card checkin">
-      {yesterdayCtx.context && (
-        <p className="checkin-yesterday-ref">{yesterdayCtx.context}</p>
+      {followUp ? (
+        <div className="checkin-followup">
+          <div className="checkin-followup-question">{followUp.question}</div>
+          <p className="checkin-followup-ref">You wrote: &ldquo;{followUp.snippet}&rdquo;</p>
+        </div>
+      ) : (
+        <>
+          {yesterdayCtx.context && (
+            <p className="checkin-yesterday-ref">{yesterdayCtx.context}</p>
+          )}
+          <div className="checkin-question">{yesterdayCtx.question}</div>
+        </>
       )}
 
-      <div className="checkin-question">
-        {yesterdayCtx.question}
-      </div>
-
-      {!yesterdayCtx.context && dayHint && (
+      {!followUp && !yesterdayCtx.context && dayHint && (
         <p className="checkin-day-hint">{dayHint}</p>
       )}
 

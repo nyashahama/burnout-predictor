@@ -5825,3 +5825,153 @@ body {
     font-size: 13px;
   }
 }
+
+/* ─── CheckIn: follow-up memory ─────────────────────────────────────────── */
+.checkin-followup {
+  margin-bottom: 12px;
+}
+.checkin-followup-question {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+.checkin-followup-ref {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+/* ─── RecoveryMilestone ──────────────────────────────────────────────────── */
+.recovery-milestone {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: color-mix(in srgb, var(--green) 10%, var(--paper-2));
+  border-left: 3px solid var(--green);
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 0;
+}
+.recovery-milestone-icon {
+  font-size: 14px;
+  color: var(--green);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.recovery-milestone-text {
+  font-size: 14px;
+  color: var(--ink-2);
+  line-height: 1.6;
+  margin: 0;
+  flex: 1;
+}
+.recovery-milestone-dismiss {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--muted-2);
+  padding: 0;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.recovery-milestone-dismiss:hover { color: var(--ink); }
+
+/* ─── PersonalizedInsight ────────────────────────────────────────────────── */
+.personalized-insight {
+  margin-bottom: 0;
+}
+.pi-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.pi-text {
+  font-size: 14px;
+  color: var(--ink);
+  line-height: 1.65;
+  margin: 0;
+  font-weight: 500;
+}
+
+/* ─── ScoreCard: baseline context ────────────────────────────────────────── */
+.scorecard-baseline {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.45;
+}
+
+/* ─── RecoveryPlan: note context header ──────────────────────────────────── */
+.recovery-note-context {
+  font-size: 13px;
+  color: var(--muted);
+  font-style: italic;
+  margin: -4px 0 16px;
+  line-height: 1.5;
+}
+
+/* ─── Settings: learned profile ──────────────────────────────────────────── */
+.settings-learned {
+  border-left: 3px solid var(--muted-2);
+}
+.settings-stale-notice {
+  font-size: 13px;
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 10%, var(--paper-2));
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+.settings-learned-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.settings-learned-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-learned-key {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.settings-learned-val {
+  font-size: 14px;
+  color: var(--ink);
+  font-weight: 500;
+}
+.settings-trend--improving { color: var(--green); }
+.settings-trend--worsening { color: var(--red); }
+.settings-trend--stable    { color: var(--muted); }
+
+/* ─── Settings: role/sleep selectors ────────────────────────────────────── */
+.settings-select {
+  background: var(--paper-3);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  min-width: 160px;
+  transition: border-color 0.15s;
+}
+.settings-select:focus {
+  outline: none;
+  border-color: var(--ink-2);
+}

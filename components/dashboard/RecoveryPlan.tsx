@@ -6,6 +6,20 @@ import {
   buildDynamicRecoveryPlan,
 } from "@/app/dashboard/data";
 
+function getNoteContext(note?: string): string | null {
+  if (!note) return null;
+  const n = note.toLowerCase();
+  if (/deadline|deliver|submit|due|launch/.test(n))
+    return "You mentioned deadlines — these actions are calibrated to that.";
+  if (/meeting|call|sync|standup|presentation|demo/.test(n))
+    return "Heavy meeting load noted — these actions address fragmentation specifically.";
+  if (/sleep|tired|exhausted|insomnia/.test(n))
+    return "Sleep came up in your note — that's the lever these actions focus on.";
+  if (/travel|trip|flight/.test(n))
+    return "Travel disrupts your baseline — these actions account for that.";
+  return null;
+}
+
 const STORAGE_KEY = `recovery-checked-${new Date().toISOString().split("T")[0]}`;
 
 export default function RecoveryPlan({
@@ -86,6 +100,10 @@ export default function RecoveryPlan({
           </div>
         </div>
       </div>
+
+      {getNoteContext(note) && (
+        <p className="recovery-note-context">{getNoteContext(note)}</p>
+      )}
 
       <div className="recovery-sections">
         {effectivePlan.map((section) => (

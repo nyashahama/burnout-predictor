@@ -15,6 +15,7 @@ import {
   buildScoreExplanation,
   buildTrajectoryInsight,
   buildNotificationText,
+  buildPersonalBaselineContext,
   type HistoryDay,
   type ForecastDay,
   type SignalLevel,
@@ -31,6 +32,8 @@ import ComebackCard from "@/components/dashboard/ComebackCard";
 import MilestoneInsight from "@/components/dashboard/MilestoneInsight";
 import EarlyArc from "@/components/dashboard/EarlyArc";
 import GapReturn from "@/components/dashboard/GapReturn";
+import RecoveryMilestone from "@/components/dashboard/RecoveryMilestone";
+import PersonalizedInsight from "@/components/dashboard/PersonalizedInsight";
 
 // Forecast stats derived from live forecast (updated after check-in)
 function getForecastStats(data: ForecastDay[]) {
@@ -248,6 +251,7 @@ export default function DashboardPage() {
   const [consecutiveDangerReal, setConsecutiveDangerReal] = useState(0);
   const [liveForecast, setLiveForecast]                   = useState<ForecastDay[]>(forecast);
   const [personalBest, setPersonalBest]                   = useState<string | null>(null);
+  const [baselineContext, setBaselineContext]              = useState<string | null>(null);
 
   // Ambient danger mode
   useEffect(() => {
@@ -326,6 +330,7 @@ export default function DashboardPage() {
       setPersonalBest(detectPersonalBest(score, stress, savedRole, savedSleep, count));
     }
 
+    setBaselineContext(buildPersonalBaselineContext(score));
     setReady(true);
 
     // Contextual notification — fires when past reminder time, not yet checked in, not sent today
@@ -376,6 +381,7 @@ export default function DashboardPage() {
       setLiveScore(newScore);
       setLiveForecast(buildLiveForecast(newScore, role, sleepBaseline));
       setPersonalBest(detectPersonalBest(newScore, stress, role, sleepBaseline, newCount));
+      setBaselineContext(buildPersonalBaselineContext(newScore));
     },
     [role, sleepBaseline, estimatedScore, calendarConnected, checkinCount],
   );
@@ -419,6 +425,7 @@ export default function DashboardPage() {
         <GapReturn hasCheckedIn={hasCheckedIn} />
         <EarlyArc checkinCount={checkinCount} />
         <ComebackCard currentScore={liveScore} />
+        <RecoveryMilestone />
         <MilestoneInsight checkinCount={checkinCount} />
         <MondayDebrief />
         <div className="dash-grid">
@@ -432,11 +439,14 @@ export default function DashboardPage() {
             explanation={scoreExplanation}
             trajectory={trajectoryInsight ?? undefined}
             personalBest={personalBest ?? undefined}
+            baselineContext={baselineContext ?? undefined}
           />
           <ForecastChart data={liveForecast} />
           <CheckIn onCheckin={handleCheckin} />
         </div>
       </div>
+
+      <PersonalizedInsight />
 
       <RecoveryPlan
         plan={recoveryPlan}

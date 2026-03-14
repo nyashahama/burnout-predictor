@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { mockCheckIns } from "../data";
+import { mockCheckIns, computePersonalSignature } from "../data";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -177,6 +177,8 @@ function GCalModal({ onConnect, onClose }: { onConnect: () => void; onClose: () 
 export default function SettingsPage() {
   const router = useRouter();
   const [name, setName]                     = useState("");
+  const [role, setRole]                     = useState("engineer");
+  const [sleep, setSleep]                   = useState("8");
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderTime, setReminderTime]     = useState("17:30");
   const [weeklySummary, setWeeklySummary]   = useState(true);
@@ -187,16 +189,27 @@ export default function SettingsPage() {
   const [showGcalModal, setShowGcalModal]   = useState(false);
   const [cleared, setCleared]               = useState(false);
   const [exported, setExported]             = useState(false);
+  const [learnedProfile, setLearnedProfile] = useState<{
+    checkinCount: number;
+    hardestDay: string | null;
+    trigger: string | null;
+    trend: string | null;
+    isStale: boolean;
+  } | null>(null);
 
   // Bootstrap from localStorage
   useEffect(() => {
     const storedName    = localStorage.getItem("overload-name") || "there";
+    const storedRole    = localStorage.getItem("overload-role")  || "engineer";
+    const storedSleep   = localStorage.getItem("overload-sleep") || "8";
     const notifEnabled  = localStorage.getItem("overload-notif-enabled") === "1";
     const notifTime     = localStorage.getItem("overload-notif-time") || "17:30";
     const weeklyEnabled = localStorage.getItem("overload-weekly-summary") !== "0";
     const gcal          = localStorage.getItem("overload-gcal-connected") === "1";
 
     setName(storedName);
+    setRole(storedRole);
+    setSleep(storedSleep);
     setReminderEnabled(notifEnabled);
     setReminderTime(notifTime);
     setWeeklySummary(weeklyEnabled);
@@ -205,12 +218,34 @@ export default function SettingsPage() {
     if ("Notification" in window) {
       setNotifPermission(Notification.permission);
     }
+
+    // Compute learned profile
+    let checkinCount = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      if (localStorage.key(i)?.startsWith("checkin-")) checkinCount++;
+    }
+    const sig = checkinCount >= 7 ? computePersonalSignature() : null;
+    const lastUpdated = localStorage.getItem("overload-profile-updated");
+    const isStale = !lastUpdated || (() => {
+      const daysSince = Math.floor((Date.now() - new Date(lastUpdated).getTime()) / 86_400_000);
+      return daysSince > 90;
+    })();
+    setLearnedProfile({
+      checkinCount,
+      hardestDay: sig?.hardestDay ?? null,
+      trigger: sig?.topTrigger ?? null,
+      trend: sig?.trend ?? null,
+      isStale: checkinCount >= 7 && isStale,
+    });
   }, []);
 
   // ── Save ──────────────────────────────────────────────────────────────────
 
   async function handleSave() {
     localStorage.setItem("overload-name", name.trim() || "there");
+    localStorage.setItem("overload-role", role);
+    localStorage.setItem("overload-sleep", sleep);
+    localStorage.setItem("overload-profile-updated", new Date().toISOString().split("T")[0]);
     localStorage.setItem("overload-weekly-summary", weeklySummary ? "1" : "0");
 
     if (reminderEnabled) {
@@ -326,6 +361,45 @@ export default function SettingsPage() {
 
       <div className="settings-sections">
 
+        {/* ── What the app knows ── */}
+        {learnedProfile && learnedProfile.checkinCount >= 7 && (
+          <div className="dash-card settings-section settings-learned">
+            <div className="settings-section-title">What the app has learned</div>
+            {learnedProfile.isStale && (
+              <div className="settings-stale-notice">
+                Your profile was set at onboarding. Does it still reflect you? Update below and save.
+              </div>
+            )}
+            <div className="settings-learned-grid">
+              <div className="settings-learned-item">
+                <span className="settings-learned-key">Check-ins</span>
+                <span className="settings-learned-val">{learnedProfile.checkinCount} total</span>
+              </div>
+              {learnedProfile.hardestDay && (
+                <div className="settings-learned-item">
+                  <span className="settings-learned-key">Hardest day</span>
+                  <span className="settings-learned-val">{learnedProfile.hardestDay}s</span>
+                </div>
+              )}
+              {learnedProfile.trigger && (
+                <div className="settings-learned-item">
+                  <span className="settings-learned-key">Main trigger</span>
+                  <span className="settings-learned-val">{learnedProfile.trigger.charAt(0).toUpperCase() + learnedProfile.trigger.slice(1)}</span>
+                </div>
+              )}
+              {learnedProfile.trend && (
+                <div className="settings-learned-item">
+                  <span className="settings-learned-key">Trend</span>
+                  <span className={`settings-learned-val settings-trend--${learnedProfile.trend}`}>
+                    {learnedProfile.trend === "improving" ? "Load coming down" :
+                     learnedProfile.trend === "worsening" ? "Load climbing" : "Holding steady"}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── Profile ── */}
         <div className="dash-card settings-section">
           <div className="settings-section-title">Who you are</div>
@@ -351,6 +425,42 @@ export default function SettingsPage() {
               placeholder="Your name"
               maxLength={40}
             />
+          </div>
+
+          <div className="settings-row">
+            <div className="settings-row-info">
+              <div className="settings-row-label">Your role</div>
+              <div className="settings-row-sub">Affects how the score is calibrated</div>
+            </div>
+            <select
+              className="settings-select"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+            >
+              <option value="engineer">Engineer</option>
+              <option value="manager">Manager</option>
+              <option value="founder">Founder</option>
+              <option value="pm">Product Manager</option>
+              <option value="designer">Designer</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <div className="settings-row">
+            <div className="settings-row-info">
+              <div className="settings-row-label">Sleep baseline</div>
+              <div className="settings-row-sub">How much sleep you usually get</div>
+            </div>
+            <select
+              className="settings-select"
+              value={sleep}
+              onChange={(e) => setSleep(e.target.value)}
+            >
+              <option value="6">6 hours or less</option>
+              <option value="7">About 7 hours</option>
+              <option value="8">About 8 hours</option>
+              <option value="9">9 hours or more</option>
+            </select>
           </div>
         </div>
 

@@ -136,6 +136,7 @@ export default function ScoreCard({
   explanation,
   trajectory,
   personalBest,
+  baselineContext,
 }: {
   data: ScoreCardData;
   trend: number;
@@ -146,6 +147,7 @@ export default function ScoreCard({
   explanation?: string;
   trajectory?: string;
   personalBest?: string;
+  baselineContext?: string;
 }) {
   const color      = scoreColor(data.score);
   const trendUp    = trend > 0;
@@ -212,6 +214,9 @@ export default function ScoreCard({
               <div className="scorecard-accuracy">{label}</div>
             ) : null;
           })()}
+          {baselineContext && (
+            <div className="scorecard-baseline">{baselineContext}</div>
+          )}
         </div>
       </div>
 
