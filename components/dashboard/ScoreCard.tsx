@@ -142,14 +142,21 @@ export default function ScoreCard({
   const color   = scoreColor(data.score);
   const trendUp = trend > 0;
 
+  // Human badge labels — what a person would say, not a clinical category
+  const badgeLabel = {
+    danger:  "Running hot",
+    warning: "Watch this",
+    ok:      "In your zone",
+  }[data.level];
+
   return (
     <div className="dash-card scorecard">
       {/* Header */}
       <div className="scorecard-header">
-        <div className="scorecard-label">Cognitive load score</div>
+        <div className="scorecard-label">How you&apos;re carrying it</div>
         <div className={`scorecard-badge scorecard-badge--${data.level}`}>
           {data.level === "danger" ? "⚠ " : data.level === "warning" ? "◑ " : "✓ "}
-          {data.statusLabel}
+          {badgeLabel}
         </div>
       </div>
 
@@ -177,7 +184,7 @@ export default function ScoreCard({
           )}
           {data.isPending && (
             <div className="scorecard-pending">
-              Check in below to update your score
+              Check in below — this number refines when you do
             </div>
           )}
         </div>
@@ -200,7 +207,7 @@ export default function ScoreCard({
       {/* Suggestion */}
       <div className={`scorecard-suggestion scorecard-suggestion--${data.level}`}>
         <div className={`suggestion-label suggestion-label--${data.level}`}>
-          Today&apos;s recommendation
+          {data.isPending ? "Your situation right now" : "One thing to do today"}
         </div>
         <p className="suggestion-text">{data.suggestion}</p>
       </div>
