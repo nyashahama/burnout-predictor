@@ -169,6 +169,11 @@ export default function ScoreCard({
         </div>
       </div>
 
+      {/* Score explanation — language leads the number */}
+      {explanation && (
+        <p className="scorecard-explanation scorecard-explanation--lead">{explanation}</p>
+      )}
+
       {/* Large centered gauge */}
       <div className="scorecard-gauge-row">
         <ScoreGauge score={data.score} color={color} animate={animate} />
@@ -215,10 +220,7 @@ export default function ScoreCard({
         <p className="scorecard-personal-best">{personalBest}</p>
       )}
 
-      {/* Score explanation + trajectory */}
-      {explanation && (
-        <p className="scorecard-explanation">{explanation}</p>
-      )}
+      {/* Trajectory */}
       {trajectory && (
         <p className="scorecard-trajectory">{trajectory}</p>
       )}
@@ -240,7 +242,7 @@ export default function ScoreCard({
       {/* Suggestion */}
       <div className={`scorecard-suggestion scorecard-suggestion--${data.level}`}>
         <div className={`suggestion-label suggestion-label--${data.level}`}>
-          {data.isPending ? "Your situation right now" : "One thing to do today"}
+          {dangerStreak >= 4 ? "Where you are right now" : data.isPending ? "Your situation right now" : "One thing to do today"}
         </div>
         <p className="suggestion-text">{data.suggestion}</p>
       </div>

@@ -114,7 +114,7 @@ function findEchoPattern(note: string, stress: number): string | null {
   }
 
   if (!bestMatch) return null;
-  return `This looks like ${bestMatch.dateLabel} — you noted: "${bestMatch.snippet}"`;
+  return `The app remembered something — ${bestMatch.dateLabel}: "${bestMatch.snippet}"`;
 }
 
 /**
@@ -294,7 +294,8 @@ function getPersonalizedResponse(
 
   if (stress >= 5) {
     if (priorHighDays >= 3)
-      base = `${totalHighDays} days running at overwhelm. This isn't sustainable — something needs to come off your plate today, not tomorrow. Pick one thing and move it.`;
+      // Witness — no directive for 4th+ consecutive overwhelm day
+      base = `${totalHighDays} days in. That's not a rough patch — that's sustained. I see it.`;
     else if (priorHighDays === 2)
       base = "Third consecutive high day. Your body is absorbing debt your mind is ignoring. Tonight: laptop closed by 9, no screens after 10. Sleep is the only thing that helps now.";
     else if (priorHighDays === 1)
@@ -346,6 +347,7 @@ export default function CheckIn({
   const [memoryNote, setMemoryNote]           = useState<{ dateLabel: string; note: string } | null>(null);
   const [echoPattern, setEchoPattern]         = useState<string | null>(null);
   const [previousOutcome, setPreviousOutcome] = useState<string | null>(null);
+  const [submittedNote, setSubmittedNote]     = useState(false);
   const [role, setRole]                       = useState("engineer");
   const [sleepBaseline, setSleepBaseline]     = useState("8");
 
@@ -390,6 +392,7 @@ export default function CheckIn({
 
     localStorage.setItem(todayKey(), JSON.stringify({ stress, note, ts: Date.now() }));
     setSubmittedStress(stress);
+    setSubmittedNote(!!note.trim());
     setResponse(getPersonalizedResponse(stress, priorHigh, streak, role));
     setPreviousOutcome(findPreviousOutcome(stress, role, sleepBaseline));
 
@@ -427,6 +430,9 @@ export default function CheckIn({
         )}
         {previousOutcome && (
           <p className="checkin-previous-outcome">{previousOutcome}</p>
+        )}
+        {submittedNote && (
+          <div className="checkin-note-logged">Note captured — the app read it.</div>
         )}
       </div>
     );
@@ -470,8 +476,7 @@ export default function CheckIn({
 
       <div className="checkin-note-wrap">
         <label className="checkin-note-label">
-          {stress ? getFollowUpQuestion(stress) : "Anything behind it?"}{" "}
-          <span className="checkin-note-optional">(optional)</span>
+          {stress ? getFollowUpQuestion(stress) : "Anything behind it?"}
         </label>
         <textarea
           className="checkin-textarea"
@@ -480,6 +485,7 @@ export default function CheckIn({
           onChange={(e) => setNote(e.target.value)}
           rows={2}
         />
+        <p className="checkin-note-hint">The more specific, the smarter the app gets.</p>
       </div>
 
       <button

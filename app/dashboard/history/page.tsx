@@ -8,6 +8,7 @@ import {
   stressToScore,
   computePersonalSignature,
   buildSignatureNarrative,
+  buildLongArcNarrative,
   type HistoryDay,
   type CheckInEntry,
 } from "../data";
@@ -87,11 +88,13 @@ export default function HistoryPage() {
   const [realHistory, setRealHistory]   = useState<HistoryDay[]>([]);
   const [entries,     setEntries]       = useState<CheckInEntry[]>([]);
   const [signature,   setSignature]     = useState<ReturnType<typeof computePersonalSignature>>(null);
+  const [arcStory,    setArcStory]      = useState<string | null>(null);
 
   useEffect(() => {
     setRealHistory(buildRealHistory());
     setEntries(buildRealEntries());
     setSignature(computePersonalSignature());
+    setArcStory(buildLongArcNarrative());
   }, []);
 
   const realDays       = realHistory.filter((d) => !d.ghost);
@@ -119,6 +122,13 @@ export default function HistoryPage() {
             : `${checkinCount} check-in${checkinCount !== 1 ? "s" : ""} — this is what the data has learned`}
         </p>
       </header>
+
+      {/* Long arc story — narrates the past 2+ months when enough data exists */}
+      {arcStory && (
+        <div className="hist-arc-story">
+          <p className="hist-arc-text">{arcStory}</p>
+        </div>
+      )}
 
       {/* Pattern callouts — only shown when there's enough real data */}
       {patterns.length > 0 && (

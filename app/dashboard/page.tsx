@@ -29,6 +29,8 @@ import RecoveryPlan from "@/components/dashboard/RecoveryPlan";
 import MondayDebrief from "@/components/dashboard/MondayDebrief";
 import ComebackCard from "@/components/dashboard/ComebackCard";
 import MilestoneInsight from "@/components/dashboard/MilestoneInsight";
+import EarlyArc from "@/components/dashboard/EarlyArc";
+import GapReturn from "@/components/dashboard/GapReturn";
 
 // Forecast stats derived from live forecast (updated after check-in)
 function getForecastStats(data: ForecastDay[]) {
@@ -380,7 +382,7 @@ export default function DashboardPage() {
 
   const hasCheckedIn      = todayStress !== null;
   const signals           = getLiveSignals(todayStress, role, sleepBaseline, calendarConnected);
-  const suggestion        = getLiveSuggestion(liveScore, hasCheckedIn);
+  const suggestion        = getLiveSuggestion(liveScore, hasCheckedIn, consecutiveDangerReal);
   const level             = liveScore > 65 ? "danger" : liveScore > 40 ? "warning" : "ok";
   const recentStressesNow = getRecentStresses();
   const scoreExplanation  = buildScoreExplanation({
@@ -414,6 +416,8 @@ export default function DashboardPage() {
 
       <div className="dash-hero">
         <UserGreeting liveScore={liveScore} />
+        <GapReturn hasCheckedIn={hasCheckedIn} />
+        <EarlyArc checkinCount={checkinCount} />
         <ComebackCard currentScore={liveScore} />
         <MilestoneInsight checkinCount={checkinCount} />
         <MondayDebrief />

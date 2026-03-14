@@ -5651,3 +5651,177 @@ body {
   line-height: 1.7;
   margin: 0;
 }
+
+/* ─── EarlyArc ───────────────────────────────────────────────────────────── */
+.early-arc {
+  background: var(--paper-2);
+  border-radius: 16px;
+  padding: 20px 24px;
+  margin-bottom: 0;
+}
+.early-arc-headline {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.early-arc-body {
+  font-size: 14px;
+  color: var(--ink-2);
+  line-height: 1.6;
+  margin: 0 0 10px;
+}
+.early-arc-note-hint {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 0 0 14px;
+  font-style: italic;
+}
+.early-arc-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+}
+.early-arc-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--paper-3);
+  transition: background 0.3s ease;
+}
+.early-arc-dot--filled {
+  background: var(--amber);
+}
+.early-arc-progress-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
+/* ─── GapReturn ──────────────────────────────────────────────────────────── */
+.gap-return {
+  background: var(--paper-2);
+  border-left: 3px solid var(--muted-2);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 0;
+}
+.gap-return-text {
+  font-size: 14px;
+  color: var(--ink-2);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ─── CheckIn: note hint + note logged ──────────────────────────────────── */
+.checkin-note-hint {
+  font-size: 12px;
+  color: var(--muted-2);
+  margin: 4px 0 0;
+  line-height: 1.4;
+}
+.checkin-note-logged {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ─── ScoreCard: explanation as lead ────────────────────────────────────── */
+.scorecard-explanation--lead {
+  margin-top: 4px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+
+/* ─── History: long arc story ────────────────────────────────────────────── */
+.hist-arc-story {
+  background: var(--paper-2);
+  border-radius: 14px;
+  padding: 18px 22px;
+  margin-bottom: 24px;
+}
+.hist-arc-text {
+  font-size: 15px;
+  color: var(--ink);
+  line-height: 1.7;
+  margin: 0;
+  font-family: var(--font-serif);
+}
+
+/* ─── Mobile ─────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Check-in card first on mobile */
+  .dash-grid {
+    display: flex;
+    flex-direction: column;
+  }
+  .dash-grid .checkin {
+    order: -1;
+  }
+  .dash-grid .scorecard {
+    order: 0;
+  }
+  .dash-grid .forecast-card {
+    order: 1;
+  }
+
+  /* Larger stress button touch targets */
+  .checkin-stress {
+    gap: 6px;
+  }
+  .checkin-stress-btn {
+    min-height: 56px;
+    padding: 10px 6px;
+  }
+
+  /* Smaller gauge on mobile */
+  .scorecard-gauge-wrap {
+    width: 130px;
+    height: 130px;
+  }
+  .scorecard-gauge-svg {
+    width: 130px;
+    height: 130px;
+  }
+  .scorecard-number {
+    font-size: 32px;
+  }
+
+  /* Score explanation stacks nicely */
+  .scorecard-explanation--lead {
+    font-size: 13px;
+  }
+
+  /* History log: stack on mobile */
+  .hist-log-row {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 12px 0;
+  }
+  .hist-log-date   { min-width: 70px; }
+  .hist-log-stress { flex-basis: 100%; }
+  .hist-log-note,
+  .hist-log-no-note { flex-basis: 100%; font-size: 12px; }
+
+  /* EarlyArc + GapReturn full-width on mobile */
+  .early-arc,
+  .gap-return {
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+
+  /* Weekly mini bars: taller on mobile */
+  .weekly-mini-bar-wrap {
+    height: 80px;
+  }
+
+  /* Signature prose readable on mobile */
+  .hist-signature-prose {
+    font-size: 13px;
+  }
+}

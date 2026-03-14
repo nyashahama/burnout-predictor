@@ -546,9 +546,13 @@ export function buildDynamicRecoveryPlan({
 }
 
 /** Returns a personalised suggestion based on the live score + check-in state. */
-export function getLiveSuggestion(score: number, hasCheckedIn: boolean): string {
+export function getLiveSuggestion(score: number, hasCheckedIn: boolean, dangerStreak: number = 0): string {
   if (!hasCheckedIn) {
     return "Complete your daily check-in below to get a personalised recommendation based on how you're actually feeling today.";
+  }
+  // Witness-only path — no directive, just acknowledgment
+  if (dangerStreak >= 4) {
+    return `${dangerStreak} consecutive days in the red. That's not a rough patch. That's sustained. I see it.`;
   }
   if (score > 75) {
     return "You're in critical load territory. Hard-stop work by 8 PM tonight — no exceptions. Skip optional evening commitments and aim for 8+ hours of sleep. That's your single highest-leverage action right now.";
@@ -940,4 +944,200 @@ export function buildNotificationText({
     title: "How are you carrying it?",
     body: "Take 30 seconds. The data gets smarter every time you check in.",
   };
+}
+
+// ─── Long arc story ───────────────────────────────────────────────────────────
+
+/**
+ * Narrates the past 2+ months as a story — not patterns, not stats.
+ * Finds the worst stretch, detects whether a turning point occurred,
+ * and compares the recent 14 days to the 14 before.
+ * Requires ≥21 check-ins.
+ */
+export function buildLongArcNarrative(): string | null {
+  if (typeof window === "undefined") return null;
+  const role  = localStorage.getItem("overload-role")  || "engineer";
+  const sleep = localStorage.getItem("overload-sleep") || "8";
+
+  const keys: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k?.startsWith("checkin-")) keys.push(k);
+  }
+  if (keys.length < 21) return null;
+  keys.sort();
+
+  const entries: Array<{ dateStr: string; score: number }> = [];
+  for (const key of keys) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      entries.push({
+        dateStr: key.replace("checkin-", ""),
+        score:   stressToScore(parsed.stress ?? 3, role, sleep),
+      });
+    } catch {}
+  }
+  if (entries.length < 21) return null;
+
+  // Find worst individual day
+  const worstIdx   = entries.reduce((maxI, e, i, arr) => e.score > arr[maxI].score ? i : maxI, 0);
+  const worstEntry = entries[worstIdx];
+  const worstDate  = new Date(worstEntry.dateStr);
+  const worstLabel = worstDate.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+
+  // Find consecutive danger run containing worst day
+  let runStart = worstIdx, runEnd = worstIdx;
+  while (runStart > 0 && entries[runStart - 1].score > 65) runStart--;
+  while (runEnd < entries.length - 1 && entries[runEnd + 1].score > 65) runEnd++;
+  const runLength = runEnd - runStart + 1;
+
+  // How long ago was that?
+  const now = new Date();
+  const daysAgo  = Math.round((now.getTime() - worstDate.getTime()) / 86_400_000);
+  const weeksAgo = Math.max(1, Math.round(daysAgo / 7));
+
+  // Only narrate if worst period was at least 2 weeks ago (so it's history, not now)
+  if (daysAgo < 14) return null;
+
+  // Detect turning point: first window after worst run where rolling avg drops ≥8pts
+  let turningPointLabel: string | null = null;
+  for (let i = runEnd + 1; i < entries.length - 6; i++) {
+    const before = entries.slice(Math.max(0, i - 7), i).map(e => e.score);
+    const after  = entries.slice(i, i + 7).map(e => e.score);
+    if (before.length < 3) continue;
+    const beforeAvg = before.reduce((a, b) => a + b, 0) / before.length;
+    const afterAvg  = after.reduce((a, b) => a + b, 0) / after.length;
+    if (beforeAvg - afterAvg >= 8) {
+      const tpDate = new Date(entries[i].dateStr);
+      turningPointLabel = tpDate.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+      break;
+    }
+  }
+
+  // Recent 14 vs prior 14
+  const recent = entries.slice(-14).map(e => e.score);
+  const prior  = entries.slice(-28, -14).map(e => e.score);
+  if (prior.length < 7) return null;
+
+  const recentAvg = Math.round(recent.reduce((a, b) => a + b, 0) / recent.length);
+  const priorAvg  = Math.round(prior.reduce((a, b) => a + b, 0) / prior.length);
+  const delta     = recentAvg - priorAvg;
+
+  const timeDesc =
+    weeksAgo >= 8 ? `${weeksAgo} weeks ago` :
+    weeksAgo >= 4 ? "about a month ago" :
+    weeksAgo >= 3 ? "three weeks ago" :
+    weeksAgo >= 2 ? "a couple of weeks ago" :
+    "about two weeks ago";
+
+  if (runLength >= 3 && worstEntry.score > 65) {
+    let arc = `${timeDesc.charAt(0).toUpperCase() + timeDesc.slice(1)}, you had your worst stretch in this dataset — ${runLength} consecutive day${runLength > 1 ? "s" : ""} in the red, peaking around ${worstLabel}.`;
+
+    if (turningPointLabel && delta <= -5) {
+      arc += ` Something shifted around ${turningPointLabel}. Your load has been holding lower since.`;
+    } else if (delta <= -8) {
+      arc += ` The past two weeks have been noticeably lighter. Whatever changed — it's in the data.`;
+    } else if (delta >= 6) {
+      arc += ` The load is back up now. Worth paying attention to before it compounds.`;
+    } else {
+      arc += ` You've been holding steady since.`;
+    }
+    return arc;
+  }
+
+  // No severe worst run, but can narrate trend
+  if (Math.abs(delta) >= 8) {
+    if (delta <= -8) {
+      return `The past two weeks are your lightest in the dataset — ${Math.abs(delta)} points lower on average than the two weeks before. Something changed and it's showing up.`;
+    }
+    return `The load has been climbing. The past two weeks are running ${delta} points heavier on average than the two weeks before that. Two weeks is long enough to be a trend.`;
+  }
+
+  return null;
+}
+
+// ─── What works specifically for you ─────────────────────────────────────────
+
+/**
+ * Scans past check-in notes for keywords that consistently correlate with
+ * a lower score the following day. Returns the strongest confirmed pattern
+ * as a personal insight. Requires ≥14 check-ins with notes and ≥3 matches.
+ */
+export function findWhatWorksForYou(): string | null {
+  if (typeof window === "undefined") return null;
+  const role  = localStorage.getItem("overload-role")  || "engineer";
+  const sleep = localStorage.getItem("overload-sleep") || "8";
+
+  const KEYWORDS = [
+    "walk", "exercise", "gym", "outside", "run",
+    "meditation", "yoga", "lunch", "break", "reading",
+    "no meetings", "sleep early", "early",
+  ];
+
+  const keys: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k?.startsWith("checkin-")) keys.push(k);
+  }
+  if (keys.length < 14) return null;
+  keys.sort();
+
+  // Build score map
+  const scoreMap: Record<string, number> = {};
+  for (const key of keys) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      scoreMap[key.replace("checkin-", "")] = stressToScore(parsed.stress ?? 3, role, sleep);
+    } catch {}
+  }
+
+  // Build entries with note + next-day score
+  type NoteEntry = { score: number; note: string; nextScore: number | null };
+  const entries: NoteEntry[] = [];
+  for (const key of keys) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      if (!parsed.note) continue;
+      const dateStr  = key.replace("checkin-", "");
+      const d        = new Date(dateStr);
+      d.setDate(d.getDate() + 1);
+      const nextStr  = d.toISOString().split("T")[0];
+      const nextScore = scoreMap[nextStr] ?? null;
+      entries.push({ score: scoreMap[dateStr], note: parsed.note, nextScore });
+    } catch {}
+  }
+  if (entries.length < 5) return null;
+
+  let bestKeyword   = "";
+  let bestAvgDelta  = 0;
+
+  for (const kw of KEYWORDS) {
+    const matches = entries.filter(e => e.note.toLowerCase().includes(kw) && e.nextScore !== null);
+    if (matches.length < 3) continue;
+    const deltas        = matches.map(e => e.score - (e.nextScore as number));
+    const positiveCount = deltas.filter(d => d > 0).length;
+    const avgDelta      = deltas.reduce((a, b) => a + b, 0) / deltas.length;
+    if (positiveCount / matches.length >= 0.6 && avgDelta > 3 && avgDelta > bestAvgDelta) {
+      bestKeyword  = kw;
+      bestAvgDelta = avgDelta;
+    }
+  }
+
+  if (!bestKeyword || bestAvgDelta < 3) return null;
+
+  const delta    = Math.round(bestAvgDelta);
+  const activity =
+    bestKeyword === "no meetings"   ? "you protect meeting-free time" :
+    bestKeyword === "sleep early"   ? "you sleep early" :
+    bestKeyword === "outside"       ? "you get outside" :
+    bestKeyword === "early"         ? "you start early" :
+    `you ${bestKeyword}`;
+
+  return `When ${activity}, your next-day score drops an average of ${delta} points. That's not generic advice — that's your data.`;
 }

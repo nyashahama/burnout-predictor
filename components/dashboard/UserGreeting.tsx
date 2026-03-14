@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { mockUser } from "@/app/dashboard/data";
+import { mockUser, findWhatWorksForYou } from "@/app/dashboard/data";
 
 function timeGreeting() {
   const h = new Date().getHours();
@@ -255,6 +255,11 @@ export default function UserGreeting({ liveScore }: { liveScore?: number }) {
     const earned = getEarnedPatternInsight();
     if (earned) {
       setInsight(earned);
+      return;
+    }
+    const whatWorks = findWhatWorksForYou();
+    if (whatWorks) {
+      setInsight(whatWorks);
       return;
     }
     setInsight(getMonthlyArc());
