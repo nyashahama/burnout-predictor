@@ -1,11 +1,7 @@
-import { scoreColor } from "@/app/dashboard/data";
+"use client";
 
-type Signal = {
-  label: string;
-  detail: string;
-  val: string;
-  level: "ok" | "warning" | "danger";
-};
+import { useEffect, useRef, useState } from "react";
+import { scoreColor, type Signal } from "@/app/dashboard/data";
 
 type ScoreCardData = {
   score: number;
@@ -13,64 +9,140 @@ type ScoreCardData = {
   level: "ok" | "warning" | "danger";
   signals: Signal[];
   suggestion: string;
+  isPending?: boolean;
 };
 
-// SVG gauge constants
-const CX = 60, CY = 60, R = 50;
-const CIRC = 2 * Math.PI * R; // ≈ 314
-const ARC = 0.75 * CIRC;      // 270° arc
+// ── SVG gauge constants (180×180 viewBox, 270° arc) ──────────────────────────
+const CX = 90, CY = 90, R = 76;
+const CIRC = 2 * Math.PI * R;   // full circumference
+const ARC  = CIRC * 0.75;       // 270° arc length
 
-function ScoreGauge({ score, color }: { score: number; color: string }) {
-  const fill = (score / 100) * ARC;
+// ── Animated gauge ────────────────────────────────────────────────────────────
+function ScoreGauge({
+  score,
+  color,
+  animate,
+}: {
+  score: number;
+  color: string;
+  animate: boolean;
+}) {
+  const [dashOffset, setDashOffset] = useState(ARC); // start fully empty
+
+  useEffect(() => {
+    if (!animate) return;
+    // Tiny delay so the initial empty state is painted before the transition fires
+    const t = setTimeout(() => {
+      setDashOffset(ARC * (1 - score / 100));
+    }, 80);
+    return () => clearTimeout(t);
+  }, [score, animate]);
+
   return (
     <div className="scorecard-gauge-wrap">
-      <svg viewBox="0 0 120 120" className="scorecard-gauge-svg">
+      <svg viewBox="0 0 180 180" className="scorecard-gauge-svg">
         {/* Background track */}
         <circle
           cx={CX} cy={CY} r={R}
           fill="none"
           stroke="var(--paper-3)"
-          strokeWidth={8}
+          strokeWidth={9}
           strokeLinecap="round"
           strokeDasharray={`${ARC} ${CIRC}`}
           transform={`rotate(135 ${CX} ${CY})`}
         />
-        {/* Score arc */}
+        {/* Filled arc */}
         <circle
           cx={CX} cy={CY} r={R}
           fill="none"
           stroke={color}
-          strokeWidth={8}
+          strokeWidth={9}
           strokeLinecap="round"
-          strokeDasharray={`${fill} ${CIRC}`}
+          strokeDasharray={`${ARC} ${CIRC}`}
+          strokeDashoffset={dashOffset}
           transform={`rotate(135 ${CX} ${CY})`}
-          style={{ transition: "stroke-dasharray 0.6s ease" }}
+          style={{
+            transition:
+              "stroke-dashoffset 1.4s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.4s ease",
+          }}
         />
       </svg>
+
       {/* Number overlay */}
       <div className="scorecard-gauge-center">
-        <div className="scorecard-number" style={{ color }}>{score}</div>
+        <div className="scorecard-number" style={{ color }}>
+          <CountingScore target={score} animate={animate} />
+        </div>
         <div className="scorecard-of">/ 100</div>
       </div>
     </div>
   );
 }
 
+// ── Counting score animation ──────────────────────────────────────────────────
+function CountingScore({
+  target,
+  animate,
+}: {
+  target: number;
+  animate: boolean;
+}) {
+  const [display, setDisplay] = useState(0);
+  const rafRef = useRef<number>(0);
+  // Track the value we started from so updates mid-session animate from current
+  const fromRef = useRef(0);
+
+  useEffect(() => {
+    if (!animate) return;
+    const from     = fromRef.current;
+    const DURATION = 1400;
+    const start    = Date.now();
+
+    cancelAnimationFrame(rafRef.current);
+
+    const tick = () => {
+      const progress = Math.min((Date.now() - start) / DURATION, 1);
+      const eased    = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      const value    = Math.round(from + (target - from) * eased);
+      setDisplay(value);
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        fromRef.current = target;
+      }
+    };
+
+    const t = setTimeout(() => {
+      rafRef.current = requestAnimationFrame(tick);
+    }, 80);
+
+    return () => {
+      clearTimeout(t);
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [target, animate]);
+
+  return <>{display}</>;
+}
+
+// ── Main ScoreCard ─────────────────────────────────────────────────────────────
 export default function ScoreCard({
   data,
   trend,
   dangerStreak,
+  animate,
 }: {
   data: ScoreCardData;
   trend: number;
   dangerStreak: number;
+  animate: boolean;
 }) {
-  const color = scoreColor(data.score);
+  const color   = scoreColor(data.score);
   const trendUp = trend > 0;
-  const trendLabel = `${trendUp ? "↑" : "↓"} ${Math.abs(trend)} pts this week`;
 
   return (
     <div className="dash-card scorecard">
+      {/* Header */}
       <div className="scorecard-header">
         <div className="scorecard-label">Cognitive load score</div>
         <div className={`scorecard-badge scorecard-badge--${data.level}`}>
@@ -79,24 +151,32 @@ export default function ScoreCard({
         </div>
       </div>
 
+      {/* Large centered gauge */}
       <div className="scorecard-gauge-row">
-        <ScoreGauge score={data.score} color={color} />
+        <ScoreGauge score={data.score} color={color} animate={animate} />
 
         <div className="scorecard-meta">
           <div
             className="scorecard-trend"
             style={{ color: trendUp ? "var(--red)" : "var(--green)" }}
           >
-            {trendLabel}
+            {trendUp ? "↑" : "↓"} {Math.abs(trend)} pts this week
           </div>
           {dangerStreak >= 2 && (
             <div className="scorecard-streak">
-              {dangerStreak === 2 ? "2nd" : dangerStreak === 3 ? "3rd" : `${dangerStreak}th`} consecutive day in the danger zone
+              {dangerStreak === 2 ? "2nd" : dangerStreak === 3 ? "3rd" : `${dangerStreak}th`}{" "}
+              consecutive day in the danger zone
+            </div>
+          )}
+          {data.isPending && (
+            <div className="scorecard-pending">
+              Check in below to update your score
             </div>
           )}
         </div>
       </div>
 
+      {/* Signals */}
       <div className="scorecard-signals">
         {data.signals.map((s, i) => (
           <div key={i} className="scorecard-signal">
@@ -110,6 +190,7 @@ export default function ScoreCard({
         ))}
       </div>
 
+      {/* Suggestion */}
       <div className={`scorecard-suggestion scorecard-suggestion--${data.level}`}>
         <div className={`suggestion-label suggestion-label--${data.level}`}>
           Today&apos;s recommendation

@@ -172,3 +172,136 @@ export function scoreLabel(score: number): string {
   if (score > 40) return "Moderate load";
   return "In your zone";
 }
+
+// ─── Live Score Engine ────────────────────────────────────────────────────────
+
+export type Signal = {
+  label: string;
+  detail: string;
+  val: string;
+  level: SignalLevel;
+};
+
+/**
+ * Calculates a live cognitive load score from the user's real check-in
+ * data and their onboarding profile. When no check-in exists for today,
+ * returns the onboarding estimated score so Day 1 feels personal.
+ */
+export function calculateLiveScore({
+  todayStress,
+  role,
+  sleepBaseline,
+  recentStresses,
+  estimatedScore,
+}: {
+  todayStress: number | null;
+  role: string;
+  sleepBaseline: string;
+  recentStresses: number[];
+  estimatedScore: number | null;
+}): number {
+  // No check-in yet — surface the onboarding estimate so the score isn't generic
+  if (todayStress === null) {
+    return estimatedScore ?? 55;
+  }
+
+  // Stress level → base score range
+  const base: Record<number, number> = { 1: 22, 2: 35, 3: 50, 4: 64, 5: 76 };
+  let score = base[todayStress] ?? 50;
+
+  // Role modifier (different ambient pressure baselines)
+  const roleMod: Record<string, number> = {
+    founder: 6, manager: 3, pm: 2, engineer: 0, designer: -2, other: 0,
+  };
+  score += roleMod[role] ?? 0;
+
+  // Sleep baseline modifier (hours below target directly raises load)
+  const sleepMod: Record<string, number> = { "6": 10, "7": 5, "8": 0, "9": -4 };
+  score += sleepMod[sleepBaseline] ?? 0;
+
+  // Recent trend — if the last 2+ check-ins trend above neutral, add weight
+  if (recentStresses.length >= 2) {
+    const avg = recentStresses.reduce((a, b) => a + b, 0) / recentStresses.length;
+    score += Math.round((avg - 3) * 2.5); // 3 is neutral
+  }
+
+  return Math.max(8, Math.min(92, Math.round(score)));
+}
+
+/** Builds live signal rows from the user's real profile + today's check-in. */
+export function getLiveSignals(
+  todayStress: number | null,
+  role: string,
+  sleepBaseline: string,
+): Signal[] {
+  const results: Signal[] = [];
+
+  // Sleep signal
+  const hoursMap: Record<string, number> = { "6": 6, "7": 7, "8": 8, "9": 9 };
+  const hours = hoursMap[sleepBaseline] ?? 8;
+  results.push({
+    label: "Sleep baseline",
+    detail:
+      hours <= 6
+        ? `${hours}h target — chronic deficit, little recovery margin`
+        : hours === 7
+        ? "7h target — slightly below the ideal recovery window"
+        : `${hours}h target — solid recovery capacity`,
+    val: `${hours}h`,
+    level: hours <= 6 ? "danger" : hours === 7 ? "warning" : "ok",
+  });
+
+  // Stress signal — pending if no check-in yet
+  if (todayStress !== null) {
+    const stressMap: Record<number, { detail: string; val: string; level: SignalLevel }> = {
+      1: { detail: "You're running calm — protect this",          val: "Very calm",   level: "ok" },
+      2: { detail: "Good baseline — keep protecting sleep",       val: "Relaxed",     level: "ok" },
+      3: { detail: "Manageable — watch for accumulation",         val: "Moderate",    level: "warning" },
+      4: { detail: "Elevated — your body is working hard",        val: "Stressed",    level: "warning" },
+      5: { detail: "High — take action today, not tomorrow",      val: "Overwhelmed", level: "danger" },
+    };
+    const s = stressMap[todayStress];
+    if (s) results.push({ label: "Stress (today)", ...s });
+  } else {
+    results.push({
+      label: "Stress (check-in)",
+      detail: "Check in below to factor today's stress into your score",
+      val: "Pending",
+      level: "warning",
+    });
+  }
+
+  // Role load signal
+  const roleSignals: Record<string, { detail: string; val: string; level: SignalLevel }> = {
+    founder:  { detail: "Executive role adds significant ambient pressure",      val: "Very high",    level: "danger" },
+    manager:  { detail: "Context-switching and people load increase overhead",   val: "Elevated",     level: "warning" },
+    pm:       { detail: "Coordination overhead elevates your baseline",          val: "Moderate+",    level: "warning" },
+    engineer: { detail: "Deep work role — protecting focus blocks is key",       val: "Baseline",     level: "ok" },
+    designer: { detail: "Creative role — lower ambient pressure baseline",       val: "Low baseline", level: "ok" },
+    other:    { detail: "Your role contributes to your baseline load",           val: "Baseline",     level: "ok" },
+  };
+  const rs = roleSignals[role];
+  if (rs) results.push({ label: "Role load", ...rs });
+
+  return results;
+}
+
+/** Returns a personalised suggestion based on the live score + check-in state. */
+export function getLiveSuggestion(score: number, hasCheckedIn: boolean): string {
+  if (!hasCheckedIn) {
+    return "Complete your daily check-in below to get a personalised recommendation based on how you're actually feeling today.";
+  }
+  if (score > 75) {
+    return "You're in critical load territory. Hard-stop work by 8 PM tonight — no exceptions. Skip optional evening commitments and aim for 8+ hours of sleep. That's your single highest-leverage action right now.";
+  }
+  if (score > 65) {
+    return "Block tomorrow 9–11 AM for deep work before your calendar fills. Convert at least one sync today to async. Sleep is your biggest lever tonight — aim for 8 hours.";
+  }
+  if (score > 50) {
+    return "You're in the moderate zone. Protect your focus blocks and don't let meetings creep into mornings. A 15-minute walk today will measurably lower tomorrow's score.";
+  }
+  if (score > 40) {
+    return "You're running sustainably. Build the habit here — consistent sleep and protected focus time will keep you in this zone.";
+  }
+  return "You're in your zone. Your cognitive capacity is at its best today. Do the deep work that matters, and protect tonight's sleep to carry this forward.";
+}

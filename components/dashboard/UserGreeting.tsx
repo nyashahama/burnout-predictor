@@ -1,13 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { mockUser, today } from "@/app/dashboard/data";
+import { mockUser } from "@/app/dashboard/data";
 
 function timeGreeting() {
   const h = new Date().getHours();
   if (h < 12) return "Good morning";
   if (h < 17) return "Good afternoon";
   return "Good evening";
+}
+
+function todayLabel() {
+  return new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
 }
 
 export default function UserGreeting() {
@@ -24,7 +32,7 @@ export default function UserGreeting() {
         {timeGreeting()}, <em>{name}</em>
       </h1>
       <p className="dash-subheading">
-        {today.date} &nbsp;·&nbsp; {mockUser.streak}-day streak 🔥
+        {todayLabel()} &nbsp;·&nbsp; {mockUser.streak}-day streak 🔥
       </p>
     </header>
   );

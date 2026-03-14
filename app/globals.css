@@ -1775,23 +1775,24 @@ footer {
   color: var(--green);
 }
 
-/* Gauge */
+/* Gauge — centered, large, the hero of the card */
 .scorecard-gauge-row {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 18px;
+  gap: 14px;
 }
 
 .scorecard-gauge-wrap {
   position: relative;
-  width: 120px;
-  height: 120px;
+  width: 180px;
+  height: 180px;
   flex-shrink: 0;
 }
 
 .scorecard-gauge-svg {
-  width: 120px;
-  height: 120px;
+  width: 180px;
+  height: 180px;
   display: block;
 }
 
@@ -1808,7 +1809,9 @@ footer {
 .scorecard-meta {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 6px;
+  text-align: center;
 }
 
 .scorecard-trend {
@@ -1823,6 +1826,12 @@ footer {
   line-height: 1.4;
 }
 
+.scorecard-pending {
+  font-size: 11px;
+  color: var(--muted-2);
+  font-style: italic;
+}
+
 .scorecard-score-row {
   display: flex;
   align-items: baseline;
@@ -1831,7 +1840,7 @@ footer {
 
 .scorecard-number {
   font-family: var(--font-serif);
-  font-size: 46px;
+  font-size: 58px;
   line-height: 1;
   letter-spacing: -0.04em;
 }
@@ -1839,6 +1848,7 @@ footer {
 .scorecard-of {
   font-size: 13px;
   color: var(--muted);
+  margin-top: 4px;
 }
 
 .scorecard-signals {
@@ -2337,6 +2347,11 @@ footer {
   cursor: not-allowed;
 }
 
+.checkin-submit--updating {
+  opacity: 0.7;
+  cursor: default;
+}
+
 /* ─── HISTORY CHART ──────────────────────────────────────── */
 
 .history {
@@ -2666,20 +2681,30 @@ footer {
     font-weight: 600;
   }
 
-  /* Component tweaks */
+  /* Check-in: full-width horizontal buttons on mobile for easy tapping */
   .checkin-stress {
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 6px;
   }
 
   .checkin-stress-btn {
-    min-width: calc(50% - 4px);
     flex: none;
+    width: 100%;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 16px;
+    min-height: 52px;
   }
 
-  .scorecard-gauge-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
+  .checkin-stress-label {
+    text-align: left;
+    font-size: 13px;
+  }
+
+  .checkin-submit {
+    width: 100%;
   }
 
   .burnout-alert {
