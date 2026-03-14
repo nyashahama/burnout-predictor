@@ -314,13 +314,13 @@ export default function SettingsPage() {
       )}
 
       <header className="dash-header">
-        <h1 className="dash-greeting">Settings</h1>
-        <p className="dash-subheading">Manage your profile and preferences</p>
+        <h1 className="dash-greeting">How it knows you</h1>
+        <p className="dash-subheading">Tell it when something changes.</p>
       </header>
 
       {cleared && (
         <div className="settings-flash settings-flash--ok">
-          ✓ All check-in data cleared successfully
+          ✓ All check-in data cleared. Starting fresh.
         </div>
       )}
 
@@ -328,20 +328,20 @@ export default function SettingsPage() {
 
         {/* ── Profile ── */}
         <div className="dash-card settings-section">
-          <div className="settings-section-title">Profile</div>
+          <div className="settings-section-title">Who you are</div>
 
           <div className="settings-avatar-row">
             <div className="settings-avatar">{initials}</div>
             <div>
               <div className="settings-row-label">{name || "—"}</div>
-              <div className="settings-row-sub">Your display name</div>
+              <div className="settings-row-sub">What the app calls you</div>
             </div>
           </div>
 
           <div className="settings-row">
             <div className="settings-row-info">
-              <div className="settings-row-label">Display name</div>
-              <div className="settings-row-sub">Shown in your dashboard greeting</div>
+              <div className="settings-row-label">Your name</div>
+              <div className="settings-row-sub">Used in your daily greeting</div>
             </div>
             <input
               className="settings-input"
@@ -356,7 +356,7 @@ export default function SettingsPage() {
 
         {/* ── Notifications ── */}
         <div className="dash-card settings-section">
-          <div className="settings-section-title">Notifications</div>
+          <div className="settings-section-title">When to check in</div>
 
           {notifBlocked && (
             <div className="settings-notif-blocked">
@@ -367,9 +367,9 @@ export default function SettingsPage() {
 
           <div className="settings-row">
             <div className="settings-row-info">
-              <div className="settings-row-label">Daily check-in reminder</div>
+              <div className="settings-row-label">Remind me to check in</div>
               <div className="settings-row-sub">
-                Get a browser notification when it&apos;s time to log your stress
+                A nudge at the end of your day, before the evening blurs the memory
               </div>
             </div>
             <label className="settings-toggle">
@@ -387,9 +387,9 @@ export default function SettingsPage() {
           {reminderEnabled && !notifBlocked && (
             <div className="settings-row">
               <div className="settings-row-info">
-                <div className="settings-row-label">Reminder time</div>
+                <div className="settings-row-label">Best time for your nudge</div>
                 <div className="settings-row-sub">
-                  Default is 5:30 PM — end of the workday before the evening starts
+                  5:30 PM works for most — end of work, before the evening starts
                 </div>
               </div>
               <input
@@ -403,9 +403,9 @@ export default function SettingsPage() {
 
           <div className="settings-row">
             <div className="settings-row-info">
-              <div className="settings-row-label">Weekly summary</div>
+              <div className="settings-row-label">Monday morning debrief</div>
               <div className="settings-row-sub">
-                Show the Monday morning debrief prompt on the dashboard
+                A recap of last week surfaces on the dashboard every Monday morning
               </div>
             </div>
             <label className="settings-toggle">
@@ -422,10 +422,9 @@ export default function SettingsPage() {
 
         {/* ── Integrations ── */}
         <div className="dash-card settings-section">
-          <div className="settings-section-title">Integrations</div>
+          <div className="settings-section-title">Connect your tools</div>
           <p className="settings-section-desc">
-            Connect your tools to improve score accuracy. Overload never stores raw data
-            from third-party apps.
+            The more context the app has, the more accurate your score. Your data stays on your device — nothing is stored from third-party services.
           </p>
 
           {/* Google Calendar — live integration */}
@@ -477,33 +476,33 @@ export default function SettingsPage() {
 
         {/* ── Data ── */}
         <div className="dash-card settings-section">
-          <div className="settings-section-title">Data</div>
+          <div className="settings-section-title">Your data</div>
 
           <div className="settings-row">
             <div className="settings-row-info">
-              <div className="settings-row-label">Export data</div>
-              <div className="settings-row-sub">Download your full check-in history as CSV</div>
+              <div className="settings-row-label">Take it with you</div>
+              <div className="settings-row-sub">Everything the app knows — yours to keep, as a CSV.</div>
             </div>
             <button
               className={`settings-outline-btn${exported ? " settings-outline-btn--done" : ""}`}
               onClick={handleExport}
             >
-              {exported ? "Downloaded ✓" : "Export CSV"}
+              {exported ? "Downloaded ✓" : "Download history"}
             </button>
           </div>
 
           <div className="settings-row">
             <div className="settings-row-info">
-              <div className="settings-row-label">Clear history</div>
+              <div className="settings-row-label">Start over</div>
               <div className="settings-row-sub">
-                Permanently delete all check-ins and scores — cannot be undone
+                Wipe all check-ins and begin again. Your name and profile stay. This cannot be undone.
               </div>
             </div>
             <button
               className="settings-danger-btn"
               onClick={() => setShowClearModal(true)}
             >
-              Clear data
+              Wipe clean
             </button>
           </div>
         </div>

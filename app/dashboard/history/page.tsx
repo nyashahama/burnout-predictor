@@ -6,8 +6,10 @@ import {
   scoreLabel,
   detectPatterns,
   stressToScore,
+  computePersonalSignature,
   type HistoryDay,
   type CheckInEntry,
+  type SignatureData,
 } from "../data";
 import HistoryChart from "@/components/dashboard/HistoryChart";
 
@@ -82,12 +84,14 @@ function levelClass(score: number) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function HistoryPage() {
-  const [realHistory, setRealHistory] = useState<HistoryDay[]>([]);
-  const [entries,     setEntries]     = useState<CheckInEntry[]>([]);
+  const [realHistory, setRealHistory]   = useState<HistoryDay[]>([]);
+  const [entries,     setEntries]       = useState<CheckInEntry[]>([]);
+  const [signature,   setSignature]     = useState<SignatureData | null>(null);
 
   useEffect(() => {
     setRealHistory(buildRealHistory());
     setEntries(buildRealEntries());
+    setSignature(computePersonalSignature());
   }, []);
 
   const realDays       = realHistory.filter((d) => !d.ghost);
@@ -108,11 +112,11 @@ export default function HistoryPage() {
   return (
     <div className="dash-content">
       <header className="dash-header">
-        <h1 className="dash-greeting">History</h1>
+        <h1 className="dash-greeting">Your history</h1>
         <p className="dash-subheading">
           {isEmpty
-            ? "Your load history will appear here as you check in each day"
-            : `Your ${checkinCount} check-in${checkinCount !== 1 ? "s" : ""} — real data, no filler`}
+            ? "Check in each day and the data will start to know you"
+            : `${checkinCount} check-in${checkinCount !== 1 ? "s" : ""} — this is what the data has learned`}
         </p>
       </header>
 
@@ -127,6 +131,55 @@ export default function HistoryPage() {
                 <span className="pattern-callout-text">{p}</span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Personal signature — shown when ≥14 real check-ins */}
+      {signature && (
+        <div className="hist-signature">
+          <div className="hist-signature-label">Your signature</div>
+          <div className="hist-signature-items">
+            {signature.hardestDay && (
+              <div className="hist-signature-item">
+                <span className="hist-sig-key">Hardest day</span>
+                <span className="hist-sig-val">{signature.hardestDay}s</span>
+              </div>
+            )}
+            {signature.easiestDay && signature.easiestDay !== signature.hardestDay && (
+              <div className="hist-signature-item">
+                <span className="hist-sig-key">Easiest day</span>
+                <span className="hist-sig-val">{signature.easiestDay}s</span>
+              </div>
+            )}
+            {signature.topTrigger && signature.triggerLift >= 0.5 && (
+              <div className="hist-signature-item">
+                <span className="hist-sig-key">Biggest trigger</span>
+                <span className="hist-sig-val">
+                  "{signature.topTrigger}" (+{signature.triggerLift.toFixed(1)} stress)
+                </span>
+              </div>
+            )}
+            {signature.recoveryDays !== null && (
+              <div className="hist-signature-item">
+                <span className="hist-sig-key">Recovery speed</span>
+                <span className="hist-sig-val">
+                  {signature.recoveryDays === 1
+                    ? "1 day after a hard period"
+                    : `${signature.recoveryDays} days after a hard period`}
+                </span>
+              </div>
+            )}
+            <div className="hist-signature-item">
+              <span className="hist-sig-key">Trend</span>
+              <span className={`hist-sig-val hist-sig-trend--${signature.trend}`}>
+                {signature.trend === "improving"
+                  ? "Load coming down"
+                  : signature.trend === "worsening"
+                  ? "Load climbing"
+                  : "Holding steady"}
+              </span>
+            </div>
           </div>
         </div>
       )}
@@ -147,7 +200,7 @@ export default function HistoryPage() {
             <div className="hist-stat-value" style={{ color: scoreColor(avg) }}>
               {avg}
             </div>
-            <div className="hist-stat-label">Avg score</div>
+            <div className="hist-stat-label">Your average</div>
             <div className="hist-stat-sublabel">{scoreLabel(avg)}</div>
           </div>
 
@@ -155,7 +208,7 @@ export default function HistoryPage() {
             <div className="hist-stat-value" style={{ color: "var(--red)" }}>
               {highStrainDays}
             </div>
-            <div className="hist-stat-label">High-strain days</div>
+            <div className="hist-stat-label">Hard days</div>
             <div className="hist-stat-sublabel">Score above 65</div>
           </div>
 
@@ -163,7 +216,7 @@ export default function HistoryPage() {
             <div className="hist-stat-value" style={{ color: "var(--green)" }}>
               {inZoneDays}
             </div>
-            <div className="hist-stat-label">In-zone days</div>
+            <div className="hist-stat-label">Good days</div>
             <div className="hist-stat-sublabel">Score below 40</div>
           </div>
 
@@ -171,8 +224,8 @@ export default function HistoryPage() {
             <div className="hist-stat-value" style={{ color: scoreColor(peakScore) }}>
               {peakScore}
             </div>
-            <div className="hist-stat-label">Peak load</div>
-            <div className="hist-stat-sublabel">Highest recorded</div>
+            <div className="hist-stat-label">Highest point</div>
+            <div className="hist-stat-sublabel">Most load recorded</div>
           </div>
         </div>
       )}

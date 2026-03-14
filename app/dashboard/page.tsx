@@ -13,6 +13,7 @@ import {
   scoreLabel,
   stressToScore,
   buildScoreExplanation,
+  buildTrajectoryInsight,
   type HistoryDay,
 } from "./data";
 import ScoreCard from "@/components/dashboard/ScoreCard";
@@ -23,6 +24,8 @@ import UserGreeting from "@/components/dashboard/UserGreeting";
 import BurnoutAlert from "@/components/dashboard/BurnoutAlert";
 import RecoveryPlan from "@/components/dashboard/RecoveryPlan";
 import MondayDebrief from "@/components/dashboard/MondayDebrief";
+import ComebackCard from "@/components/dashboard/ComebackCard";
+import MilestoneInsight from "@/components/dashboard/MilestoneInsight";
 
 // Forecast stats derived from static forecast data
 const dangerDaysAhead = Math.max(
@@ -200,12 +203,14 @@ export default function DashboardPage() {
   const signals          = getLiveSignals(todayStress, role, sleepBaseline, calendarConnected);
   const suggestion       = getLiveSuggestion(liveScore, hasCheckedIn);
   const level            = liveScore > 65 ? "danger" : liveScore > 40 ? "warning" : "ok";
-  const scoreExplanation = buildScoreExplanation({
+  const recentStressesNow = getRecentStresses();
+  const scoreExplanation  = buildScoreExplanation({
     score: liveScore,
     todayStress,
     consecutiveDangerDays: consecutiveDangerReal,
-    recentStresses: getRecentStresses(),
+    recentStresses: recentStressesNow,
   });
+  const trajectoryInsight = buildTrajectoryInsight(liveScore, recentStressesNow, consecutiveDangerReal);
 
   const scoreData = {
     score: liveScore,
@@ -233,6 +238,8 @@ export default function DashboardPage() {
       */}
       <div className="dash-hero">
         <UserGreeting liveScore={liveScore} />
+        <ComebackCard currentScore={liveScore} />
+        <MilestoneInsight checkinCount={checkinCount} />
         <MondayDebrief />
         <div className="dash-grid">
           <ScoreCard
@@ -243,6 +250,7 @@ export default function DashboardPage() {
             streak={streak}
             checkinCount={checkinCount}
             explanation={scoreExplanation}
+            trajectory={trajectoryInsight ?? undefined}
           />
           <ForecastChart data={forecast} />
           <CheckIn onCheckin={handleCheckin} />

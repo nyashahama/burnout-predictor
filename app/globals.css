@@ -5432,3 +5432,186 @@ body {
   transition: color 0.15s;
 }
 .monday-debrief-link:hover { color: var(--ink); }
+
+/* ─── CheckIn: memory note (past comparable entry) ───────────────────────── */
+.checkin-memory-note {
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--paper-2);
+  border-left: 2px solid var(--paper-3);
+  padding: 8px 12px;
+  border-radius: 0 6px 6px 0;
+  margin: 0 0 14px;
+  line-height: 1.55;
+}
+.checkin-memory-date {
+  font-weight: 600;
+  color: var(--muted);
+}
+.checkin-memory-text {
+  font-style: italic;
+  color: var(--muted-2);
+}
+
+/* ─── CheckIn: echo pattern (submitted state) ────────────────────────────── */
+.checkin-echo {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 12px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--paper-3);
+  font-style: italic;
+}
+
+/* ─── ScoreCard: trajectory line ─────────────────────────────────────────── */
+.scorecard-trajectory {
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.6;
+  margin: -8px 0 16px;
+  font-weight: 500;
+}
+
+/* ─── Comeback card ───────────────────────────────────────────────────────── */
+.comeback-card {
+  background: rgba(42, 122, 74, 0.06);
+  border: 1px solid rgba(42, 122, 74, 0.22);
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+.comeback-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.comeback-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--green);
+}
+.comeback-dismiss {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: var(--muted-2);
+  line-height: 1;
+  padding: 0 2px;
+  transition: color 0.15s;
+}
+.comeback-dismiss:hover { color: var(--ink); }
+.comeback-narrative {
+  font-size: 14px;
+  color: var(--ink);
+  line-height: 1.65;
+  margin: 0;
+}
+
+/* ─── Milestone insight card ──────────────────────────────────────────────── */
+.milestone-card {
+  background: var(--paper-2);
+  border: 1px solid var(--paper-3);
+  border-radius: 14px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+.milestone-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.milestone-headline {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  color: var(--ink);
+  line-height: 1.2;
+  margin-bottom: 6px;
+}
+.milestone-sub {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.55;
+  max-width: 420px;
+}
+.milestone-dismiss {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  color: var(--muted-2);
+  line-height: 1;
+  padding: 0 2px;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+.milestone-dismiss:hover { color: var(--ink); }
+.milestone-insights {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.milestone-insight-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.milestone-insight-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted-2);
+  flex-shrink: 0;
+  margin-top: 7px;
+}
+.milestone-insight-text {
+  font-size: 14px;
+  color: var(--ink-2);
+  line-height: 1.65;
+  margin: 0;
+}
+
+/* ─── History: personal signature ────────────────────────────────────────── */
+.hist-signature {
+  margin-bottom: 24px;
+}
+.hist-signature-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.hist-signature-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--paper-2);
+  border-radius: 12px;
+  padding: 14px 18px;
+}
+.hist-signature-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 13px;
+}
+.hist-sig-key {
+  color: var(--muted);
+  min-width: 130px;
+  flex-shrink: 0;
+}
+.hist-sig-val {
+  color: var(--ink);
+  font-weight: 500;
+}
+.hist-sig-trend--improving { color: var(--green); }
+.hist-sig-trend--worsening { color: var(--red); }
+.hist-sig-trend--stable    { color: var(--muted); }

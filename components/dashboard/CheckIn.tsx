@@ -66,6 +66,85 @@ function getDayPatternHint(): string | null {
 }
 
 /**
+ * Scans past check-ins (14–90 days ago) for a similar note or stress context.
+ * Returns a recall line when a meaningful match is found.
+ */
+function findEchoPattern(note: string, stress: number): string | null {
+  if (!note && stress < 4) return null;
+
+  const STOPWORDS = new Set([
+    "the","a","an","and","or","but","in","on","at","to","for","of","was","is","are",
+    "been","have","had","did","do","i","my","me","it","with","this","that","so","got",
+    "just","all","too","very","really","day","today","week","been","feel","feels",
+  ]);
+
+  function extractKeywords(text: string): string[] {
+    return text.toLowerCase().split(/\W+/).filter((w) => w.length >= 4 && !STOPWORDS.has(w));
+  }
+
+  const currentKws = new Set(extractKeywords(note));
+  const now = new Date();
+  let bestMatch: { dateLabel: string; snippet: string; overlap: number } | null = null;
+
+  for (let i = 14; i <= 90; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const key = `checkin-${d.toISOString().split("T")[0]}`;
+    const raw = localStorage.getItem(key);
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed.note) continue;
+      const pastStress: number = parsed.stress ?? 0;
+      const pastKws = extractKeywords(parsed.note);
+      const overlap = pastKws.filter((w) => currentKws.has(w)).length;
+
+      const isMatch =
+        (currentKws.size >= 2 && overlap >= 2) ||
+        (stress >= 4 && pastStress >= 4 && parsed.note.length > 10 && overlap >= 1);
+      if (!isMatch) continue;
+
+      if (!bestMatch || overlap > bestMatch.overlap) {
+        const dateLabel = d.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+        const snippet   = parsed.note.length > 50 ? parsed.note.slice(0, 50) + "…" : parsed.note;
+        bestMatch = { dateLabel, snippet, overlap };
+      }
+    } catch {}
+  }
+
+  if (!bestMatch) return null;
+  return `This looks like ${bestMatch.dateLabel} — you noted: "${bestMatch.snippet}"`;
+}
+
+/**
+ * When the user selects a stress level, look for a past note from a
+ * similar state (7+ days ago) to surface as a memory prompt.
+ */
+function getComparableNote(stress: number): { dateLabel: string; note: string } | null {
+  if (stress < 3) return null;
+  const now = new Date();
+
+  for (let i = 7; i <= 60; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const key = `checkin-${d.toISOString().split("T")[0]}`;
+    const raw = localStorage.getItem(key);
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed.note || typeof parsed.stress !== "number") continue;
+      // Match: same or adjacent stress level AND has a note
+      if (Math.abs(parsed.stress - stress) <= 1 && parsed.note.trim().length > 5) {
+        const dateLabel = d.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+        const note = parsed.note.length > 55 ? parsed.note.slice(0, 55) + "…" : parsed.note;
+        return { dateLabel, note };
+      }
+    } catch {}
+  }
+  return null;
+}
+
+/**
  * Reads yesterday's check-in note and stress and returns a dynamic
  * question + optional context line to show above the stress buttons.
  */
@@ -176,6 +255,8 @@ export default function CheckIn({
   const [response, setResponse]               = useState("");
   const [dayHint, setDayHint]                 = useState<string | null>(null);
   const [yesterdayCtx, setYesterdayCtx]       = useState<{ question: string; context: string | null }>({ question: "How are you carrying it today?", context: null });
+  const [memoryNote, setMemoryNote]           = useState<{ dateLabel: string; note: string } | null>(null);
+  const [echoPattern, setEchoPattern]         = useState<string | null>(null);
 
   useEffect(() => {
     setYesterdayCtx(getYesterdayContext());
@@ -199,6 +280,11 @@ export default function CheckIn({
     }
   }, []);
 
+  function handleStressSelect(value: number) {
+    setStress(value);
+    setMemoryNote(getComparableNote(value));
+  }
+
   function handleSubmit() {
     if (!stress) return;
     const priorHigh = getConsecutiveHighStress();
@@ -207,6 +293,11 @@ export default function CheckIn({
     localStorage.setItem(todayKey(), JSON.stringify({ stress, note, ts: Date.now() }));
     setSubmittedStress(stress);
     setResponse(getPersonalizedResponse(stress, priorHigh, streak));
+
+    // Find echo pattern if user wrote a note
+    if (note.trim()) {
+      setEchoPattern(findEchoPattern(note, stress));
+    }
 
     // The "beat" — a pause before the response appears
     setUpdating(true);
@@ -231,6 +322,9 @@ export default function CheckIn({
         </div>
         {response && (
           <p className="checkin-response-text">{response}</p>
+        )}
+        {echoPattern && (
+          <p className="checkin-echo">{echoPattern}</p>
         )}
       </div>
     );
@@ -257,13 +351,20 @@ export default function CheckIn({
             className={`checkin-stress-btn checkin-stress-btn--${s.level}${
               stress === s.value ? " checkin-stress-btn--active" : ""
             }`}
-            onClick={() => setStress(s.value)}
+            onClick={() => handleStressSelect(s.value)}
           >
             <span className="checkin-stress-num">{s.value}</span>
             <span className="checkin-stress-label">{s.label}</span>
           </button>
         ))}
       </div>
+
+      {memoryNote && !note && (
+        <div className="checkin-memory-note">
+          <span className="checkin-memory-date">{memoryNote.dateLabel}:</span>{" "}
+          <span className="checkin-memory-text">"{memoryNote.note}"</span>
+        </div>
+      )}
 
       <div className="checkin-note-wrap">
         <label className="checkin-note-label">

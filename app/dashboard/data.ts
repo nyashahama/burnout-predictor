@@ -564,3 +564,273 @@ export function getLiveSuggestion(score: number, hasCheckedIn: boolean): string 
   }
   return "You're in the green. Cognitive capacity at its best — do the deep work that actually matters today. Protect tonight's sleep and this carries into tomorrow.";
 }
+
+// ─── Trajectory language ──────────────────────────────────────────────────────
+
+/**
+ * Projects where the score is heading and names a specific day.
+ * Returns forward-looking, action-motivating language — not a description
+ * of where the user already is.
+ */
+export function buildTrajectoryInsight(
+  score: number,
+  recentStresses: number[],
+  consecutiveDangerDays: number,
+): string | null {
+  if (recentStresses.length < 2) return null;
+
+  const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const now = new Date();
+
+  const last3 = recentStresses.slice(0, 3);
+  const trendingUp   = last3.length >= 2 && last3[0] >= last3[last3.length - 1];
+  const trendingDown = last3.length >= 2 && last3[0] < last3[last3.length - 1] - 0.4;
+
+  const peakDayDate = new Date(now);
+  peakDayDate.setDate(peakDayDate.getDate() + 2);
+  const peakDayName = DAY_NAMES[peakDayDate.getDay()];
+
+  const clearDayDate = new Date(now);
+  clearDayDate.setDate(clearDayDate.getDate() + 2);
+  const clearDayName = DAY_NAMES[clearDayDate.getDay()];
+
+  if (consecutiveDangerDays >= 4) {
+    return `${consecutiveDangerDays} days at high load without recovery. The compounding effect is real — this doesn't ease on its own. One structural change today matters more than a perfect week later.`;
+  }
+  if (score > 65 && trendingUp && recentStresses.length >= 2) {
+    return `The load has been building for ${recentStresses.length} days. If the pattern holds, ${peakDayName} is your highest-risk point this week. The window to change it is now, not then.`;
+  }
+  if (score > 65 && trendingDown) {
+    return `The pressure is starting to ease. Two more careful nights and you should be out of the red by ${clearDayName}.`;
+  }
+  if (score > 40 && score <= 65 && trendingUp && last3[0] >= 3.5) {
+    return `Three more days like this and you're in hard territory. The time to protect sleep and cut one commitment is before you hit the wall, not after.`;
+  }
+  if (score <= 40 && trendingDown) {
+    return `You're holding the line. The risk now is letting a good run become an excuse to push harder. Protect tonight the same way you protected last night.`;
+  }
+  return null;
+}
+
+// ─── Milestone insight ────────────────────────────────────────────────────────
+
+export type MilestoneData = {
+  milestone: 30 | 60 | 90;
+  hardestDay: string | null;
+  easiestDay: string | null;
+  hardestDayStress: number;
+  easiestDayStress: number;
+  keywordTrigger: string | null;
+  keywordLift: number;
+  recoveryDays: number | null;
+  firstHalfAvg: number;
+  secondHalfAvg: number;
+  totalEntries: number;
+};
+
+/**
+ * Computes what the app has learned about the user at the 30/60/90
+ * check-in milestone. Returns null if the milestone has already been seen
+ * or we're not near one.
+ */
+export function buildMilestoneData(checkinCount: number): MilestoneData | null {
+  let milestone: 30 | 60 | 90 | null = null;
+  if (checkinCount >= 28 && checkinCount <= 33) milestone = 30;
+  else if (checkinCount >= 58 && checkinCount <= 63) milestone = 60;
+  else if (checkinCount >= 88 && checkinCount <= 93) milestone = 90;
+  if (!milestone) return null;
+
+  const seenKey = `milestone-seen-${milestone}`;
+  if (typeof window !== "undefined" && localStorage.getItem(seenKey)) return null;
+
+  const role  = localStorage.getItem("overload-role")  || "engineer";
+  const sleep = localStorage.getItem("overload-sleep") || "8";
+  const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+
+  const entries: Array<{ dateStr: string; stress: number; score: number; note: string }> = [];
+  const keys: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k?.startsWith("checkin-")) keys.push(k);
+  }
+  keys.sort();
+
+  for (const key of keys) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      const dateStr = key.replace("checkin-", "");
+      entries.push({
+        dateStr,
+        stress: parsed.stress ?? 3,
+        score:  stressToScore(parsed.stress ?? 3, role, sleep),
+        note:   parsed.note ?? "",
+      });
+    } catch {}
+  }
+
+  if (entries.length < 10) return null;
+
+  // Hardest / easiest day of week
+  const byDow: Record<number, number[]> = {};
+  entries.forEach((e) => {
+    const dow = new Date(e.dateStr).getDay();
+    if (!byDow[dow]) byDow[dow] = [];
+    byDow[dow].push(e.stress);
+  });
+
+  let hardestDay: string | null = null, easiestDay: string | null = null;
+  let hardestDayStress = 0, easiestDayStress = 6;
+  Object.entries(byDow).forEach(([dow, stresses]) => {
+    if (stresses.length < 3) return;
+    const avg = stresses.reduce((a, b) => a + b, 0) / stresses.length;
+    if (avg > hardestDayStress)  { hardestDayStress  = avg; hardestDay  = DAY_NAMES[Number(dow)]; }
+    if (avg < easiestDayStress)  { easiestDayStress  = avg; easiestDay  = DAY_NAMES[Number(dow)]; }
+  });
+
+  // Keyword trigger — which word most predicts elevated stress
+  const KEYWORDS = ["deadline","meeting","sleep","tired","travel","overwhelm","pressure","project","launch"];
+  let keywordTrigger: string | null = null;
+  let keywordLift = 0;
+  const baseline = entries.reduce((a, b) => a + b.stress, 0) / entries.length;
+  for (const kw of KEYWORDS) {
+    const matches = entries.filter((e) => e.note.toLowerCase().includes(kw));
+    if (matches.length < 2) continue;
+    const avg  = matches.reduce((a, b) => a + b.stress, 0) / matches.length;
+    const lift = avg - baseline;
+    if (lift > keywordLift) { keywordLift = lift; keywordTrigger = kw; }
+  }
+
+  // Recovery speed — after stress ≥ 4, how many days to stress ≤ 2
+  let totalRecDays = 0, recCount = 0;
+  for (let i = 0; i < entries.length - 1; i++) {
+    if (entries[i].stress >= 4) {
+      for (let j = i + 1; j < Math.min(entries.length, i + 14); j++) {
+        if (entries[j].stress <= 2) { totalRecDays += j - i; recCount++; break; }
+      }
+    }
+  }
+  const recoveryDays = recCount > 0 ? Math.round(totalRecDays / recCount) : null;
+
+  // First half vs second half trajectory
+  const mid = Math.floor(entries.length / 2);
+  const firstHalfAvg  = Math.round(entries.slice(0, mid).reduce((a, b) => a + b.score, 0) / mid);
+  const secondHalfAvg = Math.round(entries.slice(mid).reduce((a, b) => a + b.score, 0) / (entries.length - mid));
+
+  return {
+    milestone,
+    hardestDay,
+    easiestDay,
+    hardestDayStress: Math.round(hardestDayStress * 10) / 10,
+    easiestDayStress: Math.round(easiestDayStress * 10) / 10,
+    keywordTrigger,
+    keywordLift: Math.round(keywordLift * 10) / 10,
+    recoveryDays,
+    firstHalfAvg,
+    secondHalfAvg,
+    totalEntries: entries.length,
+  };
+}
+
+// ─── Personal signature ───────────────────────────────────────────────────────
+
+export type SignatureData = {
+  hardestDay: string | null;
+  easiestDay: string | null;
+  topTrigger: string | null;
+  triggerLift: number;
+  avgScore: number;
+  recoveryDays: number | null;
+  trend: "improving" | "stable" | "worsening";
+};
+
+/**
+ * Computes the user's personal load signature from all available check-ins.
+ * Requires ≥14 entries. Used in the History page "Your signature" section.
+ */
+export function computePersonalSignature(): SignatureData | null {
+  const role  = localStorage.getItem("overload-role")  || "engineer";
+  const sleep = localStorage.getItem("overload-sleep") || "8";
+  const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+
+  const entries: Array<{ dateStr: string; stress: number; score: number; note: string }> = [];
+  const keys: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k?.startsWith("checkin-")) keys.push(k);
+  }
+  if (keys.length < 14) return null;
+  keys.sort();
+
+  for (const key of keys) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      entries.push({
+        dateStr: key.replace("checkin-", ""),
+        stress:  parsed.stress ?? 3,
+        score:   stressToScore(parsed.stress ?? 3, role, sleep),
+        note:    parsed.note ?? "",
+      });
+    } catch {}
+  }
+  if (entries.length < 14) return null;
+
+  const byDow: Record<number, number[]> = {};
+  entries.forEach((e) => {
+    const dow = new Date(e.dateStr).getDay();
+    if (!byDow[dow]) byDow[dow] = [];
+    byDow[dow].push(e.stress);
+  });
+
+  let hardestDay: string | null = null, easiestDay: string | null = null;
+  let hardestAvg = 0, easiestAvg = 6;
+  Object.entries(byDow).forEach(([dow, stresses]) => {
+    if (stresses.length < 2) return;
+    const avg = stresses.reduce((a, b) => a + b, 0) / stresses.length;
+    if (avg > hardestAvg) { hardestAvg = avg; hardestDay = DAY_NAMES[Number(dow)]; }
+    if (avg < easiestAvg) { easiestAvg = avg; easiestDay = DAY_NAMES[Number(dow)]; }
+  });
+
+  const KEYWORDS = ["deadline","meeting","sleep","tired","travel","overwhelm","pressure","project"];
+  let topTrigger: string | null = null, triggerLift = 0;
+  const baseline = entries.reduce((a, b) => a + b.stress, 0) / entries.length;
+  for (const kw of KEYWORDS) {
+    const matches = entries.filter((e) => e.note.toLowerCase().includes(kw));
+    if (matches.length < 2) continue;
+    const avg  = matches.reduce((a, b) => a + b.stress, 0) / matches.length;
+    const lift = avg - baseline;
+    if (lift > triggerLift) { triggerLift = lift; topTrigger = kw; }
+  }
+
+  const avgScore = Math.round(entries.reduce((a, b) => a + b.score, 0) / entries.length);
+
+  let totalRec = 0, recCount = 0;
+  for (let i = 0; i < entries.length - 1; i++) {
+    if (entries[i].stress >= 4) {
+      for (let j = i + 1; j < Math.min(entries.length, i + 10); j++) {
+        if (entries[j].stress <= 2) { totalRec += j - i; recCount++; break; }
+      }
+    }
+  }
+  const recoveryDays = recCount > 0 ? Math.round(totalRec / recCount) : null;
+
+  const mid = Math.floor(entries.length / 2);
+  const firstAvg  = entries.slice(0, mid).reduce((a, b) => a + b.score, 0) / mid;
+  const secondAvg = entries.slice(mid).reduce((a, b) => a + b.score, 0) / (entries.length - mid);
+  const trend: "improving" | "stable" | "worsening" =
+    secondAvg < firstAvg - 4 ? "improving" :
+    secondAvg > firstAvg + 4 ? "worsening" : "stable";
+
+  return {
+    hardestDay,
+    easiestDay,
+    topTrigger,
+    triggerLift: Math.round(triggerLift * 10) / 10,
+    avgScore,
+    recoveryDays,
+    trend,
+  };
+}
