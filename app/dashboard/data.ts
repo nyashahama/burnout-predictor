@@ -286,6 +286,95 @@ export function getLiveSignals(
   return results;
 }
 
+// ─── Pattern Detection ────────────────────────────────────────────────────────
+
+const MONTH_MAP: Record<string, number> = {
+  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+};
+
+function parseDateStr(dateStr: string): Date | null {
+  const [mon, day] = dateStr.trim().split(" ");
+  const m = MONTH_MAP[mon];
+  if (m === undefined || !day) return null;
+  return new Date(2026, m, parseInt(day, 10));
+}
+
+/**
+ * Analyses a history array and returns up to 3 human-readable
+ * pattern observations (day-of-week spikes, trend, strain frequency).
+ */
+export function detectPatterns(data: HistoryDay[]): string[] {
+  if (data.length < 7) return [];
+
+  const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+  // Group scores by day of week
+  const byDow: Record<number, number[]> = {};
+  data.forEach((d) => {
+    const date = parseDateStr(d.date);
+    if (!date) return;
+    const dow = date.getDay();
+    if (!byDow[dow]) byDow[dow] = [];
+    byDow[dow].push(d.score);
+  });
+
+  const overallAvg = Math.round(data.reduce((s, d) => s + d.score, 0) / data.length);
+  const patterns: string[] = [];
+
+  // Find the highest and lowest average weekday (need ≥3 samples)
+  let highDay = -1, highAvg = 0;
+  let lowDay  = -1, lowAvg  = 101;
+  Object.entries(byDow).forEach(([dow, scores]) => {
+    if (scores.length < 3) return;
+    const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+    if (avg > highAvg && avg > overallAvg + 4) { highAvg = avg; highDay = Number(dow); }
+    if (avg < lowAvg  && avg < overallAvg - 4) { lowAvg  = avg; lowDay  = Number(dow); }
+  });
+
+  if (highDay >= 0) {
+    const delta = highAvg - overallAvg;
+    patterns.push(
+      `${DAY_NAMES[highDay]}s hit hardest — avg ${highAvg} (+${delta} vs your mean)`
+    );
+  }
+  if (lowDay >= 0) {
+    const delta = lowAvg - overallAvg;
+    patterns.push(
+      `${DAY_NAMES[lowDay]}s are your recovery anchor — avg ${lowAvg} (${delta} vs your mean)`
+    );
+  }
+
+  // 7-day trend vs prior 7
+  if (data.length >= 14) {
+    const recent = data.slice(-7).map((d) => d.score);
+    const prior  = data.slice(-14, -7).map((d) => d.score);
+    const rAvg = Math.round(recent.reduce((a, b) => a + b, 0) / 7);
+    const pAvg = Math.round(prior.reduce((a, b) => a + b, 0) / 7);
+    const delta = rAvg - pAvg;
+    if (Math.abs(delta) >= 4) {
+      patterns.push(
+        delta > 0
+          ? `Load climbed ${delta} pts over the past week — this trend needs attention`
+          : `Load eased ${Math.abs(delta)} pts this week — recovery is working`
+      );
+    }
+  }
+
+  // High-strain frequency callout
+  if (patterns.length < 3) {
+    const highStrainCount = data.filter((d) => d.score > 65).length;
+    const pct = Math.round((highStrainCount / data.length) * 100);
+    if (pct >= 25) {
+      patterns.push(`${pct}% of your days this month were high-strain — above the healthy threshold`);
+    } else if (pct <= 10 && data.length >= 14) {
+      patterns.push(`Only ${pct}% of days in high strain this month — you're managing load well`);
+    }
+  }
+
+  return patterns.slice(0, 3);
+}
+
 /** Returns a personalised suggestion based on the live score + check-in state. */
 export function getLiveSuggestion(score: number, hasCheckedIn: boolean): string {
   if (!hasCheckedIn) {
