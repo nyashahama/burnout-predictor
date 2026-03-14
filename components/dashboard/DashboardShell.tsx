@@ -22,11 +22,24 @@ export default function DashboardShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [name, setName] = useState(mockUser.name);
+  const [name,   setName]   = useState(mockUser.name);
+  const [streak, setStreak] = useState(mockUser.streak);
 
   useEffect(() => {
     const stored = localStorage.getItem("overload-name");
     if (stored) setName(stored);
+
+    // Compute real streak from check-ins
+    let s = 0;
+    const now = new Date();
+    for (let i = 0; i < 365; i++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const key = `checkin-${d.toISOString().split("T")[0]}`;
+      if (localStorage.getItem(key)) s++;
+      else break;
+    }
+    setStreak(s);
   }, []);
 
   function signOut() {
@@ -64,7 +77,9 @@ export default function DashboardShell({
           <div className="dash-avatar">{initials}</div>
           <div className="dash-user-info">
             <div className="dash-user-name">{name}</div>
-            <div className="dash-user-sub">{mockUser.streak}-day streak 🔥</div>
+            <div className={`dash-user-sub${streak > 0 ? " dash-user-sub--streak" : ""}`}>
+              {streak > 0 ? `🔥 ${streak}-day streak` : "No streak yet"}
+            </div>
           </div>
           <button className="dash-signout" onClick={signOut} title="Sign out">
             ⎋

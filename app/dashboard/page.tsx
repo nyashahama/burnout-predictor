@@ -51,12 +51,13 @@ function getRecentStresses(): number[] {
 }
 
 export default function DashboardPage() {
-  const [role, setRole]                   = useState("engineer");
-  const [sleepBaseline, setSleepBaseline] = useState("8");
+  const [role, setRole]                     = useState("engineer");
+  const [sleepBaseline, setSleepBaseline]   = useState("8");
   const [estimatedScore, setEstimatedScore] = useState<number | null>(null);
-  const [todayStress, setTodayStress]     = useState<number | null>(null);
-  const [liveScore, setLiveScore]         = useState(55);
-  const [ready, setReady]                 = useState(false);
+  const [todayStress, setTodayStress]       = useState<number | null>(null);
+  const [liveScore, setLiveScore]           = useState(55);
+  const [ready, setReady]                   = useState(false);
+  const [checkinCount, setCheckinCount]     = useState(0);
 
   // Bootstrap: read profile + today's check-in from localStorage
   useEffect(() => {
@@ -64,6 +65,13 @@ export default function DashboardPage() {
     const savedSleep = localStorage.getItem("overload-sleep") || "8";
     const rawEstimate = localStorage.getItem("overload-estimated-score");
     const estimate = rawEstimate ? parseInt(rawEstimate, 10) : null;
+
+    // Count all real check-in days ever logged
+    let count = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      if (localStorage.key(i)?.startsWith("checkin-")) count++;
+    }
+    setCheckinCount(count);
 
     setRole(savedRole);
     setSleepBaseline(savedSleep);
@@ -148,7 +156,7 @@ export default function DashboardPage() {
 
       <RecoveryPlan plan={recoveryPlan} score={liveScore} />
 
-      <HistoryChart data={history} />
+      <HistoryChart data={history} checkinCount={checkinCount} />
     </div>
   );
 }
