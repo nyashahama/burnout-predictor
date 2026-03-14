@@ -72,6 +72,13 @@ export default function DashboardPage() {
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [streak, setStreak]                       = useState(0);
 
+  // Ambient danger mode — paint the whole interface with the score's urgency
+  useEffect(() => {
+    const lvl = liveScore > 65 ? "danger" : liveScore > 40 ? "warning" : "ok";
+    document.body.dataset.scoreLevel = lvl;
+    return () => { delete document.body.dataset.scoreLevel; };
+  }, [liveScore]);
+
   useEffect(() => {
     const savedRole   = localStorage.getItem("overload-role")  || "engineer";
     const savedSleep  = localStorage.getItem("overload-sleep") || "8";

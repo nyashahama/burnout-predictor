@@ -1552,6 +1552,7 @@ footer {
   display: flex;
   flex-direction: column;
   padding: 32px 16px;
+  transition: background 0.9s ease-out, border-color 0.9s ease-out;
   /* Sticky: stays in viewport as page scrolls */
   position: sticky;
   top: 0;
@@ -1690,11 +1691,13 @@ footer {
 .dash-main {
   flex: 1;
   padding: 40px 48px;
+  transition: background 0.9s ease-out;
 }
 
 /* Bottom nav — hidden on desktop/tablet */
 .dash-bottom-nav {
   display: none;
+  transition: background 0.9s ease-out, border-color 0.9s ease-out;
 }
 
 .dash-header {
@@ -1759,6 +1762,69 @@ footer {
   flex-direction: column;
 }
 
+/* ─── AMBIENT SCORE MODE ──────────────────────────────────────────────────────
+   When your score changes, the whole interface responds — not by screaming, but
+   by shifting. Danger tints everything a barely-perceptible warm red. Warning
+   shifts amber. Ok is clean. You feel it before you see it.
+   The transitions are slow (0.9s) so the shift is atmosphere, not animation.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* ── Danger (score > 65) ── */
+
+body[data-score-level="danger"] .dash-main {
+  background: rgba(200, 57, 26, 0.04);
+}
+
+body[data-score-level="danger"] .dash-sidebar {
+  background: rgba(200, 57, 26, 0.02);
+  border-right-color: rgba(200, 57, 26, 0.14);
+}
+
+body[data-score-level="danger"] .dash-card {
+  border-color: rgba(200, 57, 26, 0.2);
+}
+
+body[data-score-level="danger"] .dash-bottom-nav {
+  background: rgba(200, 57, 26, 0.03);
+  border-top-color: rgba(200, 57, 26, 0.18);
+}
+
+/* ── Warning (score 41–65) ── */
+
+body[data-score-level="warning"] .dash-main {
+  background: rgba(196, 125, 26, 0.025);
+}
+
+body[data-score-level="warning"] .dash-sidebar {
+  border-right-color: rgba(196, 125, 26, 0.12);
+}
+
+body[data-score-level="warning"] .dash-card {
+  border-color: rgba(196, 125, 26, 0.16);
+}
+
+body[data-score-level="warning"] .dash-bottom-nav {
+  border-top-color: rgba(196, 125, 26, 0.14);
+}
+
+/* ── Ok (score ≤ 40) — clean, no tinting; default state reads as a reward ── */
+
+/* ── Body-level ambient shift (critical on mobile — body IS the viewport) ── */
+
+body[data-score-level="danger"] {
+  background: rgba(200, 57, 26, 0.04);
+  transition: background 0.9s ease-out;
+}
+
+body[data-score-level="warning"] {
+  background: rgba(196, 125, 26, 0.025);
+  transition: background 0.9s ease-out;
+}
+
+body {
+  transition: background 0.9s ease-out;
+}
+
 /* Grid */
 .dash-grid {
   display: grid;
@@ -1773,6 +1839,7 @@ footer {
   border: 1px solid var(--paper-3);
   border-radius: 16px;
   padding: 24px;
+  transition: border-color 0.9s ease-out;
 }
 
 /* ─── SCORE CARD ─────────────────────────────────────────── */
@@ -3067,7 +3134,12 @@ footer {
   }
 
   .burnout-alert {
-    padding: 16px;
+    padding: 14px 16px;
+  }
+
+  /* On mobile in danger mode, collapse the action items into a summary */
+  .burnout-alert-actions {
+    display: none;
   }
 
   .burnout-alert-top {
