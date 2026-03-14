@@ -1,49 +1,332 @@
 "use client";
 
-import { useState } from "react";
-import { mockUser } from "../data";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { mockCheckIns } from "../data";
 
-const integrations = [
-  {
-    icon: "📅",
-    name: "Google Calendar",
-    description: "Auto-detect meeting load and blocked focus time",
-  },
-  {
-    icon: "🍎",
-    name: "Apple Health",
-    description: "Sync sleep duration and activity data",
-  },
-  {
-    icon: "🌙",
-    name: "Oura Ring",
-    description: "Import HRV, sleep stages, and recovery score",
-  },
-];
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function requestNotifPermission(): Promise<NotificationPermission> {
+  if (!("Notification" in window)) return Promise.resolve("denied");
+  if (Notification.permission === "granted") return Promise.resolve("granted");
+  return Notification.requestPermission();
+}
+
+function getRealCheckIns(): Array<{ date: string; stress: number; score: number; note?: string }> {
+  const entries: Array<{ date: string; stress: number; score: number; note?: string }> = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key?.startsWith("checkin-")) continue;
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      const dateStr = key.replace("checkin-", ""); // YYYY-MM-DD
+      entries.push({
+        date: dateStr,
+        stress: parsed.stress ?? 0,
+        score: parsed.score ?? 0,
+        note: parsed.note,
+      });
+    } catch {}
+  }
+  return entries.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function stressLabel(s: number): string {
+  const map: Record<number, string> = {
+    1: "Very calm", 2: "Relaxed", 3: "Moderate", 4: "Stressed", 5: "Overwhelmed",
+  };
+  return map[s] ?? "—";
+}
+
+function buildCSV(): string {
+  const rows: string[] = ["Date,Stress Level,Stress Label,Score,Note"];
+
+  // Real check-ins from localStorage first
+  const real = getRealCheckIns();
+  real.forEach(({ date, stress, score, note }) => {
+    const escaped = (note ?? "").replace(/"/g, '""');
+    rows.push(`${date},${stress},"${stressLabel(stress)}",${score},"${escaped}"`);
+  });
+
+  // Fill in mock check-ins for dates not already in real data
+  const realDates = new Set(real.map((r) => r.date));
+  mockCheckIns.forEach((entry) => {
+    // Convert "Mar 13" style to something usable — skip if duplicate
+    if (realDates.size > 0) return; // only fall back when no real data at all
+    const escaped = (entry.note ?? "").replace(/"/g, '""');
+    rows.push(`${entry.date},${entry.stress},"${entry.stressLabel}",${entry.score},"${escaped}"`);
+  });
+
+  // If nothing real exists yet, use mock data
+  if (real.length === 0) {
+    mockCheckIns.forEach((entry) => {
+      const escaped = (entry.note ?? "").replace(/"/g, '""');
+      rows.push(`${entry.date},${entry.stress},"${entry.stressLabel}",${entry.score},"${escaped}"`);
+    });
+  }
+
+  return rows.join("\n");
+}
+
+function downloadCSV(content: string, filename: string) {
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+
+function ConfirmModal({
+  title,
+  body,
+  confirmLabel,
+  onConfirm,
+  onCancel,
+}: {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="modal-backdrop" onClick={onCancel}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-title">{title}</div>
+        <p className="modal-body">{body}</p>
+        <div className="modal-actions">
+          <button className="modal-cancel" onClick={onCancel}>Cancel</button>
+          <button className="modal-confirm" onClick={onConfirm}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GCalModal({ onConnect, onClose }: { onConnect: () => void; onClose: () => void }) {
+  const [phase, setPhase] = useState<"idle" | "connecting" | "done">("idle");
+
+  function handleConnect() {
+    setPhase("connecting");
+    // Simulate OAuth delay
+    setTimeout(() => {
+      setPhase("done");
+      setTimeout(() => {
+        onConnect();
+      }, 800);
+    }, 1800);
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={phase === "idle" ? onClose : undefined}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        {phase === "idle" && (
+          <>
+            <div className="modal-icon">📅</div>
+            <div className="modal-title">Connect Google Calendar</div>
+            <p className="modal-body">
+              Overload will read your calendar density — meetings, blocked focus time, and
+              scheduling patterns — to improve your score accuracy. No event content is stored.
+            </p>
+            <div className="modal-permissions">
+              <div className="modal-perm-item">
+                <span className="modal-perm-icon">✓</span> Read meeting counts and times
+              </div>
+              <div className="modal-perm-item">
+                <span className="modal-perm-icon">✓</span> Detect focus blocks vs fragmented days
+              </div>
+              <div className="modal-perm-item modal-perm-never">
+                <span className="modal-perm-icon">✗</span> Event titles, descriptions, or attendees
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="modal-cancel" onClick={onClose}>Cancel</button>
+              <button className="modal-confirm" onClick={handleConnect}>
+                Connect with Google
+              </button>
+            </div>
+          </>
+        )}
+
+        {phase === "connecting" && (
+          <div className="modal-connecting">
+            <div className="modal-spinner" />
+            <div className="modal-connecting-text">Connecting to Google Calendar…</div>
+          </div>
+        )}
+
+        {phase === "done" && (
+          <div className="modal-connecting">
+            <div className="modal-done-icon">✓</div>
+            <div className="modal-connecting-text">Calendar connected!</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
-  const [name, setName] = useState(mockUser.name);
-  const [reminderEnabled, setReminderEnabled] = useState(true);
-  const [reminderTime, setReminderTime] = useState("09:00");
-  const [weeklySummary, setWeeklySummary] = useState(true);
-  const [saved, setSaved] = useState(false);
+  const router = useRouter();
+  const [name, setName]                     = useState("");
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderTime, setReminderTime]     = useState("17:30");
+  const [weeklySummary, setWeeklySummary]   = useState(true);
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>("default");
+  const [gcalConnected, setGcalConnected]   = useState(false);
+  const [saved, setSaved]                   = useState(false);
+  const [showClearModal, setShowClearModal] = useState(false);
+  const [showGcalModal, setShowGcalModal]   = useState(false);
+  const [cleared, setCleared]               = useState(false);
+  const [exported, setExported]             = useState(false);
 
-  function handleSave() {
+  // Bootstrap from localStorage
+  useEffect(() => {
+    const storedName    = localStorage.getItem("overload-name") || "there";
+    const notifEnabled  = localStorage.getItem("overload-notif-enabled") === "1";
+    const notifTime     = localStorage.getItem("overload-notif-time") || "17:30";
+    const weeklyEnabled = localStorage.getItem("overload-weekly-summary") !== "0";
+    const gcal          = localStorage.getItem("overload-gcal-connected") === "1";
+
+    setName(storedName);
+    setReminderEnabled(notifEnabled);
+    setReminderTime(notifTime);
+    setWeeklySummary(weeklyEnabled);
+    setGcalConnected(gcal);
+
+    if ("Notification" in window) {
+      setNotifPermission(Notification.permission);
+    }
+  }, []);
+
+  // ── Save ──────────────────────────────────────────────────────────────────
+
+  async function handleSave() {
+    localStorage.setItem("overload-name", name.trim() || "there");
+    localStorage.setItem("overload-weekly-summary", weeklySummary ? "1" : "0");
+
+    if (reminderEnabled) {
+      const perm = await requestNotifPermission();
+      setNotifPermission(perm);
+      if (perm === "granted") {
+        localStorage.setItem("overload-notif-enabled", "1");
+        localStorage.setItem("overload-notif-time", reminderTime);
+      } else {
+        // Permission denied — save preference but can't schedule
+        localStorage.setItem("overload-notif-enabled", "1");
+        localStorage.setItem("overload-notif-time", reminderTime);
+      }
+    } else {
+      localStorage.setItem("overload-notif-enabled", "0");
+    }
+
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setTimeout(() => setSaved(false), 2500);
+  }
+
+  // ── Toggle reminder with permission request ───────────────────────────────
+
+  async function handleReminderToggle(checked: boolean) {
+    if (checked) {
+      const perm = await requestNotifPermission();
+      setNotifPermission(perm);
+    }
+    setReminderEnabled(checked);
+  }
+
+  // ── Export CSV ────────────────────────────────────────────────────────────
+
+  function handleExport() {
+    const csv = buildCSV();
+    const today = new Date().toISOString().split("T")[0];
+    downloadCSV(csv, `overload-history-${today}.csv`);
+    setExported(true);
+    setTimeout(() => setExported(false), 2500);
+  }
+
+  // ── Clear Data ────────────────────────────────────────────────────────────
+
+  function handleClearConfirm() {
+    // Remove all checkin entries
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      if (
+        key.startsWith("checkin-") ||
+        key.startsWith("burnout-dismissed-") ||
+        key.startsWith("recovery-checked-")
+      ) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+    localStorage.removeItem("overload-estimated-score");
+    localStorage.removeItem("overload-gcal-connected");
+    setGcalConnected(false);
+    setShowClearModal(false);
+    setCleared(true);
+    setTimeout(() => setCleared(false), 3000);
+  }
+
+  // ── GCal connect ──────────────────────────────────────────────────────────
+
+  function handleGcalConnect() {
+    localStorage.setItem("overload-gcal-connected", "1");
+    setGcalConnected(true);
+    setShowGcalModal(false);
+  }
+
+  function handleGcalDisconnect() {
+    localStorage.removeItem("overload-gcal-connected");
+    setGcalConnected(false);
   }
 
   const initials = name.trim() ? name.trim()[0].toUpperCase() : "?";
 
+  const notifBlocked = notifPermission === "denied";
+
   return (
     <div className="dash-content">
+      {showClearModal && (
+        <ConfirmModal
+          title="Clear all data?"
+          body="This permanently deletes every check-in, recovery progress, and dismissed alert. Your profile (name, role, sleep) is kept. This cannot be undone."
+          confirmLabel="Yes, clear everything"
+          onConfirm={handleClearConfirm}
+          onCancel={() => setShowClearModal(false)}
+        />
+      )}
+
+      {showGcalModal && (
+        <GCalModal
+          onConnect={handleGcalConnect}
+          onClose={() => setShowGcalModal(false)}
+        />
+      )}
+
       <header className="dash-header">
         <h1 className="dash-greeting">Settings</h1>
         <p className="dash-subheading">Manage your profile and preferences</p>
       </header>
 
+      {cleared && (
+        <div className="settings-flash settings-flash--ok">
+          ✓ All check-in data cleared successfully
+        </div>
+      )}
+
       <div className="settings-sections">
-        {/* Profile */}
+
+        {/* ── Profile ── */}
         <div className="dash-card settings-section">
           <div className="settings-section-title">Profile</div>
 
@@ -71,33 +354,43 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Notifications */}
+        {/* ── Notifications ── */}
         <div className="dash-card settings-section">
           <div className="settings-section-title">Notifications</div>
+
+          {notifBlocked && (
+            <div className="settings-notif-blocked">
+              Notifications are blocked in your browser settings. To enable them, open your
+              browser&apos;s site settings and allow notifications for this site.
+            </div>
+          )}
 
           <div className="settings-row">
             <div className="settings-row-info">
               <div className="settings-row-label">Daily check-in reminder</div>
               <div className="settings-row-sub">
-                Get a nudge to log your stress each morning
+                Get a browser notification when it&apos;s time to log your stress
               </div>
             </div>
             <label className="settings-toggle">
               <input
                 type="checkbox"
                 checked={reminderEnabled}
-                onChange={(e) => setReminderEnabled(e.target.checked)}
+                onChange={(e) => handleReminderToggle(e.target.checked)}
+                disabled={notifBlocked}
               />
               <span className="settings-toggle-track" />
               <span className="settings-toggle-thumb" />
             </label>
           </div>
 
-          {reminderEnabled && (
+          {reminderEnabled && !notifBlocked && (
             <div className="settings-row">
               <div className="settings-row-info">
                 <div className="settings-row-label">Reminder time</div>
-                <div className="settings-row-sub">When to send your daily prompt</div>
+                <div className="settings-row-sub">
+                  Default is 5:30 PM — end of the workday before the evening starts
+                </div>
               </div>
               <input
                 className="settings-input settings-input--time"
@@ -112,7 +405,7 @@ export default function SettingsPage() {
             <div className="settings-row-info">
               <div className="settings-row-label">Weekly summary</div>
               <div className="settings-row-sub">
-                Receive a digest of your load trends every Monday
+                Show the Monday morning debrief prompt on the dashboard
               </div>
             </div>
             <label className="settings-toggle">
@@ -127,50 +420,95 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Integrations */}
+        {/* ── Integrations ── */}
         <div className="dash-card settings-section">
           <div className="settings-section-title">Integrations</div>
           <p className="settings-section-desc">
-            Connect your tools to improve score accuracy. Overload never stores
-            raw data from third-party apps.
+            Connect your tools to improve score accuracy. Overload never stores raw data
+            from third-party apps.
           </p>
 
-          <div className="settings-integrations">
-            {integrations.map((item) => (
-              <div key={item.name} className="settings-integration">
-                <div className="settings-integration-icon">{item.icon}</div>
-                <div className="settings-integration-info">
-                  <div className="settings-integration-name">{item.name}</div>
-                  <div className="settings-integration-sub">{item.description}</div>
-                </div>
-                <div className="settings-integration-badge">Coming soon</div>
+          {/* Google Calendar — live integration */}
+          <div className="settings-integration settings-integration--gcal">
+            <div className="settings-integration-icon">📅</div>
+            <div className="settings-integration-info">
+              <div className="settings-integration-name">Google Calendar</div>
+              <div className="settings-integration-sub">
+                {gcalConnected
+                  ? "Reading meeting density · calendar signal active in your score"
+                  : "Auto-detect meeting load and blocked focus time"}
               </div>
-            ))}
+            </div>
+            {gcalConnected ? (
+              <div className="settings-integration-connected-wrap">
+                <div className="settings-integration-connected">Connected ✓</div>
+                <button
+                  className="settings-integration-disconnect"
+                  onClick={handleGcalDisconnect}
+                >
+                  Disconnect
+                </button>
+              </div>
+            ) : (
+              <button
+                className="settings-outline-btn"
+                onClick={() => setShowGcalModal(true)}
+              >
+                Connect
+              </button>
+            )}
           </div>
+
+          {/* Others — coming soon */}
+          {[
+            { icon: "🍎", name: "Apple Health", description: "Sync sleep duration and activity data" },
+            { icon: "🌙", name: "Oura Ring",    description: "Import HRV, sleep stages, and recovery score" },
+          ].map((item) => (
+            <div key={item.name} className="settings-integration">
+              <div className="settings-integration-icon">{item.icon}</div>
+              <div className="settings-integration-info">
+                <div className="settings-integration-name">{item.name}</div>
+                <div className="settings-integration-sub">{item.description}</div>
+              </div>
+              <div className="settings-integration-badge">Coming soon</div>
+            </div>
+          ))}
         </div>
 
-        {/* Data */}
+        {/* ── Data ── */}
         <div className="dash-card settings-section">
           <div className="settings-section-title">Data</div>
 
           <div className="settings-row">
             <div className="settings-row-info">
               <div className="settings-row-label">Export data</div>
-              <div className="settings-row-sub">Download your full history as CSV</div>
+              <div className="settings-row-sub">Download your full check-in history as CSV</div>
             </div>
-            <button className="settings-outline-btn">Export CSV</button>
+            <button
+              className={`settings-outline-btn${exported ? " settings-outline-btn--done" : ""}`}
+              onClick={handleExport}
+            >
+              {exported ? "Downloaded ✓" : "Export CSV"}
+            </button>
           </div>
 
           <div className="settings-row">
             <div className="settings-row-info">
               <div className="settings-row-label">Clear history</div>
-              <div className="settings-row-sub">Permanently delete all check-ins and scores</div>
+              <div className="settings-row-sub">
+                Permanently delete all check-ins and scores — cannot be undone
+              </div>
             </div>
-            <button className="settings-danger-btn">Clear data</button>
+            <button
+              className="settings-danger-btn"
+              onClick={() => setShowClearModal(true)}
+            >
+              Clear data
+            </button>
           </div>
         </div>
 
-        {/* Save */}
+        {/* ── Save ── */}
         <div className="settings-save-row">
           <button
             className={`settings-save${saved ? " settings-save--saved" : ""}`}
