@@ -3446,6 +3446,12 @@ footer {
   align-items: center;
   gap: 20px;
   text-align: center;
+  animation: onb-slide-in 0.28s ease-out;
+}
+
+@keyframes onb-slide-in {
+  from { opacity: 0; transform: translateX(14px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
 .onb-eyebrow {
@@ -3603,6 +3609,216 @@ footer {
 .onb-btn-back:hover {
   color: var(--ink);
   background: var(--paper-2);
+}
+
+/* ── Segmented progress bar (replaces dots) ─────────────────── */
+
+.onb-progress-bar {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.onb-seg {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--paper-3);
+  transition: background 0.35s;
+}
+
+.onb-seg--done   { background: var(--muted-2); }
+.onb-seg--active { background: var(--ink); }
+
+/* ── Opening question options ───────────────────────────────── */
+
+.onb-opening-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.onb-opening-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 16px 20px;
+  border: 2px solid var(--paper-3);
+  border-radius: 14px;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.onb-opening-option:hover {
+  border-color: var(--muted-2);
+  background: var(--paper-2);
+}
+
+.onb-opening-option--active {
+  border-color: var(--ink);
+  background: var(--paper-2);
+}
+
+.onb-opening-label {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.3;
+}
+
+.onb-opening-sub {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ── Score Reveal step ──────────────────────────────────────── */
+
+.onb-reveal {
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
+  animation: onb-fade-up 0.4s ease-out;
+}
+
+@keyframes onb-fade-up {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.onb-reveal-intro {
+  font-size: 14px;
+  color: var(--muted);
+  font-style: italic;
+  margin-bottom: -6px;
+}
+
+.onb-reveal-heading {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 400;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+/* Gauge */
+.onb-reveal-gauge-wrap {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  flex-shrink: 0;
+}
+
+.onb-reveal-svg {
+  display: block;
+}
+
+.onb-reveal-score-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.onb-reveal-num {
+  font-family: var(--font-serif);
+  font-size: 52px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.onb-reveal-denom {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Score badge */
+.onb-reveal-badge {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border-radius: 100px;
+  margin-top: -4px;
+}
+
+.onb-reveal-badge--danger {
+  background: var(--red-soft);
+  color: var(--red);
+  border: 1px solid var(--red-mid);
+}
+
+.onb-reveal-badge--warning {
+  background: rgba(196, 125, 26, 0.08);
+  color: var(--amber);
+  border: 1px solid rgba(196, 125, 26, 0.22);
+}
+
+.onb-reveal-badge--ok {
+  background: rgba(42, 122, 74, 0.08);
+  color: var(--green);
+  border: 1px solid rgba(42, 122, 74, 0.22);
+}
+
+/* Context box */
+.onb-reveal-context {
+  width: 100%;
+  padding: 18px 22px;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+
+.onb-reveal-context--danger {
+  background: var(--red-soft);
+  border: 1px solid var(--red-mid);
+}
+
+.onb-reveal-context--warning {
+  background: rgba(196, 125, 26, 0.06);
+  border: 1px solid rgba(196, 125, 26, 0.16);
+}
+
+.onb-reveal-context--ok {
+  background: rgba(42, 122, 74, 0.06);
+  border: 1px solid rgba(42, 122, 74, 0.16);
+}
+
+.onb-reveal-context-headline {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.onb-reveal-context-body {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.onb-reveal-note {
+  font-size: 12px;
+  color: var(--muted-2);
+  margin-top: -6px;
 }
 
 @media (max-width: 600px) {
