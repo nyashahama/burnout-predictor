@@ -31,7 +31,6 @@ function todayKey() {
   return `checkin-${new Date().toISOString().split("T")[0]}`;
 }
 
-/** Reads the last 3 days of check-in stress values from localStorage. */
 function getRecentStresses(): number[] {
   const stresses: number[] = [];
   const now = new Date();
@@ -50,38 +49,47 @@ function getRecentStresses(): number[] {
   return stresses;
 }
 
+function computeStreak(): number {
+  let s = 0;
+  const now = new Date();
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    if (localStorage.getItem(`checkin-${d.toISOString().split("T")[0]}`)) s++;
+    else break;
+  }
+  return s;
+}
+
 export default function DashboardPage() {
-  const [role, setRole]                         = useState("engineer");
-  const [sleepBaseline, setSleepBaseline]       = useState("8");
-  const [estimatedScore, setEstimatedScore]     = useState<number | null>(null);
-  const [todayStress, setTodayStress]           = useState<number | null>(null);
-  const [liveScore, setLiveScore]               = useState(55);
-  const [ready, setReady]                       = useState(false);
-  const [checkinCount, setCheckinCount]         = useState(0);
+  const [role, setRole]                           = useState("engineer");
+  const [sleepBaseline, setSleepBaseline]         = useState("8");
+  const [estimatedScore, setEstimatedScore]       = useState<number | null>(null);
+  const [todayStress, setTodayStress]             = useState<number | null>(null);
+  const [liveScore, setLiveScore]                 = useState(55);
+  const [ready, setReady]                         = useState(false);
+  const [checkinCount, setCheckinCount]           = useState(0);
   const [calendarConnected, setCalendarConnected] = useState(false);
+  const [streak, setStreak]                       = useState(0);
 
-  // Bootstrap: read profile + today's check-in from localStorage
   useEffect(() => {
-    const savedRole  = localStorage.getItem("overload-role")  || "engineer";
-    const savedSleep = localStorage.getItem("overload-sleep") || "8";
+    const savedRole   = localStorage.getItem("overload-role")  || "engineer";
+    const savedSleep  = localStorage.getItem("overload-sleep") || "8";
     const rawEstimate = localStorage.getItem("overload-estimated-score");
-    const estimate = rawEstimate ? parseInt(rawEstimate, 10) : null;
+    const estimate    = rawEstimate ? parseInt(rawEstimate, 10) : null;
+    const gcal        = localStorage.getItem("overload-gcal-connected") === "1";
 
-    // Count all real check-in days ever logged
     let count = 0;
     for (let i = 0; i < localStorage.length; i++) {
       if (localStorage.key(i)?.startsWith("checkin-")) count++;
     }
     setCheckinCount(count);
-
-    const gcalConnected = localStorage.getItem("overload-gcal-connected") === "1";
-    setCalendarConnected(gcalConnected);
-
+    setStreak(computeStreak());
+    setCalendarConnected(gcal);
     setRole(savedRole);
     setSleepBaseline(savedSleep);
     setEstimatedScore(estimate);
 
-    // Check if user already checked in today
     let stress: number | null = null;
     try {
       const saved = localStorage.getItem(todayKey());
@@ -99,16 +107,16 @@ export default function DashboardPage() {
       sleepBaseline: savedSleep,
       recentStresses: getRecentStresses(),
       estimatedScore: estimate,
-      calendarConnected: gcalConnected,
+      calendarConnected: gcal,
     });
     setLiveScore(score);
     setReady(true);
   }, []);
 
-  // Called by CheckIn immediately after the user submits
   const handleCheckin = useCallback(
     (stress: number) => {
       setTodayStress(stress);
+      setStreak(computeStreak());
       const newScore = calculateLiveScore({
         todayStress: stress,
         role,
@@ -119,7 +127,7 @@ export default function DashboardPage() {
       });
       setLiveScore(newScore);
     },
-    [role, sleepBaseline, estimatedScore],
+    [role, sleepBaseline, estimatedScore, calendarConnected],
   );
 
   const hasCheckedIn = todayStress !== null;
@@ -146,16 +154,23 @@ export default function DashboardPage() {
         recoveryDate={firstRecoveryDay?.date ?? "this weekend"}
       />
 
-      <UserGreeting />
-
-      <div className="dash-grid">
-        <ScoreCard
-          data={scoreData}
-          trend={trendDelta}
-          dangerStreak={consecutiveDangerDays}
-          animate={ready}
-        />
-        <ForecastChart data={forecast} />
+      {/*
+        dash-hero wraps greeting + grid together.
+        On mobile, CSS gives the grid order:-1 so the score card
+        appears before the text greeting — score dominates immediately.
+      */}
+      <div className="dash-hero">
+        <UserGreeting />
+        <div className="dash-grid">
+          <ScoreCard
+            data={scoreData}
+            trend={trendDelta}
+            dangerStreak={consecutiveDangerDays}
+            animate={ready}
+            streak={streak}
+          />
+          <ForecastChart data={forecast} />
+        </div>
       </div>
 
       <CheckIn onCheckin={handleCheckin} />

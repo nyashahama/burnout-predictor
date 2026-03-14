@@ -131,11 +131,13 @@ export default function ScoreCard({
   trend,
   dangerStreak,
   animate,
+  streak,
 }: {
   data: ScoreCardData;
   trend: number;
   dangerStreak: number;
   animate: boolean;
+  streak?: number;
 }) {
   const color   = scoreColor(data.score);
   const trendUp = trend > 0;
@@ -162,8 +164,13 @@ export default function ScoreCard({
           >
             {trendUp ? "↑" : "↓"} {Math.abs(trend)} pts this week
           </div>
+          {(streak ?? 0) > 0 && (
+            <div className="scorecard-streak-count">
+              🔥 {streak}-day streak
+            </div>
+          )}
           {dangerStreak >= 2 && (
-            <div className="scorecard-streak">
+            <div className="scorecard-danger-streak">
               {dangerStreak === 2 ? "2nd" : dangerStreak === 3 ? "3rd" : `${dangerStreak}th`}{" "}
               consecutive day in the danger zone
             </div>
