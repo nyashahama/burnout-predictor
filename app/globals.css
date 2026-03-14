@@ -5344,3 +5344,91 @@ body {
   background: var(--paper-3) !important;
   opacity: 0.5;
 }
+
+/* ─── Check-in: yesterday context ─────────────────────────────────────────── */
+.checkin-yesterday-ref {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 12px;
+  border-left: 2px solid var(--paper-3);
+  padding-left: 10px;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+/* ─── ScoreCard: explanation line ─────────────────────────────────────────── */
+.scorecard-explanation {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0 0 16px;
+}
+
+/* ─── Monday debrief card ─────────────────────────────────────────────────── */
+.monday-debrief {
+  border-radius: 14px;
+  border: 1px solid;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+.monday-debrief--danger {
+  background: rgba(200, 57, 26, 0.05);
+  border-color: var(--red-mid);
+}
+.monday-debrief--warning {
+  background: rgba(196, 125, 26, 0.04);
+  border-color: rgba(196, 125, 26, 0.22);
+}
+.monday-debrief--ok {
+  background: rgba(42, 122, 74, 0.05);
+  border-color: rgba(42, 122, 74, 0.18);
+}
+.monday-debrief-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.monday-debrief-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.monday-debrief-dismiss {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: var(--muted-2);
+  line-height: 1;
+  padding: 0 2px;
+  transition: color 0.15s;
+}
+.monday-debrief-dismiss:hover { color: var(--ink); }
+.monday-debrief-narrative {
+  font-size: 14px;
+  color: var(--ink);
+  line-height: 1.65;
+  margin: 0 0 12px;
+}
+.monday-debrief-onething {
+  font-size: 13px;
+  color: var(--ink-2);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+.monday-debrief-thing-label {
+  font-weight: 600;
+  color: var(--ink);
+}
+.monday-debrief-thing-text { color: var(--ink-2); }
+.monday-debrief-link {
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px solid var(--paper-3);
+  transition: color 0.15s;
+}
+.monday-debrief-link:hover { color: var(--ink); }

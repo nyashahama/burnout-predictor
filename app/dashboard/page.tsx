@@ -12,6 +12,7 @@ import {
   getLiveSuggestion,
   scoreLabel,
   stressToScore,
+  buildScoreExplanation,
   type HistoryDay,
 } from "./data";
 import ScoreCard from "@/components/dashboard/ScoreCard";
@@ -21,6 +22,7 @@ import HistoryChart from "@/components/dashboard/HistoryChart";
 import UserGreeting from "@/components/dashboard/UserGreeting";
 import BurnoutAlert from "@/components/dashboard/BurnoutAlert";
 import RecoveryPlan from "@/components/dashboard/RecoveryPlan";
+import MondayDebrief from "@/components/dashboard/MondayDebrief";
 
 // Forecast stats derived from static forecast data
 const dangerDaysAhead = Math.max(
@@ -100,12 +102,14 @@ export default function DashboardPage() {
   const [sleepBaseline, setSleepBaseline]         = useState("8");
   const [estimatedScore, setEstimatedScore]       = useState<number | null>(null);
   const [todayStress, setTodayStress]             = useState<number | null>(null);
+  const [todayNote, setTodayNote]                 = useState<string | undefined>(undefined);
   const [liveScore, setLiveScore]                 = useState(55);
   const [ready, setReady]                         = useState(false);
   const [checkinCount, setCheckinCount]           = useState(0);
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [streak, setStreak]                       = useState(0);
   const [realHistory, setRealHistory]             = useState<HistoryDay[]>([]);
+  const [consecutiveDangerReal, setConsecutiveDangerReal] = useState(0);
 
   // Ambient danger mode — paint the whole interface with the score's urgency
   useEffect(() => {
@@ -134,15 +138,34 @@ export default function DashboardPage() {
     setEstimatedScore(estimate);
 
     let stress: number | null = null;
+    let note: string | undefined = undefined;
     try {
       const saved = localStorage.getItem(todayKey());
       if (saved) {
         const parsed = JSON.parse(saved);
         if (typeof parsed.stress === "number") stress = parsed.stress;
+        if (typeof parsed.note === "string" && parsed.note) note = parsed.note;
       }
     } catch {}
 
     setTodayStress(stress);
+    setTodayNote(note);
+
+    // Compute consecutive danger days from real check-ins
+    let dangerCount = 0;
+    const nowRef = new Date();
+    for (let i = 1; i <= 30; i++) {
+      const d = new Date(nowRef);
+      d.setDate(d.getDate() - i);
+      const raw = localStorage.getItem(`checkin-${d.toISOString().split("T")[0]}`);
+      if (!raw) break;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed.stress >= 4) dangerCount++;
+        else break;
+      } catch { break; }
+    }
+    setConsecutiveDangerReal(dangerCount);
 
     const score = calculateLiveScore({
       todayStress: stress,
@@ -173,10 +196,16 @@ export default function DashboardPage() {
     [role, sleepBaseline, estimatedScore, calendarConnected],
   );
 
-  const hasCheckedIn = todayStress !== null;
-  const signals      = getLiveSignals(todayStress, role, sleepBaseline, calendarConnected);
-  const suggestion   = getLiveSuggestion(liveScore, hasCheckedIn);
-  const level        = liveScore > 65 ? "danger" : liveScore > 40 ? "warning" : "ok";
+  const hasCheckedIn     = todayStress !== null;
+  const signals          = getLiveSignals(todayStress, role, sleepBaseline, calendarConnected);
+  const suggestion       = getLiveSuggestion(liveScore, hasCheckedIn);
+  const level            = liveScore > 65 ? "danger" : liveScore > 40 ? "warning" : "ok";
+  const scoreExplanation = buildScoreExplanation({
+    score: liveScore,
+    todayStress,
+    consecutiveDangerDays: consecutiveDangerReal,
+    recentStresses: getRecentStresses(),
+  });
 
   const scoreData = {
     score: liveScore,
@@ -203,7 +232,8 @@ export default function DashboardPage() {
         appears before the text greeting — score dominates immediately.
       */}
       <div className="dash-hero">
-        <UserGreeting />
+        <UserGreeting liveScore={liveScore} />
+        <MondayDebrief />
         <div className="dash-grid">
           <ScoreCard
             data={scoreData}
@@ -212,13 +242,21 @@ export default function DashboardPage() {
             animate={ready}
             streak={streak}
             checkinCount={checkinCount}
+            explanation={scoreExplanation}
           />
           <ForecastChart data={forecast} />
           <CheckIn onCheckin={handleCheckin} />
         </div>
       </div>
 
-      <RecoveryPlan plan={recoveryPlan} score={liveScore} />
+      <RecoveryPlan
+        plan={recoveryPlan}
+        score={liveScore}
+        note={todayNote}
+        stress={todayStress ?? undefined}
+        consecutiveDays={consecutiveDangerReal}
+        role={role}
+      />
 
       <HistoryChart data={realHistory.length ? realHistory : history} checkinCount={checkinCount} />
     </div>

@@ -133,6 +133,7 @@ export default function ScoreCard({
   animate,
   streak,
   checkinCount,
+  explanation,
 }: {
   data: ScoreCardData;
   trend: number;
@@ -140,6 +141,7 @@ export default function ScoreCard({
   animate: boolean;
   streak?: number;
   checkinCount?: number;
+  explanation?: string;
 }) {
   const color      = scoreColor(data.score);
   const trendUp    = trend > 0;
@@ -203,6 +205,11 @@ export default function ScoreCard({
           })()}
         </div>
       </div>
+
+      {/* Score explanation */}
+      {explanation && (
+        <p className="scorecard-explanation">{explanation}</p>
+      )}
 
       {/* Signals */}
       <div className="scorecard-signals">

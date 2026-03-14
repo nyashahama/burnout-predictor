@@ -1,22 +1,39 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-type PlanSection = {
-  timing: string;
-  actions: string[];
-};
+import {
+  type PlanSection,
+  buildDynamicRecoveryPlan,
+} from "@/app/dashboard/data";
 
 const STORAGE_KEY = `recovery-checked-${new Date().toISOString().split("T")[0]}`;
 
 export default function RecoveryPlan({
   plan,
   score,
+  note,
+  stress,
+  consecutiveDays,
+  role,
 }: {
   plan: PlanSection[];
   score: number;
+  note?: string;
+  stress?: number;
+  consecutiveDays?: number;
+  role?: string;
 }) {
-  const allActions = plan.flatMap((s) => s.actions);
+  const effectivePlan =
+    stress !== undefined
+      ? buildDynamicRecoveryPlan({
+          note,
+          stress,
+          consecutiveDays: consecutiveDays ?? 0,
+          role: role ?? "engineer",
+        })
+      : plan;
+
+  const allActions = effectivePlan.flatMap((s) => s.actions);
   const [checked, setChecked] = useState<boolean[]>(() =>
     new Array(allActions.length).fill(false)
   );
@@ -71,7 +88,7 @@ export default function RecoveryPlan({
       </div>
 
       <div className="recovery-sections">
-        {plan.map((section) => (
+        {effectivePlan.map((section) => (
           <div key={section.timing} className="recovery-section">
             <div className="recovery-timing">{section.timing}</div>
             <div className="recovery-actions">

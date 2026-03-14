@@ -36,20 +36,76 @@ function computeStreak(): number {
 }
 
 /**
- * Reads check-ins for the same day-of-week from the past 8 weeks.
- * Returns a short, human observation when a clear pattern exists.
+ * Session continuity — reads yesterday's check-in and compares it to the
+ * current live score to surface a meaningful one-liner about what changed.
  */
-function getPatternInsight(): string | null {
-  const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-  const now = new Date();
-  const todayDow = now.getDay();
-  const dayName  = DAY_NAMES[todayDow];
-  const stresses: number[] = [];
+function getSessionContext(liveScore: number): string | null {
+  const now       = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const key = `checkin-${yesterday.toISOString().split("T")[0]}`;
+  const raw = localStorage.getItem(key);
+  if (!raw) return null;
 
+  try {
+    const parsed = JSON.parse(raw);
+    const yesterdayStress: number = parsed.stress ?? 0;
+    const note: string            = parsed.note   ?? "";
+
+    // Approximate yesterday's score from stress (same base map as calculateLiveScore)
+    const baseMap: Record<number, number> = { 1: 22, 2: 35, 3: 50, 4: 64, 5: 76 };
+    const yesterdayBase = baseMap[yesterdayStress] ?? 50;
+    const delta         = liveScore - yesterdayBase;
+
+    const n = note.toLowerCase();
+    const hadDeadline = /deadline|deliver|launch|submit|due/.test(n);
+    const hadMeetings = /meeting|call|sync|standup|review|presentation|demo/.test(n);
+    const hadSleep    = /sleep|tired|exhausted|rest|insomnia/.test(n);
+
+    if (hadDeadline && delta < -8)
+      return `Looks like the pressure lifted a bit from yesterday's deadline.`;
+    if (hadSleep && delta < -8)
+      return `Yesterday's tiredness shows up in the data. Rest when you can today.`;
+    if (hadMeetings && yesterdayStress >= 4)
+      return `Yesterday was heavy on calls. See if you can protect some focus time today.`;
+    if (delta <= -12)
+      return `Down from yesterday. Whatever shifted — keep it.`;
+    if (delta >= 12 && yesterdayStress <= 2)
+      return `Yesterday was calm. Today the load is climbing — watch it early.`;
+    if (delta >= 12)
+      return `Up from yesterday. The data is tracking the pressure.`;
+    if (Math.abs(delta) <= 5 && yesterdayStress >= 4)
+      return `Still in elevated territory from yesterday. Today's choices matter.`;
+  } catch {}
+
+  return null;
+}
+
+/**
+ * Fires once when a day-of-week pattern is first discovered.
+ * Waits 30 days before surfacing the same pattern again.
+ */
+function getEarnedPatternInsight(): string | null {
+  const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const now       = new Date();
+  const todayDow  = now.getDay();
+  const dayName   = DAY_NAMES[todayDow];
+
+  // Check the cooldown — skip if seen within 30 days
+  const seenKey = `pattern-seen-dow-${todayDow}`;
+  const lastSeen = localStorage.getItem(seenKey);
+  if (lastSeen) {
+    const daysSince = Math.floor(
+      (now.getTime() - new Date(lastSeen).getTime()) / (1000 * 60 * 60 * 24)
+    );
+    if (daysSince < 30) return null;
+  }
+
+  const stresses: number[] = [];
   for (let week = 1; week <= 8; week++) {
     const d = new Date(now);
     d.setDate(d.getDate() - week * 7);
-    if (d.getDay() !== todayDow) continue; // safety guard
+    if (d.getDay() !== todayDow) continue;
     const raw = localStorage.getItem(`checkin-${d.toISOString().split("T")[0]}`);
     if (!raw) continue;
     try {
@@ -61,14 +117,76 @@ function getPatternInsight(): string | null {
   if (stresses.length < 2) return null;
   const avg = stresses.reduce((a, b) => a + b, 0) / stresses.length;
 
-  if (avg >= 4.2) return `Your ${dayName}s have been running hot. Plan lighter today if you can.`;
-  if (avg >= 3.6) return `${dayName}s tend to be one of your harder days. Head's up.`;
-  if (avg <= 1.8) return `${dayName}s are usually easy on you. The data is on your side.`;
-  if (avg <= 2.4) return `${dayName}s tend to be good. Let's keep it that way.`;
-  return null;
+  let insight: string | null = null;
+  if (avg >= 4.2)      insight = `${dayName}s have been your hardest day, consistently. That's a pattern — it's worth changing something about them.`;
+  else if (avg >= 3.6) insight = `${dayName}s tend to run heavier for you. The data has been saying this for a while.`;
+  else if (avg <= 1.8) insight = `${dayName}s are reliably good to you. Whatever makes them work — protect it.`;
+  else if (avg <= 2.4) insight = `${dayName}s tend to be your lighter days. Lean into that today.`;
+
+  if (insight) {
+    localStorage.setItem(seenKey, now.toISOString().split("T")[0]);
+  }
+
+  return insight;
 }
 
-export default function UserGreeting() {
+/**
+ * Month-over-month arc — compares this month's average to last month's
+ * when both have at least 7 real check-ins.
+ */
+function getMonthlyArc(): string | null {
+  const now         = new Date();
+  const thisMonth   = now.getMonth();
+  const thisYear    = now.getFullYear();
+  const lastMonth   = thisMonth === 0 ? 11 : thisMonth - 1;
+  const lastYear    = thisMonth === 0 ? thisYear - 1 : thisYear;
+
+  const thisScores: number[] = [];
+  const lastScores: number[] = [];
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k?.startsWith("checkin-")) continue;
+    const dateStr = k.replace("checkin-", "");
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) continue;
+
+    try {
+      const raw    = localStorage.getItem(k);
+      const parsed = raw ? JSON.parse(raw) : null;
+      const base: Record<number, number> = { 1: 22, 2: 35, 3: 50, 4: 64, 5: 76 };
+      const score  = parsed?.stress ? (base[parsed.stress] ?? 50) : null;
+      if (score === null) continue;
+
+      if (d.getFullYear() === thisYear && d.getMonth() === thisMonth)
+        thisScores.push(score);
+      else if (d.getFullYear() === lastYear && d.getMonth() === lastMonth)
+        lastScores.push(score);
+    } catch {}
+  }
+
+  if (thisScores.length < 7 || lastScores.length < 7) return null;
+
+  const thisAvg = Math.round(thisScores.reduce((a, b) => a + b, 0) / thisScores.length);
+  const lastAvg = Math.round(lastScores.reduce((a, b) => a + b, 0) / lastScores.length);
+  const delta   = thisAvg - lastAvg;
+
+  if (Math.abs(delta) < 4) return null;
+
+  const MONTH_NAMES = ["January","February","March","April","May","June",
+                       "July","August","September","October","November","December"];
+  const lastMonthName = MONTH_NAMES[lastMonth];
+
+  if (delta <= -8)
+    return `Noticeably lighter than ${lastMonthName}. Whatever changed this month — it's showing up in the data.`;
+  if (delta < -4)
+    return `Your load is trending down from ${lastMonthName}. Carry this forward.`;
+  if (delta >= 8)
+    return `Load is up compared to ${lastMonthName}. Worth paying attention to before it compounds.`;
+  return `Running a bit hotter than ${lastMonthName}. The trend is worth watching.`;
+}
+
+export default function UserGreeting({ liveScore }: { liveScore?: number }) {
   const [name,    setName]    = useState(mockUser.name);
   const [streak,  setStreak]  = useState<number | null>(null);
   const [insight, setInsight] = useState<string | null>(null);
@@ -77,8 +195,20 @@ export default function UserGreeting() {
     const stored = localStorage.getItem("overload-name");
     if (stored) setName(stored);
     setStreak(computeStreak());
-    setInsight(getPatternInsight());
-  }, []);
+
+    // Priority: session context > earned pattern discovery > monthly arc
+    const sessionCtx = liveScore !== undefined ? getSessionContext(liveScore) : null;
+    if (sessionCtx) {
+      setInsight(sessionCtx);
+      return;
+    }
+    const earned = getEarnedPatternInsight();
+    if (earned) {
+      setInsight(earned);
+      return;
+    }
+    setInsight(getMonthlyArc());
+  }, [liveScore]);
 
   const showStreak = streak !== null;
   const hasStreak  = (streak ?? 0) > 0;

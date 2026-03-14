@@ -65,6 +65,48 @@ function getDayPatternHint(): string | null {
   return null;
 }
 
+/**
+ * Reads yesterday's check-in note and stress and returns a dynamic
+ * question + optional context line to show above the stress buttons.
+ */
+function getYesterdayContext(): { question: string; context: string | null } {
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const key = `checkin-${yesterday.toISOString().split("T")[0]}`;
+  const raw = localStorage.getItem(key);
+  if (!raw) return { question: "How are you carrying it today?", context: null };
+
+  try {
+    const parsed = JSON.parse(raw);
+    const note: string = parsed.note || "";
+    const stress: number = parsed.stress ?? 0;
+    const n = note.toLowerCase();
+
+    if (/deadline|deliver|launch|submit|due/.test(n)) {
+      const snippet = note.length > 40 ? note.slice(0, 40) + "…" : note;
+      return {
+        question: "How did it go?",
+        context: `Yesterday: "${snippet}"`,
+      };
+    }
+    if (/meeting|call|sync|standup|review|presentation|demo/.test(n)) {
+      return { question: "How are you coming out of it?", context: null };
+    }
+    if (/sleep|tired|exhausted|rest|insomnia/.test(n)) {
+      return { question: "Did you manage to rest?", context: null };
+    }
+    if (stress >= 5) {
+      return { question: "Still in it, or is today different?", context: null };
+    }
+    if (stress >= 4) {
+      return { question: "How does today feel compared to yesterday?", context: null };
+    }
+  } catch {}
+
+  return { question: "How are you carrying it today?", context: null };
+}
+
 /** Check-in streak — consecutive days with any check-in, including today */
 function getStreak(): number {
   let s = 0;
@@ -133,8 +175,10 @@ export default function CheckIn({
   const [updating, setUpdating]               = useState(false);
   const [response, setResponse]               = useState("");
   const [dayHint, setDayHint]                 = useState<string | null>(null);
+  const [yesterdayCtx, setYesterdayCtx]       = useState<{ question: string; context: string | null }>({ question: "How are you carrying it today?", context: null });
 
   useEffect(() => {
+    setYesterdayCtx(getYesterdayContext());
     setDayHint(getDayPatternHint());
     const saved = localStorage.getItem(todayKey());
     if (saved) {
@@ -194,11 +238,15 @@ export default function CheckIn({
 
   return (
     <div className="dash-card checkin">
+      {yesterdayCtx.context && (
+        <p className="checkin-yesterday-ref">{yesterdayCtx.context}</p>
+      )}
+
       <div className="checkin-question">
-        How are you carrying it today?
+        {yesterdayCtx.question}
       </div>
 
-      {dayHint && (
+      {!yesterdayCtx.context && dayHint && (
         <p className="checkin-day-hint">{dayHint}</p>
       )}
 

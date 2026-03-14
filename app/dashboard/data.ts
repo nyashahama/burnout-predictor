@@ -246,7 +246,7 @@ export function getLiveSignals(
   const hoursMap: Record<string, number> = { "6": 6, "7": 7, "8": 8, "9": 9 };
   const hours = hoursMap[sleepBaseline] ?? 8;
   results.push({
-    label: "Sleep baseline",
+    label: "Your sleep",
     detail:
       hours <= 6
         ? `${hours}h target — chronic deficit, little recovery margin`
@@ -267,10 +267,10 @@ export function getLiveSignals(
       5: { detail: "High — take action today, not tomorrow",      val: "Overwhelmed", level: "danger" },
     };
     const s = stressMap[todayStress];
-    if (s) results.push({ label: "Stress (today)", ...s });
+    if (s) results.push({ label: "How you carried it", ...s });
   } else {
     results.push({
-      label: "Stress (check-in)",
+      label: "Today's check-in",
       detail: "Check in below to factor today's stress into your score",
       val: "Pending",
       level: "warning",
@@ -289,15 +289,15 @@ export function getLiveSignals(
 
   // Role load signal
   const roleSignals: Record<string, { detail: string; val: string; level: SignalLevel }> = {
-    founder:  { detail: "Executive role adds significant ambient pressure",      val: "Very high",    level: "danger" },
-    manager:  { detail: "Context-switching and people load increase overhead",   val: "Elevated",     level: "warning" },
-    pm:       { detail: "Coordination overhead elevates your baseline",          val: "Moderate+",    level: "warning" },
-    engineer: { detail: "Deep work role — protecting focus blocks is key",       val: "Baseline",     level: "ok" },
-    designer: { detail: "Creative role — lower ambient pressure baseline",       val: "Low baseline", level: "ok" },
-    other:    { detail: "Your role contributes to your baseline load",           val: "Baseline",     level: "ok" },
+    founder:  { detail: "Founders carry ambient pressure most tools don't measure",   val: "Very high",    level: "danger" },
+    manager:  { detail: "Managing people adds invisible overhead your calendar doesn't show", val: "Elevated", level: "warning" },
+    pm:       { detail: "Coordination overhead elevates your baseline",               val: "Moderate+",    level: "warning" },
+    engineer: { detail: "Deep work role — protecting focus blocks is key",            val: "Baseline",     level: "ok" },
+    designer: { detail: "Creative role — lower ambient pressure baseline",            val: "Low baseline", level: "ok" },
+    other:    { detail: "Your role contributes to your baseline load",                val: "Baseline",     level: "ok" },
   };
   const rs = roleSignals[role];
-  if (rs) results.push({ label: "Role load", ...rs });
+  if (rs) results.push({ label: "Your role", ...rs });
 
   return results;
 }
@@ -420,6 +420,129 @@ export function getAccuracyLabel(count: number): string | null {
   if (count >= 7)  return `Based on ${count} real check-ins`;
   if (count >= 3)  return `${count} check-ins in — getting smarter`;
   return null;
+}
+
+// ─── Plan section type (shared with RecoveryPlan component) ──────────────────
+
+export type PlanSection = { timing: string; actions: string[] };
+
+// ─── Score explanation ────────────────────────────────────────────────────────
+
+/**
+ * Returns one sentence explaining WHY the score is what it is,
+ * connecting consecutive days, stress level, and sleep baseline.
+ */
+export function buildScoreExplanation({
+  score,
+  todayStress,
+  consecutiveDangerDays,
+  recentStresses,
+}: {
+  score: number;
+  todayStress: number | null;
+  consecutiveDangerDays: number;
+  recentStresses: number[];
+}): string {
+  if (todayStress === null) {
+    if (score > 65)
+      return "This estimate is based on your onboarding profile — check in below to make it yours.";
+    return "Your starting estimate from onboarding. Check in below to refine it.";
+  }
+  if (consecutiveDangerDays >= 3)
+    return `${consecutiveDangerDays} consecutive days of high load compound in ways that sleep alone can't fix overnight.`;
+  if (consecutiveDangerDays >= 2)
+    return "Back-to-back hard days leave a residue that a single rest day doesn't clear.";
+  if (todayStress >= 5 && score > 65)
+    return "Overwhelm today drives the score hard. Sleep is the fastest recovery lever you have tonight.";
+  if (todayStress <= 2 && score > 50) {
+    const recentHigh = recentStresses.filter((s) => s >= 4).length;
+    if (recentHigh >= 1)
+      return "You're carrying it better today, but the load from earlier this week is still in the number.";
+    return "Your sleep baseline is keeping the score up even on a calm day.";
+  }
+  if (todayStress <= 2 && score <= 40)
+    return "Low stress and a solid sleep baseline put you in the clear. This is what recovery looks like.";
+  if (score > 65)
+    return "Today's stress combined with your recent pattern is pushing the number up.";
+  if (score <= 40)
+    return "Everything is working in your favour today. Protect tonight's sleep to carry this forward.";
+  return "Your score reflects today's check-in and the load pattern from earlier this week.";
+}
+
+// ─── Dynamic recovery plan ────────────────────────────────────────────────────
+
+/**
+ * Builds a personalised recovery plan by keyword-matching the user's note
+ * and factoring in their stress level, consecutive danger days, and role.
+ */
+export function buildDynamicRecoveryPlan({
+  note,
+  stress,
+  consecutiveDays,
+  role,
+}: {
+  note?: string;
+  stress: number;
+  consecutiveDays: number;
+  role: string;
+}): PlanSection[] {
+  const n = (note || "").toLowerCase();
+  const hasDeadline = /deadline|deliver|launch|submit|due/.test(n);
+  const hasMeetings = /meeting|call|sync|standup|review|presentation|demo/.test(n);
+  const hasSleep    = /sleep|tired|exhausted|rest|insomnia/.test(n);
+  const hasTravel   = /travel|flight|hotel|trip/.test(n);
+  const hasFamily   = /family|kid|child|parent/.test(n);
+
+  const tonightActions: string[] = [];
+  const tomorrowActions: string[] = [];
+  const weekActions: string[] = [];
+
+  // Tonight
+  if (hasSleep || stress >= 4) {
+    tonightActions.push("Hard-stop work by 8 PM. Laptop closed, no exceptions.");
+    tonightActions.push("Set a 10 PM sleep alarm — 8 hours is your fastest recovery lever.");
+    tonightActions.push("No screens in the last 30 minutes before bed.");
+  } else {
+    tonightActions.push("Wind down by 9 PM — don't let relief from a calmer day become an excuse to push.");
+    tonightActions.push("Protect sleep over everything else tonight.");
+  }
+
+  // Tomorrow
+  if (hasDeadline) {
+    tomorrowActions.push("Block the first 90 minutes of tomorrow for the actual deliverable — before email or Slack.");
+    tomorrowActions.push("Identify one thing on tomorrow's list that can slip without real consequence. Move it.");
+  } else if (hasMeetings) {
+    tomorrowActions.push("Audit tomorrow's calendar now. Convert one sync to async before you close the laptop.");
+    tomorrowActions.push("Block 9–11 AM as a protected focus window before the day fills.");
+  } else {
+    tomorrowActions.push("Block 9–11 AM as a no-meeting deep-work window before your calendar fills.");
+    tomorrowActions.push("Take a 20-minute walk at lunch — leave your phone at your desk.");
+  }
+
+  if (hasTravel) {
+    tomorrowActions.push("Travel compounds load. Protect sleep over everything else while you're out.");
+  }
+  if (hasFamily) {
+    tomorrowActions.push("Protect one uninterrupted hour with family tomorrow — leave the phone in another room.");
+  }
+
+  // This week
+  if (consecutiveDays >= 2) {
+    weekActions.push(`${consecutiveDays + 1} consecutive hard days. One thing needs to come off your plate — a meeting converted to async, a deadline pushed, something.`);
+  }
+  if (role === "founder" || role === "manager") {
+    weekActions.push("Identify one decision you've been carrying that can be delegated or dropped this week.");
+  }
+  weekActions.push("Protect at least one evening this week from any work.");
+  if (stress >= 4) {
+    weekActions.push("Keep meetings under 4 per day through the end of the week.");
+  }
+
+  return [
+    { timing: "Tonight",    actions: tonightActions },
+    { timing: "Tomorrow",   actions: tomorrowActions },
+    { timing: "This week",  actions: weekActions },
+  ];
 }
 
 /** Returns a personalised suggestion based on the live score + check-in state. */
