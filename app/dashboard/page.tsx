@@ -51,13 +51,14 @@ function getRecentStresses(): number[] {
 }
 
 export default function DashboardPage() {
-  const [role, setRole]                     = useState("engineer");
-  const [sleepBaseline, setSleepBaseline]   = useState("8");
-  const [estimatedScore, setEstimatedScore] = useState<number | null>(null);
-  const [todayStress, setTodayStress]       = useState<number | null>(null);
-  const [liveScore, setLiveScore]           = useState(55);
-  const [ready, setReady]                   = useState(false);
-  const [checkinCount, setCheckinCount]     = useState(0);
+  const [role, setRole]                         = useState("engineer");
+  const [sleepBaseline, setSleepBaseline]       = useState("8");
+  const [estimatedScore, setEstimatedScore]     = useState<number | null>(null);
+  const [todayStress, setTodayStress]           = useState<number | null>(null);
+  const [liveScore, setLiveScore]               = useState(55);
+  const [ready, setReady]                       = useState(false);
+  const [checkinCount, setCheckinCount]         = useState(0);
+  const [calendarConnected, setCalendarConnected] = useState(false);
 
   // Bootstrap: read profile + today's check-in from localStorage
   useEffect(() => {
@@ -72,6 +73,9 @@ export default function DashboardPage() {
       if (localStorage.key(i)?.startsWith("checkin-")) count++;
     }
     setCheckinCount(count);
+
+    const gcalConnected = localStorage.getItem("overload-gcal-connected") === "1";
+    setCalendarConnected(gcalConnected);
 
     setRole(savedRole);
     setSleepBaseline(savedSleep);
@@ -95,6 +99,7 @@ export default function DashboardPage() {
       sleepBaseline: savedSleep,
       recentStresses: getRecentStresses(),
       estimatedScore: estimate,
+      calendarConnected: gcalConnected,
     });
     setLiveScore(score);
     setReady(true);
@@ -110,6 +115,7 @@ export default function DashboardPage() {
         sleepBaseline,
         recentStresses: getRecentStresses(),
         estimatedScore,
+        calendarConnected,
       });
       setLiveScore(newScore);
     },
@@ -117,7 +123,7 @@ export default function DashboardPage() {
   );
 
   const hasCheckedIn = todayStress !== null;
-  const signals      = getLiveSignals(todayStress, role, sleepBaseline);
+  const signals      = getLiveSignals(todayStress, role, sleepBaseline, calendarConnected);
   const suggestion   = getLiveSuggestion(liveScore, hasCheckedIn);
   const level        = liveScore > 65 ? "danger" : liveScore > 40 ? "warning" : "ok";
 

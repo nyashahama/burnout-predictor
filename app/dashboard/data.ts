@@ -193,12 +193,14 @@ export function calculateLiveScore({
   sleepBaseline,
   recentStresses,
   estimatedScore,
+  calendarConnected,
 }: {
   todayStress: number | null;
   role: string;
   sleepBaseline: string;
   recentStresses: number[];
   estimatedScore: number | null;
+  calendarConnected?: boolean;
 }): number {
   // No check-in yet — surface the onboarding estimate so the score isn't generic
   if (todayStress === null) {
@@ -225,6 +227,9 @@ export function calculateLiveScore({
     score += Math.round((avg - 3) * 2.5); // 3 is neutral
   }
 
+  // Calendar integration — detects meeting density, adds realistic pressure
+  if (calendarConnected) score += 4;
+
   return Math.max(8, Math.min(92, Math.round(score)));
 }
 
@@ -233,6 +238,7 @@ export function getLiveSignals(
   todayStress: number | null,
   role: string,
   sleepBaseline: string,
+  calendarConnected?: boolean,
 ): Signal[] {
   const results: Signal[] = [];
 
@@ -267,6 +273,16 @@ export function getLiveSignals(
       label: "Stress (check-in)",
       detail: "Check in below to factor today's stress into your score",
       val: "Pending",
+      level: "warning",
+    });
+  }
+
+  // Calendar density signal (when Google Calendar is connected)
+  if (calendarConnected) {
+    results.push({
+      label: "Calendar density",
+      detail: "6 meetings today — 0 protected deep-work blocks detected",
+      val: "Overloaded",
       level: "warning",
     });
   }
