@@ -25,65 +25,98 @@ Overload synthesizes signals across your life — sleep deficit, calendar densit
 
 | Layer | Choice |
 |---|---|
-| Framework | Next.js 16 (App Router) |
-| Language | TypeScript 5 |
-| UI | React 19 |
-| Styles | Tailwind CSS 4 |
-| Email | Resend |
-
-No database. No auth. The current version runs entirely on mock data — the architecture is designed for a real data layer to be added later.
+| **Frontend** | Next.js 16 (App Router), React 19, TypeScript 5, Tailwind CSS 4 |
+| **Backend** | Go 1.22, Chi router, pgx/sqlc, Goose migrations |
+| **Database** | PostgreSQL 16 |
+| **Email** | Resend |
+| **Payments** | PayFast |
+| **AI** | OpenAI API |
+| **Deployment** | Render (Docker), Vercel (Frontend) |
 
 ---
 
 ## Project structure
 
 ```
-app/
-  page.tsx              # Marketing landing page
-  layout.tsx            # Root layout
-  dashboard/
-    page.tsx            # Dashboard view
-    layout.tsx          # Dashboard shell wrapper
-    data.ts             # Mock data + scoring helpers
-    loading.tsx         # Suspense loading state
-
-components/
-  Nav.tsx               # Top navigation
-  Hero.tsx
-  Recognition.tsx
-  Benefits.tsx
-  CrashTimeline.tsx
-  HowItWorks.tsx
-  Score.tsx
-  Demo.tsx
-  Testimonials.tsx
-  Pricing.tsx
-  FinalCta.tsx
-  Footer.tsx
-  dashboard/
-    DashboardShell.tsx  # Sidebar layout (collapses to top nav on mobile)
-    ScoreCard.tsx       # Today's score + signals + suggestion
-    ForecastChart.tsx   # 7-day bar chart
-    HistoryChart.tsx    # 30-day bar chart with hover tooltips
-    CheckIn.tsx         # Daily stress check-in form
-
-app/
-  api/waitlist/
-    route.ts            # Waitlist signup → Resend
+burnout-predictor/
+├── frontend/                    # Next.js frontend
+│   ├── app/
+│   │   ├── page.tsx            # Marketing landing page
+│   │   ├── layout.tsx           # Root layout
+│   │   ├── login/page.tsx       # Login page
+│   │   ├── onboarding/page.tsx  # Onboarding flow
+│   │   ├── dashboard/
+│   │   │   ├── page.tsx         # Main dashboard
+│   │   │   ├── layout.tsx       # Dashboard shell
+│   │   │   ├── data.ts          # Mock data + scoring
+│   │   │   ├── history/page.tsx # 30-day history view
+│   │   │   └── settings/page.tsx# User settings
+│   │   ├── api/waitlist/route.ts # Waitlist signup
+│   │   └── globals.css          # All styles (~1800 lines)
+│   ├── components/
+│   │   ├── Nav.tsx              # Navigation
+│   │   ├── Hero.tsx
+│   │   ├── dashboard/           # Dashboard components
+│   │   │   ├── DashboardShell.tsx
+│   │   │   ├── ScoreCard.tsx
+│   │   │   ├── ForecastChart.tsx
+│   │   │   ├── HistoryChart.tsx
+│   │   │   └── CheckIn.tsx
+│   │   └── ...
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── next.config.ts
+│   └── Dockerfile              # Production build
+│
+├── backend/                     # Go backend
+│   ├── cmd/
+│   │   └── main.go             # Server entrypoint
+│   ├── internal/
+│   │   ├── handlers/           # HTTP handlers
+│   │   ├── models/             # Data models
+│   │   ├── db/                 # Database queries (sqlc)
+│   │   └── middleware/         # Auth, logging, etc.
+│   ├── migrations/             # Goose SQL migrations
+│   ├── go.mod
+│   ├── Dockerfile              # Production build
+│   └── sqlc.yaml               # sqlc config
+│
+├── docker-compose.yml          # Local dev environment
+├── .gitignore
+└── README.md
 ```
 
 ---
 
 ## Getting started
 
-**Prerequisites:** Node.js 18+
+### Prerequisites
+- Node.js 18+ (frontend)
+- Go 1.22+ (backend)
+- Docker & Docker Compose (optional, for local database)
+
+### Local development (full stack)
 
 ```bash
+# Start everything with Docker Compose
+docker-compose up
+
+# This runs:
+# - PostgreSQL on :5432
+# - Backend API on :8080
+# - Frontend dev server on :3000
+```
+
+### Frontend only (with mock data)
+
+```bash
+cd frontend
+
 # Install dependencies
 npm install
 
 # Set up environment variables
-cp .env.example .env.local
+cp .env.local.example .env.local
 # Fill in your Resend credentials (see below)
 
 # Start the dev server
@@ -92,20 +125,45 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) to see the landing page, and [http://localhost:3000/dashboard](http://localhost:3000/dashboard) to see the dashboard.
 
+### Backend only
+
+```bash
+cd backend
+
+# Install dependencies
+go mod download
+
+# Run migrations
+goose -dir migrations postgres "your-db-connection-string" up
+
+# Start the server
+go run ./cmd/main.go
+```
+
 ---
 
 ## Environment variables
 
-Create a `.env.local` file in the project root:
+### Frontend (`frontend/.env.local`)
 
 ```env
+NEXT_PUBLIC_API_URL=http://localhost:8080
 RESEND_API_KEY=re_...
 EMAIL_FROM=hello@yourdomain.com
 OWNER_EMAIL=you@yourdomain.com
 RESEND_AUDIENCE_ID=...
 ```
 
-These are only required for the waitlist signup API route. The rest of the app works without them.
+### Backend (`backend/.env.local`)
+
+```env
+DATABASE_URL=postgres://user:pass@localhost:5432/burnout_predictor
+PORT=8080
+PAYFAST_KEY=pk_...
+PAYFAST_SECRET=sk_...
+OPENAI_API_KEY=sk-...
+JWT_SECRET=your-secret-key
+```
 
 ---
 
@@ -122,20 +180,54 @@ These are only required for the waitlist signup API route. The rest of the app w
 
 ---
 
-## Design notes
-
-- All styles live in `app/globals.css` (~1800 lines, single file)
-- CSS custom properties define the full color and typography system (`--ink`, `--paper`, `--red`, `--amber`, `--green`, `--font-serif`, `--font-sans`)
-- Component styles use a BEM-ish prefix convention (`dash-`, `nav-`, `score-`, `pcard-`, etc.)
-- The dashboard is fully responsive: sidebar collapses to a top nav on mobile, grid drops to single-column below 1024px
-
----
-
 ## Scripts
 
+### Frontend
+
 ```bash
-npm run dev      # Start development server
+cd frontend
+npm run dev      # Start development server on :3000
 npm run build    # Production build
 npm run start    # Start production server
 npm run lint     # Run ESLint
 ```
+
+### Backend
+
+```bash
+cd backend
+go run ./cmd/main.go          # Run development server on :8080
+go build -o main ./cmd/main.go # Build binary
+goose status                   # Check migration status
+goose up                       # Run pending migrations
+```
+
+---
+
+## Deployment
+
+### Frontend (Vercel)
+
+1. Connect your GitHub repo to Vercel
+2. Set the **Root Directory** to `frontend/`
+3. Set environment variables (RESEND_API_KEY, etc.)
+4. Deploy automatically on push to `main`
+
+### Backend (Render)
+
+1. Create a new Web Service on Render
+2. Connect your GitHub repo
+3. Set the **Root Directory** to `backend/`
+4. Set environment variables (DATABASE_URL, PAYFAST_KEY, etc.)
+5. Set **Build Command**: `go build -o main ./cmd/main.go`
+6. Set **Start Command**: `./main`
+7. Add a PostgreSQL service and link it via DATABASE_URL
+
+---
+
+## Design notes
+
+- All frontend styles live in `frontend/app/globals.css` (~1800 lines, single file)
+- CSS custom properties define the full color and typography system
+- Component styles use a BEM-ish prefix convention
+- The dashboard is fully responsive: sidebar collapses to a top nav on mobile
