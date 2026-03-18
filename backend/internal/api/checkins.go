@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -104,7 +105,44 @@ func (h *Handler) UpsertCheckIn(w http.ResponseWriter, r *http.Request) {
 
 	danger, _ := h.q.GetConsecutiveDangerDays(r.Context(), user.ID)
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	// Generate a recovery plan for high-stress check-ins (stress >= 4).
+	// Try AI with a 10-second timeout; fall back to rule-based plan on any failure.
+	var recoveryPlan []score.PlanSection
+	if req.Stress >= 4 {
+		planInput := score.RecoveryPlanInput{
+			Note:            req.Note,
+			Stress:          req.Stress,
+			ConsecutiveDays: int(danger),
+			Role:            score.Role(user.Role),
+		}
+		if h.ai != nil {
+			aiCtx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+			aiPlan, aiErr := h.ai.GenerateRecoveryPlan(aiCtx, req.Stress, req.Note, user.Role)
+			cancel()
+			if aiErr == nil {
+				recoveryPlan = aiPlan
+				// Persist AI plan onto the check-in row asynchronously.
+				go func(planSections []score.PlanSection) {
+					planJSON, err := json.Marshal(planSections)
+					if err != nil {
+						return
+					}
+					bgCtx, bgCancel := context.WithTimeout(context.Background(), 5*time.Second)
+					defer bgCancel()
+					_ = h.q.SetAIRecoveryPlan(bgCtx, db.SetAIRecoveryPlanParams{
+						ID:             checkin.ID,
+						UserID:         checkin.UserID,
+						AiRecoveryPlan: planJSON,
+					})
+				}(recoveryPlan)
+			}
+		}
+		if recoveryPlan == nil {
+			recoveryPlan = score.BuildDynamicRecoveryPlan(planInput)
+		}
+	}
+
+	resp := map[string]interface{}{
 		"check_in": checkin,
 		"score":    out,
 		"explanation": score.BuildScoreExplanation(score.ExplanationInput{
@@ -114,7 +152,11 @@ func (h *Handler) UpsertCheckIn(w http.ResponseWriter, r *http.Request) {
 			RecentStresses:        recentStresses,
 		}),
 		"suggestion": score.BuildSuggestion(out.Score, true, int(danger)),
-	})
+	}
+	if recoveryPlan != nil {
+		resp["recovery_plan"] = recoveryPlan
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // GetScore handles GET /api/score.
