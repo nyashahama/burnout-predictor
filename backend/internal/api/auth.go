@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
+	eml "github.com/nyasha-hama/burnout-predictor-api/internal/email"
 )
 
 // Register handles POST /api/auth/register.
@@ -64,10 +66,18 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Seed default notification prefs so the user is opted in from day one.
+	_, _ = h.q.CreateDefaultNotificationPrefs(r.Context(), user.ID)
+
 	access, refresh, err := h.issueTokens(r.Context(), user.ID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to issue tokens")
 		return
+	}
+
+	// Send welcome email asynchronously — don't block the response.
+	if h.email != nil {
+		go h.sendWelcomeEmail(user.Email, user.Name)
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
@@ -129,7 +139,6 @@ func (h *Handler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Rotate: revoke old token before issuing new ones.
 	if err := h.q.RevokeRefreshToken(r.Context(), hash); err != nil {
 		writeError(w, http.StatusInternalServerError, "server error")
 		return
@@ -160,6 +169,16 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// sendWelcomeEmail fires the welcome email. Called in a goroutine from Register.
+func (h *Handler) sendWelcomeEmail(to, name string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	subject, html := eml.Welcome(name)
+	if _, err := h.email.Send(ctx, eml.Params{To: to, Subject: subject, HTML: html}); err != nil {
+		log.Printf("api/auth: welcome email to %s: %v", to, err)
+	}
+}
+
 // issueTokens creates a signed JWT access token (15 min) and a stored refresh token (7 days).
 func (h *Handler) issueTokens(ctx context.Context, userID uuid.UUID) (accessToken, refreshToken string, err error) {
 	claims := jwt.RegisteredClaims{
@@ -188,13 +207,13 @@ func (h *Handler) issueTokens(ctx context.Context, userID uuid.UUID) (accessToke
 	return
 }
 
-// tokenHash returns the hex-encoded SHA-256 of a token string.
+// tokenHash returns the hex-encoded SHA-256 of a raw token string.
 func tokenHash(raw string) string {
 	sum := sha256.Sum256([]byte(raw))
 	return fmt.Sprintf("%x", sum)
 }
 
-// safeUserResp is the user shape returned to clients (no password hash, no tokens).
+// safeUserResp is the user shape sent to clients — no password hash, no tokens.
 type safeUserResp struct {
 	ID            uuid.UUID `json:"id"`
 	Email         string    `json:"email"`
