@@ -105,6 +105,11 @@ func (h *Handler) UpsertCheckIn(w http.ResponseWriter, r *http.Request) {
 
 	danger, _ := h.q.GetConsecutiveDangerDays(r.Context(), user.ID)
 
+	// Parse note for upcoming events and schedule follow-ups for tomorrow.
+	if req.Note != "" {
+		go h.scheduleFollowUps(checkin.ID, user.ID, req.Note, today)
+	}
+
 	// Generate a recovery plan for high-stress check-ins (stress >= 4).
 	// Try AI with a 10-second timeout; fall back to rule-based plan on any failure.
 	var recoveryPlan []score.PlanSection
