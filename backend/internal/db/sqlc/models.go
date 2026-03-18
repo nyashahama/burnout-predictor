@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	"json"
 )
 
 // One row per user per calendar day. The atomic unit of all insights.
