@@ -114,6 +114,48 @@ func StreakAlert(name string, streak int) (subject, html string) {
 	return
 }
 
+// VerifyEmail is sent after registration so the user can confirm their address.
+func VerifyEmail(name, verifyURL string) (subject, html string) {
+	subject = "Confirm your Overload email"
+	html = fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Confirm your email</title></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1a1a1a;background:#fff;margin:0;padding:0">
+<div style="max-width:560px;margin:0 auto;padding:48px 24px">
+  <p style="font-size:13px;color:#888;margin:0 0 32px;letter-spacing:0.05em;text-transform:uppercase">Overload</p>
+  <h1 style="font-size:24px;font-weight:600;margin:0 0 20px;line-height:1.3">Hey %s, confirm your email</h1>
+  <p style="font-size:16px;line-height:1.7;margin:0 0 16px;color:#333">Click below to verify your email address. This link expires in 24 hours.</p>
+  <p style="font-size:16px;line-height:1.7;margin:0 0 40px;color:#333">If you didn't create an account, you can ignore this email.</p>
+  <a href="%s" style="display:inline-block;background:#1a1a1a;color:#fff;text-decoration:none;padding:13px 28px;border-radius:8px;font-size:15px;font-weight:500">Confirm email →</a>
+  <p style="font-size:12px;color:#bbb;margin:48px 0 0">This link expires in 24 hours. If it's expired, request a new one from your dashboard.</p>
+</div>
+</body>
+</html>`, name, verifyURL)
+	return
+}
+
+// PasswordReset is sent when a user requests a password reset.
+func PasswordReset(name, resetURL string) (subject, html string) {
+	subject = "Reset your Overload password"
+	html = fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reset your password</title></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1a1a1a;background:#fff;margin:0;padding:0">
+<div style="max-width:560px;margin:0 auto;padding:48px 24px">
+  <p style="font-size:13px;color:#888;margin:0 0 32px;letter-spacing:0.05em;text-transform:uppercase">Overload</p>
+  <h1 style="font-size:24px;font-weight:600;margin:0 0 20px;line-height:1.3">Reset your password, %s</h1>
+  <p style="font-size:16px;line-height:1.7;margin:0 0 16px;color:#333">Someone (hopefully you) requested a password reset for your Overload account.</p>
+  <p style="font-size:16px;line-height:1.7;margin:0 0 40px;color:#333">This link expires in 1 hour. If you didn't request this, no action is needed — your password hasn't changed.</p>
+  <a href="%s" style="display:inline-block;background:#1a1a1a;color:#fff;text-decoration:none;padding:13px 28px;border-radius:8px;font-size:15px;font-weight:500">Reset password →</a>
+  <p style="font-size:12px;color:#bbb;margin:48px 0 0">If the button doesn't work, copy this link: %s</p>
+</div>
+</body>
+</html>`, name, resetURL, resetURL)
+	return
+}
+
 // ReEngage fires after 2+ missed days for users with a recent history.
 func ReEngage(name string) (subject, html string) {
 	subject = "The data is still here"
