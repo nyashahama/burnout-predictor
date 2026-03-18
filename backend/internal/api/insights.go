@@ -104,6 +104,20 @@ func (h *Handler) GetInsights(w http.ResponseWriter, r *http.Request) {
 	// ── Milestone ─────────────────────────────────────────────────────────────
 	milestone := h.buildMilestone(r, int(totalCount), signatureEntries)
 
+	// ── Dismissed components ──────────────────────────────────────────────────
+	knownComponents := []string{
+		"session-context", "earned-pattern", "arc-narrative",
+		"monthly-arc", "what-works", "signature",
+		"milestone-30", "milestone-60", "milestone-90",
+	}
+	dismissed, _ := h.q.ListDismissedComponents(r.Context(), db.ListDismissedComponentsParams{
+		UserID:  user.ID,
+		Column2: knownComponents,
+	})
+	if dismissed == nil {
+		dismissed = []string{}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"session_context":     sessionCtx,
 		"patterns":            patterns.Patterns,
@@ -116,6 +130,7 @@ func (h *Handler) GetInsights(w http.ResponseWriter, r *http.Request) {
 		"milestone":           milestone,
 		"check_in_count":      totalCount,
 		"accuracy_label":      score.AccuracyLabel(int(totalCount)),
+		"dismissed_components": dismissed,
 	})
 }
 
