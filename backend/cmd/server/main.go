@@ -11,8 +11,11 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/nyasha-hama/burnout-predictor-api/internal/ai"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api"
 	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
+	"github.com/nyasha-hama/burnout-predictor-api/internal/email"
+	"github.com/nyasha-hama/burnout-predictor-api/internal/workers"
 )
 
 func main() {
@@ -37,8 +40,49 @@ func main() {
 		log.Fatalf("ping db: %v", err)
 	}
 
+	// Optional: email (Resend). Disabled if RESEND_API_KEY is not set.
+	var emailClient *email.Client
+	if resendKey := os.Getenv("RESEND_API_KEY"); resendKey != "" {
+		from := os.Getenv("EMAIL_FROM")
+		if from == "" {
+			from = "Overload <noreply@overload.app>"
+		}
+		emailClient = email.New(resendKey, from)
+		log.Println("email: Resend enabled")
+	} else {
+		log.Println("email: disabled (RESEND_API_KEY not set)")
+	}
+
+	// Optional: AI (OpenAI). Disabled if OPENAI_API_KEY is not set.
+	var aiClient *ai.Client
+	if openAIKey := os.Getenv("OPENAI_API_KEY"); openAIKey != "" {
+		aiClient = ai.New(openAIKey)
+		log.Println("ai: OpenAI enabled")
+	} else {
+		log.Println("ai: disabled (OPENAI_API_KEY not set)")
+	}
+
 	queries := db.New(pool)
-	h := api.NewHandler(queries, jwtSecret)
+	h := api.NewHandler(queries, jwtSecret, emailClient, aiClient)
+
+	// Start background notification + AI plan worker.
+	notifier := workers.New(queries, emailClient, aiClient)
+	go func() {
+		minuteTicker := time.NewTicker(60 * time.Second)
+		aiTicker := time.NewTicker(5 * time.Minute)
+		defer minuteTicker.Stop()
+		defer aiTicker.Stop()
+		for {
+			select {
+			case <-minuteTicker.C:
+				notifier.RunMinutely(ctx)
+			case <-aiTicker.C:
+				notifier.RunAIPlans(ctx)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	r := chi.NewRouter()
 	r.Use(chimw.Logger)
