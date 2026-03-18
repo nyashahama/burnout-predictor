@@ -4,18 +4,27 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/nyasha-hama/burnout-predictor-api/internal/ai"
 	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
+	"github.com/nyasha-hama/burnout-predictor-api/internal/email"
 )
 
 // Handler holds shared dependencies for all API handlers.
 type Handler struct {
 	q      *db.Queries
-	secret []byte // HS256 JWT signing secret
+	secret []byte       // HS256 JWT signing secret
+	email  *email.Client // nil = email sending disabled
+	ai     *ai.Client    // nil = AI recovery plans disabled
 }
 
 // NewHandler constructs the main API handler.
-func NewHandler(q *db.Queries, jwtSecret string) *Handler {
-	return &Handler{q: q, secret: []byte(jwtSecret)}
+func NewHandler(q *db.Queries, jwtSecret string, emailClient *email.Client, aiClient *ai.Client) *Handler {
+	return &Handler{
+		q:      q,
+		secret: []byte(jwtSecret),
+		email:  emailClient,
+		ai:     aiClient,
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
