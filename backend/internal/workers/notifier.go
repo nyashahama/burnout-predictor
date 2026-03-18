@@ -42,6 +42,36 @@ func (n *Notifier) RunMinutely(ctx context.Context) {
 	n.sendReEngagements(ctx)
 }
 
+// RunHourly should be called every hour.
+// Handles subscription expiry downgrades, stale follow-up cleanup, token pruning,
+// and old dismissal cleanup.
+func (n *Notifier) RunHourly(ctx context.Context) {
+	// Expire stale follow-ups (fire_date > 7 days ago, never surfaced).
+	if err := n.q.ExpireStaleFollowUps(ctx); err != nil {
+		log.Printf("workers/hourly: expire follow-ups: %v", err)
+	}
+
+	// Downgrade users whose cancel-at-period-end subscription has now expired.
+	expired, err := n.q.ListExpiredSubscriptions(ctx)
+	if err != nil {
+		log.Printf("workers/hourly: list expired subscriptions: %v", err)
+	}
+	for _, sub := range expired {
+		if err := n.q.CancelSubscription(ctx, sub.PaddleSubscriptionID); err != nil {
+			log.Printf("workers/hourly: cancel sub %s: %v", sub.PaddleSubscriptionID, err)
+			continue
+		}
+		if err := n.q.SetUserTier(ctx, db.SetUserTierParams{ID: sub.Uid, Tier: "free"}); err != nil {
+			log.Printf("workers/hourly: downgrade user %s: %v", sub.Uid, err)
+		}
+	}
+
+	// Prune expired tokens and old dismissals (maintenance).
+	_ = n.q.DeleteExpiredRefreshTokens(ctx)
+	_ = n.q.DeleteExpiredPasswordResets(ctx)
+	_ = n.q.DeleteOldDismissals(ctx)
+}
+
 // RunAIPlans generates recovery plans for high-stress check-ins that were
 // saved without one (inline attempt timed out or AI was unavailable at the time).
 func (n *Notifier) RunAIPlans(ctx context.Context) {
