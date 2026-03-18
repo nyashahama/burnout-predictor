@@ -75,9 +75,10 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Send welcome email asynchronously — don't block the response.
+	// Send welcome + verification emails asynchronously — don't block the response.
 	if h.email != nil {
 		go h.sendWelcomeEmail(user.Email, user.Name)
+		go h.sendVerificationEmail(user.Email, user.Name, user.ID)
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
@@ -169,6 +170,120 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// VerifyEmail handles POST /api/auth/verify-email.
+// Accepts a one-time token, marks it used, and sets email_verified = TRUE.
+func (h *Handler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Token == "" {
+		writeError(w, http.StatusBadRequest, "token is required")
+		return
+	}
+
+	hash := tokenHash(req.Token)
+	ev, err := h.q.GetEmailVerification(r.Context(), hash)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid or expired token")
+		return
+	}
+
+	if err := h.q.MarkEmailVerificationUsed(r.Context(), hash); err != nil {
+		writeError(w, http.StatusInternalServerError, "server error")
+		return
+	}
+	if err := h.q.VerifyUserEmail(r.Context(), ev.UserID); err != nil {
+		writeError(w, http.StatusInternalServerError, "server error")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "email verified"})
+}
+
+// ResendVerification handles POST /api/auth/resend-verification.
+// Authenticated. Resends the verification email for unverified accounts.
+func (h *Handler) ResendVerification(w http.ResponseWriter, r *http.Request) {
+	user := userFromCtx(r.Context())
+	if user.EmailVerified {
+		writeError(w, http.StatusBadRequest, "email is already verified")
+		return
+	}
+	if h.email == nil {
+		writeError(w, http.StatusServiceUnavailable, "email service unavailable")
+		return
+	}
+	go h.sendVerificationEmail(user.Email, user.Name, user.ID)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "verification email sent"})
+}
+
+// ForgotPassword handles POST /api/auth/forgot-password.
+// Public. Sends a password reset email if the address exists.
+// Always returns 200 to prevent email enumeration.
+func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Email == "" {
+		writeError(w, http.StatusBadRequest, "email is required")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "if that address is registered you'll receive an email shortly"})
+
+	// Do the DB lookup and email send asynchronously so timing doesn't leak existence.
+	if h.email != nil {
+		go func() {
+			user, err := h.q.GetUserByEmail(context.Background(), req.Email)
+			if err != nil {
+				return // user not found — silently skip
+			}
+			h.sendPasswordResetEmail(user.Email, user.Name, user.ID)
+		}()
+	}
+}
+
+// ResetPassword handles POST /api/auth/reset-password.
+// Public. Validates the token, updates the password, revokes all sessions.
+func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Token    string `json:"token"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Token == "" || len(req.Password) < 8 {
+		writeError(w, http.StatusBadRequest, "token and password (min 8 chars) are required")
+		return
+	}
+
+	hash := tokenHash(req.Token)
+	pr, err := h.q.GetPasswordReset(r.Context(), hash)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid or expired token")
+		return
+	}
+
+	newHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "server error")
+		return
+	}
+
+	if err := h.q.UpdateUserPassword(r.Context(), db.UpdateUserPasswordParams{
+		ID:           pr.UserID,
+		PasswordHash: pgtype.Text{String: string(newHash), Valid: true},
+	}); err != nil {
+		writeError(w, http.StatusInternalServerError, "server error")
+		return
+	}
+	_ = h.q.MarkPasswordResetUsed(r.Context(), hash)
+	_ = h.q.RevokeAllUserRefreshTokens(r.Context(), pr.UserID)
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "password updated"})
+}
+
 // sendWelcomeEmail fires the welcome email. Called in a goroutine from Register.
 func (h *Handler) sendWelcomeEmail(to, name string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -176,6 +291,67 @@ func (h *Handler) sendWelcomeEmail(to, name string) {
 	subject, html := eml.Welcome(name)
 	if _, err := h.email.Send(ctx, eml.Params{To: to, Subject: subject, HTML: html}); err != nil {
 		log.Printf("api/auth: welcome email to %s: %v", to, err)
+	}
+}
+
+// sendVerificationEmail creates a one-time token and sends the verify-email link.
+func (h *Handler) sendVerificationEmail(to, name string, userID uuid.UUID) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		log.Printf("api/auth: gen verify token: %v", err)
+		return
+	}
+	rawToken := fmt.Sprintf("%x", raw)
+	hash := tokenHash(rawToken)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err := h.q.CreateEmailVerification(ctx, db.CreateEmailVerificationParams{
+		UserID:    userID,
+		TokenHash: hash,
+		Email:     to,
+		ExpiresAt: pgtype.Timestamptz{Time: time.Now().Add(24 * time.Hour), Valid: true},
+	})
+	if err != nil {
+		log.Printf("api/auth: store verify token for %s: %v", to, err)
+		return
+	}
+
+	verifyURL := h.appURL + "/verify-email?token=" + rawToken
+	subject, html := eml.VerifyEmail(name, verifyURL)
+	if _, err := h.email.Send(ctx, eml.Params{To: to, Subject: subject, HTML: html}); err != nil {
+		log.Printf("api/auth: verify email to %s: %v", to, err)
+	}
+}
+
+// sendPasswordResetEmail creates a one-time token and sends the reset-password link.
+func (h *Handler) sendPasswordResetEmail(to, name string, userID uuid.UUID) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		log.Printf("api/auth: gen reset token: %v", err)
+		return
+	}
+	rawToken := fmt.Sprintf("%x", raw)
+	hash := tokenHash(rawToken)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err := h.q.CreatePasswordReset(ctx, db.CreatePasswordResetParams{
+		UserID:    userID,
+		TokenHash: hash,
+		ExpiresAt: pgtype.Timestamptz{Time: time.Now().Add(time.Hour), Valid: true},
+	})
+	if err != nil {
+		log.Printf("api/auth: store reset token for %s: %v", to, err)
+		return
+	}
+
+	resetURL := h.appURL + "/reset-password?token=" + rawToken
+	subject, html := eml.PasswordReset(name, resetURL)
+	if _, err := h.email.Send(ctx, eml.Params{To: to, Subject: subject, HTML: html}); err != nil {
+		log.Printf("api/auth: reset email to %s: %v", to, err)
 	}
 }
 
