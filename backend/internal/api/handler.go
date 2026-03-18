@@ -11,19 +11,23 @@ import (
 
 // Handler holds shared dependencies for all API handlers.
 type Handler struct {
-	q      *db.Queries
-	secret []byte       // HS256 JWT signing secret
-	email  *email.Client // nil = email sending disabled
-	ai     *ai.Client    // nil = AI recovery plans disabled
+	q             *db.Queries
+	secret        []byte        // HS256 JWT signing secret
+	email         *email.Client // nil = email sending disabled
+	ai            *ai.Client    // nil = AI recovery plans disabled
+	paddleSecret  []byte        // Paddle webhook HMAC-SHA256 secret; nil = signature check skipped
+	appURL        string        // Base URL for email links (e.g. https://overload.app)
 }
 
 // NewHandler constructs the main API handler.
-func NewHandler(q *db.Queries, jwtSecret string, emailClient *email.Client, aiClient *ai.Client) *Handler {
+func NewHandler(q *db.Queries, jwtSecret string, emailClient *email.Client, aiClient *ai.Client, paddleSecret, appURL string) *Handler {
 	return &Handler{
-		q:      q,
-		secret: []byte(jwtSecret),
-		email:  emailClient,
-		ai:     aiClient,
+		q:            q,
+		secret:       []byte(jwtSecret),
+		email:        emailClient,
+		ai:           aiClient,
+		paddleSecret: []byte(paddleSecret),
+		appURL:       appURL,
 	}
 }
 
