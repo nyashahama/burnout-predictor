@@ -124,9 +124,15 @@ func (s *Service) RunMaintenance(ctx context.Context) {
 		}
 	}
 
-	_ = s.store.DeleteExpiredRefreshTokens(ctx)
-	_ = s.store.DeleteExpiredPasswordResets(ctx)
-	_ = s.store.DeleteOldDismissals(ctx)
+	if err := s.store.DeleteExpiredRefreshTokens(ctx); err != nil {
+		s.log.WarnContext(ctx, "maintenance: delete expired refresh tokens failed", "request_id", reqid.FromCtx(ctx), "err", err)
+	}
+	if err := s.store.DeleteExpiredPasswordResets(ctx); err != nil {
+		s.log.WarnContext(ctx, "maintenance: delete expired password resets failed", "request_id", reqid.FromCtx(ctx), "err", err)
+	}
+	if err := s.store.DeleteOldDismissals(ctx); err != nil {
+		s.log.WarnContext(ctx, "maintenance: delete old dismissals failed", "request_id", reqid.FromCtx(ctx), "err", err)
+	}
 }
 
 // ── individual email senders ──────────────────────────────────────────────────

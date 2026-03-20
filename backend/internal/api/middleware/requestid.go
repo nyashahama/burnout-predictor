@@ -13,7 +13,7 @@ func RequestID() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			id := r.Header.Get("X-Request-ID")
-			if id == "" {
+			if id == "" || len(id) > 128 {
 				id = uuid.New().String()
 			}
 			w.Header().Set("X-Request-ID", id)
