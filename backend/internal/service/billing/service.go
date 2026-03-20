@@ -161,10 +161,12 @@ func (s *Service) handleSubscriptionUpsert(ctx context.Context, eventType string
 	}
 
 	if !user.PaddleCustomerID.Valid && sub.CustomerID != "" {
-		_ = s.store.SetPaddleCustomerID(ctx, db.SetPaddleCustomerIDParams{
+		if err := s.store.SetPaddleCustomerID(ctx, db.SetPaddleCustomerIDParams{
 			ID:               user.ID,
 			PaddleCustomerID: pgtype.Text{String: sub.CustomerID, Valid: true},
-		})
+		}); err != nil {
+			s.log.WarnContext(ctx, "sub upsert: set customer id failed", "request_id", reqid.FromCtx(ctx), "user_id", user.ID, "err", err)
+		}
 	}
 
 	planName, currency, unitPriceCents := extractPlanDetails(sub)
@@ -196,7 +198,9 @@ func (s *Service) handleSubscriptionUpsert(ctx context.Context, eventType string
 	}
 
 	tier := tierFromStatus(sub.Status, planName)
-	_ = s.store.SetUserTier(ctx, db.SetUserTierParams{ID: user.ID, Tier: tier})
+	if err := s.store.SetUserTier(ctx, db.SetUserTierParams{ID: user.ID, Tier: tier}); err != nil {
+		s.log.WarnContext(ctx, "sub upsert: set user tier failed", "request_id", reqid.FromCtx(ctx), "user_id", user.ID, "err", err)
+	}
 }
 
 func (s *Service) handleSubscriptionCancelled(ctx context.Context, sub paddleSubscriptionData) {
@@ -209,7 +213,9 @@ func (s *Service) handleSubscriptionCancelled(ctx context.Context, sub paddleSub
 	if shouldDowngradeNow {
 		user, err := s.resolveUserFromPaddleEvent(ctx, sub.CustomerID, sub.CustomData)
 		if err == nil {
-			_ = s.store.SetUserTier(ctx, db.SetUserTierParams{ID: user.ID, Tier: "free"})
+			if err := s.store.SetUserTier(ctx, db.SetUserTierParams{ID: user.ID, Tier: "free"}); err != nil {
+				s.log.WarnContext(ctx, "sub cancel: set user tier failed", "request_id", reqid.FromCtx(ctx), "user_id", user.ID, "err", err)
+			}
 		}
 	}
 }
@@ -221,7 +227,9 @@ func (s *Service) handleSubscriptionPaused(ctx context.Context, sub paddleSubscr
 
 	user, err := s.resolveUserFromPaddleEvent(ctx, sub.CustomerID, sub.CustomData)
 	if err == nil {
-		_ = s.store.SetUserTier(ctx, db.SetUserTierParams{ID: user.ID, Tier: "free"})
+		if err := s.store.SetUserTier(ctx, db.SetUserTierParams{ID: user.ID, Tier: "free"}); err != nil {
+			s.log.WarnContext(ctx, "sub pause: set user tier failed", "request_id", reqid.FromCtx(ctx), "user_id", user.ID, "err", err)
+		}
 	}
 }
 
@@ -237,10 +245,12 @@ func (s *Service) handleTransactionCompleted(ctx context.Context, txn paddleTran
 	}
 
 	if !user.PaddleCustomerID.Valid {
-		_ = s.store.SetPaddleCustomerID(ctx, db.SetPaddleCustomerIDParams{
+		if err := s.store.SetPaddleCustomerID(ctx, db.SetPaddleCustomerIDParams{
 			ID:               user.ID,
 			PaddleCustomerID: pgtype.Text{String: txn.CustomerID, Valid: true},
-		})
+		}); err != nil {
+			s.log.WarnContext(ctx, "txn: set customer id failed", "request_id", reqid.FromCtx(ctx), "user_id", user.ID, "err", err)
+		}
 	}
 }
 
@@ -286,8 +296,9 @@ func extractPlanDetails(sub paddleSubscriptionData) (planName, currency string, 
 	}
 	if item.Price.UnitPrice != nil {
 		var cents int32
-		fmt.Sscanf(item.Price.UnitPrice.Amount, "%d", &cents)
-		unitPriceCents = cents
+		if n, err := fmt.Sscanf(item.Price.UnitPrice.Amount, "%d", &cents); n == 1 && err == nil {
+			unitPriceCents = cents
+		}
 	}
 	return
 }
