@@ -1,11 +1,19 @@
 package auth
 
-import "errors"
+import "net/http"
+
+type authError struct {
+	msg    string
+	status int
+}
+
+func (e authError) Error() string   { return e.msg }
+func (e authError) HTTPStatus() int { return e.status }
 
 var (
-	ErrEmailInUse           = errors.New("email already in use")
-	ErrInvalidCredentials   = errors.New("invalid credentials")
-	ErrInvalidToken         = errors.New("invalid or expired token")
-	ErrEmailAlreadyVerified = errors.New("email already verified")
-	ErrEmailServiceDisabled = errors.New("email service unavailable")
+	ErrEmailInUse           = authError{"email already in use", http.StatusConflict}
+	ErrInvalidCredentials   = authError{"invalid credentials", http.StatusUnauthorized}
+	ErrInvalidToken         = authError{"invalid or expired token", http.StatusBadRequest}
+	ErrEmailAlreadyVerified = authError{"email already verified", http.StatusConflict}
+	ErrEmailServiceDisabled = authError{"email service unavailable", http.StatusServiceUnavailable}
 )
