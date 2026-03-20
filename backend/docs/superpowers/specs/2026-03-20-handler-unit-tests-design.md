@@ -77,6 +77,8 @@ func (m *mockAuthService) Register(ctx context.Context, req authsvc.RegisterRequ
 
 The nil guard means validation tests set no functions — if a test inadvertently reaches the service call, it gets a zero value rather than a panic.
 
+**Mock field naming:** function field names track the *interface method* name, not the HTTP handler name. For example, the `RefreshToken` handler calls `h.svc.Refresh(...)`, so the mock field is `RefreshFn` — not `RefreshTokenFn`.
+
 ---
 
 ## Section 3 — Shared Test Helpers (`testhelpers_test.go`)
@@ -104,16 +106,16 @@ func decodeJSON(t *testing.T, w *httptest.ResponseRecorder, v any)
 
 | Endpoint | What is tested |
 |---|---|
-| Register | invalid JSON → 400; bad email → 400; short password → 400; bad role → 400; bad sleep_baseline → 400; bad timezone → 400; `ErrEmailInUse` → 409; success → 201 |
-| Login | invalid JSON → 400; `ErrInvalidCredentials` → 401; success → 200 |
-| RefreshToken | missing `refresh_token` → 400; `ErrInvalidToken` → 400; success → 200 |
+| Register | invalid JSON → 400; bad email → 400; short password → 400; bad role → 400; bad sleep_baseline → 400; bad timezone → 400; `ErrEmailInUse` → 409; service error → 500 (via `respond.ServiceError`; use plain `errors.New`); success → 201 |
+| Login | invalid JSON → 400; `ErrInvalidCredentials` → 401; service error → 500 (via `respond.ServiceError`; use plain `errors.New`); success → 200 |
+| RefreshToken | missing `refresh_token` → 400; `ErrInvalidToken` → 400; service error → 500 (via `respond.ServiceError`; use plain `errors.New`); success → 200 |
 | Logout | success → 200 (service error is intentionally ignored) |
-| VerifyEmail | missing `token` → 400; `ErrInvalidToken` → 400; success → 200 |
-| ResendVerification | `ErrEmailServiceDisabled` → 503; success → 200 |
+| VerifyEmail | missing `token` → 400; `ErrInvalidToken` → 400; service error → 500 (via `respond.ServiceError`; use plain `errors.New`); success → 200 |
+| ResendVerification | `ErrEmailServiceDisabled` → 503; service error → 500 (via `respond.ServiceError`; use plain `errors.New`); success → 200 |
 | ForgotPassword | missing `email` → 400; service error ignored → 200 (anti-enumeration); success → 200 |
-| ResetPassword | missing `token`/`password` → 400; `ErrInvalidToken` → 400; success → 200 |
-| ChangePassword | invalid JSON → 400; short password → 400; `ErrInvalidCredentials` → 401; success → 200 |
-| ChangeEmail | invalid JSON → 400; bad email → 400; `ErrEmailInUse` → 409; success → 200 |
+| ResetPassword | missing `token`/`password` → 400; `ErrInvalidToken` → 400; service error → 500 (via `respond.ServiceError`; use plain `errors.New`); success → 200 |
+| ChangePassword | invalid JSON → 400; short password → 400; `ErrInvalidCredentials` → 401; service error → 500 (via `respond.ServiceError`; use plain `errors.New`); success → 200 |
+| ChangeEmail | invalid JSON → 400; bad email → 400; `ErrEmailInUse` → 409; service error → 500 (via `respond.ServiceError`; use plain `errors.New`); success → 200 |
 | DeleteAccount | service error → 500 (via `respond.Error` directly — hardcoded, not mapped through `respond.ServiceError`); success → 204 |
 
 ### `checkin_test.go`
@@ -145,7 +147,8 @@ func decodeJSON(t *testing.T, w *httptest.ResponseRecorder, v any)
 | GetToday | any store error → 200 with `{"follow_up": null}`; success with unsurfaced follow-up (`SurfacedAt.Valid = false`) → 200 with follow-up object (and `MarkFollowUpSurfaced` called); success with already-surfaced follow-up (`SurfacedAt.Valid = true`) → 200 with follow-up object (and `MarkFollowUpSurfaced` NOT called) |
 | Dismiss | malformed UUID path param → 400; store error → 500 (via `respond.Error` directly — any `error` value suffices in the mock, `HTTPStatus()` is not consulted); success → 200 |
 
-Note for `followup_test.go`: `mockFollowUpStore` must expose a `MarkFollowUpSurfacedFn` function field — `GetToday` calls `MarkFollowUpSurfaced` when the returned follow-up has `SurfacedAt.Valid = false`.
+Notes for `followup_test.go`:
+- `mockFollowUpStore` must expose both a `MarkFollowUpSurfacedFn` and a `DismissFollowUpFn` function field. `GetToday` calls `MarkFollowUpSurfaced` when `SurfacedAt.Valid = false`; `Dismiss` calls `DismissFollowUp`.
 
 ### `notifprefs_test.go`
 
@@ -207,5 +210,5 @@ func TestAuthHandler_Register_Success(t *testing.T) { ... }
 - `followup.go`, `subscription.go`, `export.go`, and `notifprefs.go` all access the store directly (no service layer). Their handlers accept a store interface — mocks follow the same function-field pattern.
 - `export.go` declares an unused `exportUserService` interface alongside `exportStore`. The handler only uses `exportStore`; no mock for `exportUserService` is needed.
 - Tests do not assert on response body content beyond status code and JSON shape for success paths. Exact field values are service-layer concerns, already covered by score engine tests.
-- The unauthenticated `auth.go` endpoints (`Register`, `Login`, `RefreshToken`, `ForgotPassword`, `ResetPassword`, `VerifyEmail`) do not call `middleware.UserFromCtx`; the `withUser` helper is not needed for those tests. All remaining `auth.go` endpoints (`Logout`, `ResendVerification`, `ChangePassword`, `ChangeEmail`, `DeleteAccount`) and all endpoints in the other 8 handler files require `withUser` to inject the authenticated user.
+- The unauthenticated `auth.go` endpoints (`Register`, `Login`, `RefreshToken`, `ForgotPassword`, `ResetPassword`, `VerifyEmail`) do not call `middleware.UserFromCtx`; the `withUser` helper is not needed for those tests. The remaining `auth.go` endpoints (`Logout`, `ResendVerification`, `ChangePassword`, `ChangeEmail`, `DeleteAccount`) and all endpoints in `checkin.go`, `insight.go`, `user.go`, `followup.go`, `notifprefs.go`, `subscription.go`, and `export.go` require `withUser`. `webhook.go`'s `Paddle` endpoint is called by Paddle (not an authenticated user) and does not use `UserFromCtx` — `withUser` is not needed for webhook tests.
 - `go test ./internal/api/handler/...` must pass with zero failures after this work.
