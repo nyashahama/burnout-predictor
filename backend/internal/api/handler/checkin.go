@@ -10,6 +10,7 @@ import (
 	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/middleware"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/respond"
+	"github.com/nyasha-hama/burnout-predictor-api/internal/api/validate"
 	checkinsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/checkin"
 )
 
@@ -33,6 +34,10 @@ func (h *CheckinHandler) Upsert(w http.ResponseWriter, r *http.Request) {
 	var req checkinsvc.UpsertRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respond.Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := validate.NoteLength(req.Note); err != nil {
+		respond.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	result, err := h.svc.Upsert(r.Context(), user, req)
