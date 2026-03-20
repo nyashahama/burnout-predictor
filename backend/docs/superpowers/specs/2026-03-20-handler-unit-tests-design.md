@@ -171,7 +171,7 @@ Notes for `notifprefs_test.go`:
 
 | Endpoint | What is tested |
 |---|---|
-| Get | store error → 500; success → 200 with `Content-Disposition: attachment; filename="overload-export.json"` header set |
+| Get | store error → 500 (via `respond.Error` directly — hardcoded); success → 200 with `Content-Disposition: attachment; filename="overload-export.json"` header set |
 
 Note: `export.go` does not use `respond.JSON` — it calls `json.NewEncoder(w).Encode(payload)` directly after setting response headers. The success test should assert `Content-Disposition` is present in addition to the 200 status.
 
