@@ -4,12 +4,14 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
 
@@ -164,7 +166,11 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (RegisterRe
 		Timezone:      req.Timezone,
 	})
 	if err != nil {
-		return RegisterResult{}, ErrEmailInUse
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return RegisterResult{}, ErrEmailInUse
+		}
+		return RegisterResult{}, fmt.Errorf("create user: %w", err)
 	}
 
 	_, _ = s.store.CreateDefaultNotificationPrefs(ctx, user.ID)

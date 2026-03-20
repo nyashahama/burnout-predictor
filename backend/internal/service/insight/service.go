@@ -125,10 +125,9 @@ func (s *Service) Get(ctx context.Context, user db.User) (InsightBundle, error) 
 	whatWorks := score.FindWhatWorksForYou(noteEntries) // returns string
 	milestone := s.buildMilestone(ctx, user, int(totalCount), signatureEntries)
 
-	knownComponents := []string{
-		"session-context", "earned-pattern", "arc-narrative",
-		"monthly-arc", "what-works", "signature",
-		"milestone-30", "milestone-60", "milestone-90",
+	knownComponents := make([]string, 0, len(knownDismissableComponents))
+	for k := range knownDismissableComponents {
+		knownComponents = append(knownComponents, k)
 	}
 	dismissed, _ := s.store.ListDismissedComponents(ctx, db.ListDismissedComponentsParams{
 		UserID:  user.ID,
@@ -154,8 +153,20 @@ func (s *Service) Get(ctx context.Context, user db.User) (InsightBundle, error) 
 	}, nil
 }
 
+var knownDismissableComponents = map[string]bool{
+	"session-context": true,
+	"earned-pattern":  true,
+	"arc-narrative":   true,
+	"monthly-arc":     true,
+	"what-works":      true,
+	"signature":       true,
+	"milestone-30":    true,
+	"milestone-60":    true,
+	"milestone-90":    true,
+}
+
 func (s *Service) DismissComponent(ctx context.Context, userID uuid.UUID, req DismissRequest) error {
-	if req.ComponentKey == "" {
+	if req.ComponentKey == "" || !knownDismissableComponents[req.ComponentKey] {
 		return ErrInvalidComponent
 	}
 	return s.store.DismissComponent(ctx, db.DismissComponentParams{
