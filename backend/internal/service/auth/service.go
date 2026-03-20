@@ -25,6 +25,9 @@ type authStore interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (db.User, error)
 	UpdateUserProfile(ctx context.Context, params db.UpdateUserProfileParams) (db.User, error)
 	UpdateUserPassword(ctx context.Context, params db.UpdateUserPasswordParams) error
+	UpdateUserEmail(ctx context.Context, params db.UpdateUserEmailParams) (db.User, error)
+	SetEstimatedScore(ctx context.Context, params db.SetEstimatedScoreParams) error
+	SoftDeleteUser(ctx context.Context, id uuid.UUID) error
 	VerifyUserEmail(ctx context.Context, id uuid.UUID) error
 	CreateRefreshToken(ctx context.Context, params db.CreateRefreshTokenParams) (db.RefreshToken, error)
 	GetRefreshToken(ctx context.Context, tokenHash string) (db.RefreshToken, error)
@@ -85,21 +88,34 @@ type ResetPasswordRequest struct {
 }
 
 type UpdateProfileRequest struct {
-	Name          *string `json:"name"`
-	Role          *string `json:"role"`
-	SleepBaseline *int16  `json:"sleep_baseline"`
-	Timezone      *string `json:"timezone"`
+	Name           *string `json:"name"`
+	Role           *string `json:"role"`
+	SleepBaseline  *int16  `json:"sleep_baseline"`
+	Timezone       *string `json:"timezone"`
+	EstimatedScore *int16  `json:"estimated_score"`
+}
+
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+type ChangeEmailRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 // UserResponse is the safe user shape sent to clients — no password hash.
 type UserResponse struct {
-	ID            uuid.UUID `json:"id"`
-	Email         string    `json:"email"`
-	Name          string    `json:"name"`
-	Role          string    `json:"role"`
-	SleepBaseline int16     `json:"sleep_baseline"`
-	Timezone      string    `json:"timezone"`
-	EmailVerified bool      `json:"email_verified"`
+	ID                uuid.UUID `json:"id"`
+	Email             string    `json:"email"`
+	Name              string    `json:"name"`
+	Role              string    `json:"role"`
+	SleepBaseline     int16     `json:"sleep_baseline"`
+	Timezone          string    `json:"timezone"`
+	EmailVerified     bool      `json:"email_verified"`
+	Tier              string    `json:"tier"`
+	CalendarConnected bool      `json:"calendar_connected"`
 }
 
 // RegisterResult is returned by Register and Login.
@@ -312,7 +328,61 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, req Updat
 	if err != nil {
 		return UserResponse{}, fmt.Errorf("update profile: %w", err)
 	}
+
+	if req.EstimatedScore != nil {
+		_ = s.store.SetEstimatedScore(ctx, db.SetEstimatedScoreParams{
+			ID:             userID,
+			EstimatedScore: pgtype.Int2{Int16: *req.EstimatedScore, Valid: true},
+		})
+	}
+
 	return s.safeUser(updated), nil
+}
+
+func (s *Service) ChangePassword(ctx context.Context, user db.User, req ChangePasswordRequest) error {
+	if !user.PasswordHash.Valid {
+		return ErrInvalidCredentials
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash.String), []byte(req.CurrentPassword)); err != nil {
+		return ErrInvalidCredentials
+	}
+	newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+	if err := s.store.UpdateUserPassword(ctx, db.UpdateUserPasswordParams{
+		ID:           user.ID,
+		PasswordHash: pgtype.Text{String: string(newHash), Valid: true},
+	}); err != nil {
+		return fmt.Errorf("update password: %w", err)
+	}
+	_ = s.store.RevokeAllUserRefreshTokens(ctx, user.ID)
+	return nil
+}
+
+func (s *Service) ChangeEmail(ctx context.Context, user db.User, req ChangeEmailRequest) (UserResponse, error) {
+	if !user.PasswordHash.Valid {
+		return UserResponse{}, ErrInvalidCredentials
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash.String), []byte(req.Password)); err != nil {
+		return UserResponse{}, ErrInvalidCredentials
+	}
+	updated, err := s.store.UpdateUserEmail(ctx, db.UpdateUserEmailParams{
+		ID:    user.ID,
+		Email: req.Email,
+	})
+	if err != nil {
+		return UserResponse{}, ErrEmailInUse
+	}
+	if s.email != nil {
+		go s.sendVerificationEmail(updated.Email, updated.Name, updated.ID)
+	}
+	return s.safeUser(updated), nil
+}
+
+func (s *Service) DeleteAccount(ctx context.Context, userID uuid.UUID) error {
+	_ = s.store.RevokeAllUserRefreshTokens(ctx, userID)
+	return s.store.SoftDeleteUser(ctx, userID)
 }
 
 // GetUserByID exposes a single-user lookup for the auth middleware.
@@ -427,12 +497,14 @@ func (s *Service) sendPasswordResetEmail(to, name string, userID uuid.UUID) {
 
 func (s *Service) safeUser(u db.User) UserResponse {
 	return UserResponse{
-		ID:            u.ID,
-		Email:         u.Email,
-		Name:          u.Name,
-		Role:          u.Role,
-		SleepBaseline: u.SleepBaseline,
-		Timezone:      u.Timezone,
-		EmailVerified: u.EmailVerified,
+		ID:                u.ID,
+		Email:             u.Email,
+		Name:              u.Name,
+		Role:              u.Role,
+		SleepBaseline:     u.SleepBaseline,
+		Timezone:          u.Timezone,
+		EmailVerified:     u.EmailVerified,
+		Tier:              u.Tier,
+		CalendarConnected: u.CalendarConnected,
 	}
 }
