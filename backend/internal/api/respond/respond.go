@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-
-	authsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/auth"
-	checkinsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/checkin"
-	insightsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/insight"
 )
+
+// HTTPError is implemented by service sentinel errors to declare their own HTTP status.
+// Services implement this on their error types; respond imports no service packages.
+type HTTPError interface {
+	error
+	HTTPStatus() int
+}
 
 // JSON writes v as JSON with the given status code.
 func JSON(w http.ResponseWriter, status int, v any) {
@@ -23,25 +26,14 @@ func Error(w http.ResponseWriter, status int, msg string) {
 	JSON(w, status, map[string]string{"error": msg})
 }
 
-// ServiceError maps well-known service sentinel errors to HTTP status codes.
-// Falls back to 500 for unrecognised errors.
+// ServiceError maps service errors to HTTP responses.
+// Errors implementing HTTPError declare their own status code.
+// All other errors return 500.
 func ServiceError(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, authsvc.ErrEmailInUse):
-		Error(w, http.StatusConflict, err.Error())
-	case errors.Is(err, authsvc.ErrInvalidCredentials):
-		Error(w, http.StatusUnauthorized, err.Error())
-	case errors.Is(err, authsvc.ErrInvalidToken):
-		Error(w, http.StatusBadRequest, err.Error())
-	case errors.Is(err, authsvc.ErrEmailAlreadyVerified):
-		Error(w, http.StatusConflict, err.Error())
-	case errors.Is(err, authsvc.ErrEmailServiceDisabled):
-		Error(w, http.StatusServiceUnavailable, err.Error())
-	case errors.Is(err, checkinsvc.ErrInvalidStress):
-		Error(w, http.StatusBadRequest, err.Error())
-	case errors.Is(err, insightsvc.ErrInvalidComponent):
-		Error(w, http.StatusBadRequest, err.Error())
-	default:
-		Error(w, http.StatusInternalServerError, "internal server error")
+	var he HTTPError
+	if errors.As(err, &he) {
+		Error(w, he.HTTPStatus(), he.Error())
+		return
 	}
+	Error(w, http.StatusInternalServerError, "internal server error")
 }
