@@ -205,34 +205,13 @@ func (s *Service) GetScoreCard(ctx context.Context, user db.User) (ScoreCardResu
 		Column2: 7,
 	})
 
-	recentStresses := make([]int, 0, len(recent))
-	for _, c := range recent {
-		if hasTodayCI && c.CheckedInDate.Time.Equal(today) {
-			continue
-		}
-		recentStresses = append(recentStresses, int(c.Stress))
-	}
-
 	var todayStress *int
 	if hasTodayCI {
 		s := int(todayCI.Stress)
 		todayStress = &s
 	}
 
-	var estScore *int
-	if user.EstimatedScore.Valid {
-		v := int(user.EstimatedScore.Int16)
-		estScore = &v
-	}
-
-	in := score.Input{
-		TodayStress:    todayStress,
-		Role:           score.Role(user.Role),
-		SleepBaseline:  score.SleepBaseline(user.SleepBaseline),
-		RecentStresses: recentStresses,
-		EstimatedScore: estScore,
-		MeetingCount:   -1,
-	}
+	in := BuildScoreInput(user, recent, todayStress, today)
 	out := score.Calculate(in)
 
 	danger, _ := s.store.GetConsecutiveDangerDays(ctx, user.ID)
@@ -241,7 +220,7 @@ func (s *Service) GetScoreCard(ctx context.Context, user db.User) (ScoreCardResu
 
 	trajectory := score.BuildTrajectoryInsight(score.TrajectoryInput{
 		Score:                 out.Score,
-		RecentStresses:        recentStresses,
+		RecentStresses:        in.RecentStresses,
 		ConsecutiveDangerDays: int(danger),
 		DayName: func(daysAhead int) string {
 			return time.Now().In(userLocation(user.Timezone)).AddDate(0, 0, daysAhead).Weekday().String()
@@ -254,7 +233,7 @@ func (s *Service) GetScoreCard(ctx context.Context, user db.User) (ScoreCardResu
 			Score:                 out.Score,
 			TodayStress:           todayStress,
 			ConsecutiveDangerDays: int(danger),
-			RecentStresses:        recentStresses,
+			RecentStresses:        in.RecentStresses,
 		}),
 		Suggestion: score.BuildSuggestion(out.Score, hasTodayCI, int(danger)),
 		Trajectory: trajectory,
