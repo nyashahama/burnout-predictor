@@ -16,6 +16,7 @@ import (
 	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
 	eml "github.com/nyasha-hama/burnout-predictor-api/internal/email"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/reqid"
+	"github.com/nyasha-hama/burnout-predictor-api/internal/api/validate"
 )
 
 // authStore is the data-access contract for the auth service.
@@ -280,8 +281,8 @@ func (s *Service) ForgotPassword(ctx context.Context, req ForgotPasswordRequest)
 }
 
 func (s *Service) ResetPassword(ctx context.Context, req ResetPasswordRequest) error {
-	if len(req.Password) < 8 {
-		return fmt.Errorf("password must be at least 8 characters")
+	if err := validate.Password(req.Password); err != nil {
+		return err
 	}
 
 	hash := s.tokenHash(req.Token)
