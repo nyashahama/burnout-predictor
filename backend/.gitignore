@@ -1,0 +1,23 @@
+# Binaries
+/burnout-predictor-api
+/bin/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Go test cache and coverage
+*.test
+*.out
+coverage.html
+
+# Build artifacts
+dist/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
