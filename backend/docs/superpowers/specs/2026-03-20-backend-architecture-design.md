@@ -190,6 +190,10 @@ type insightStore interface {
     ListCheckInsInRange(ctx context.Context, params db.ListCheckInsInRangeParams) ([]db.CheckIn, error)
     ListRecentCheckIns(ctx context.Context, params db.ListRecentCheckInsParams) ([]db.ListRecentCheckInsRow, error)
     GetTodayCheckIn(ctx context.Context, params db.GetTodayCheckInParams) (db.CheckIn, error)
+    // Note: GetYesterdayCheckInParams.Column2 is typed interface{} in the generated code
+    // because sqlc cannot infer the type from the "$2 - INTERVAL '1 day'" expression.
+    // Callers must pass a pgtype.Date value into Column2. Consider rewriting the query
+    // to "$2::DATE - INTERVAL '1 day'" in a future migration so sqlc generates a proper type.
     GetYesterdayCheckIn(ctx context.Context, params db.GetYesterdayCheckInParams) (db.CheckIn, error)
     CountCheckIns(ctx context.Context, userID uuid.UUID) (int64, error)
 
@@ -253,7 +257,11 @@ The billing service processes Paddle webhook events. It is called from `handler/
 
 ```go
 type billingStore interface {
-    CreatePaddleEvent(ctx context.Context, params db.CreatePaddleEventParams) (db.PaddleEvent, error)  // db.PaddleEvent, not db.Subscription
+    // ON CONFLICT (event_id) DO NOTHING: if the event was already processed, the returned
+    // PaddleEvent will be a zero-value struct (all fields empty, ID == [16]byte{}).
+    // The billing service MUST check for a zero UUID before processing — do not assume
+    // a nil error means the event is new.
+    CreatePaddleEvent(ctx context.Context, params db.CreatePaddleEventParams) (db.PaddleEvent, error)
     GetUserByID(ctx context.Context, id uuid.UUID) (db.User, error)
     GetUserByPaddleCustomerID(ctx context.Context, customerID pgtype.Text) (db.User, error)
     SetPaddleCustomerID(ctx context.Context, params db.SetPaddleCustomerIDParams) error
