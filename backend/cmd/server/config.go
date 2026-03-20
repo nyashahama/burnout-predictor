@@ -15,6 +15,7 @@ type Config struct {
 	OpenAIAPIKey  string
 	PaddleSecret  string
 	AppURL        string
+	CORSOrigin    string
 }
 
 // Load reads configuration from environment variables. Fatal if required vars are missing.
@@ -28,6 +29,7 @@ func Load() Config {
 		OpenAIAPIKey: os.Getenv("OPENAI_API_KEY"),
 		PaddleSecret: os.Getenv("PADDLE_WEBHOOK_SECRET"),
 		AppURL:       os.Getenv("APP_URL"),
+		CORSOrigin:   os.Getenv("CORS_ORIGIN"),
 	}
 	if cfg.DatabaseURL == "" {
 		log.Fatal("DATABASE_URL is required")
