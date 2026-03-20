@@ -69,9 +69,10 @@ service/auth, service/checkin, service/insight
 **How:**
 - New file `internal/api/middleware/requestid.go`.
 - `RequestID()` middleware: checks `X-Request-ID` request header; if absent, generates `uuid.New().String()`. Stores ID in context via typed key `requestIDKey`. Sets `X-Request-ID` response header.
-- Helper `RequestIDFromCtx(ctx context.Context) string` exported from the same file.
+- The context key and `RequestIDFromCtx` helper live in a new shared package `internal/reqid/reqid.go` — **not** in the middleware package — so service packages can call `reqid.FromCtx(ctx)` without importing `internal/api/middleware` (which would be a layer violation).
+- `internal/api/middleware/requestid.go` imports `internal/reqid` and calls `reqid.Set(ctx, id)` to store the ID.
 - Registered as the first middleware on the router.
-- Services that log errors pull the request ID via `middleware.RequestIDFromCtx(ctx)` and include it as a `slog` attribute: `"request_id", requestID`.
+- Services include the request ID in all error/warn log calls: `s.log.ErrorContext(ctx, "msg", "request_id", reqid.FromCtx(ctx), "err", err)`.
 
 **Wire-up in `NewServer`:**
 ```go
@@ -298,7 +299,9 @@ Run `go get` for each, then `go mod tidy`. Verify `go build ./...` and `go test 
 | `internal/service/checkin/errors.go` | `checkinError` typed struct with `HTTPStatus()` |
 | `internal/service/checkin/service.go` | logger injection, use `BuildScoreInput` in `Upsert`, use `in.RecentStresses` downstream |
 | `internal/service/insight/errors.go` | `insightError` typed struct with `HTTPStatus()` |
-| `internal/service/insight/service.go` | logger injection |
 | `internal/service/notification/service.go` | logger injection |
 | `internal/service/billing/service.go` | logger injection |
+| `internal/reqid/reqid.go` | **new** — shared request ID context key; imported by middleware and services to avoid layer violation |
 | `go.mod` / `go.sum` | dependency updates |
+
+**Note:** `internal/service/insight/service.go` has no log calls — logger injection omitted (YAGNI). `internal/worker/scheduler.go` has no log calls — the notification service owns its own logger.
