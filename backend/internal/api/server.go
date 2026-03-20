@@ -85,7 +85,7 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 
 	// Public auth routes with per-IP rate limiting.
 	r.Group(func(r chi.Router) {
-		r.Use(middleware.RateLimit(ctx, 20, time.Minute))
+		r.Use(middleware.RateLimit(ctx, 20, time.Minute, false))
 		r.Post("/api/auth/register", authH.Register)
 		r.Post("/api/auth/login", authH.Login)
 		r.Post("/api/auth/refresh", authH.RefreshToken)
@@ -156,10 +156,12 @@ func healthHandler(pool *pgxpool.Pool, start time.Time) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(httpStatus)
-		json.NewEncoder(w).Encode(map[string]any{
+		if err := json.NewEncoder(w).Encode(map[string]any{
 			"status":         func() string { if httpStatus == http.StatusOK { return "ok" }; return "degraded" }(),
 			"db":             dbStatus,
 			"uptime_seconds": math.Round(time.Since(start).Seconds()),
-		})
+		}); err != nil {
+			slog.Default().ErrorContext(r.Context(), "health: encode response failed", "err", err)
+		}
 	}
 }
