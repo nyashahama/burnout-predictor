@@ -71,6 +71,7 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 	}
 
 	r := chi.NewRouter()
+	r.Use(middleware.RequestID())
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.Timeout(30 * time.Second))
