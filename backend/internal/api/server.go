@@ -85,7 +85,7 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 
 	// Public auth routes with per-IP rate limiting.
 	r.Group(func(r chi.Router) {
-		r.Use(middleware.RateLimit(20, time.Minute))
+		r.Use(middleware.RateLimit(ctx, 20, time.Minute))
 		r.Post("/api/auth/register", authH.Register)
 		r.Post("/api/auth/login", authH.Login)
 		r.Post("/api/auth/refresh", authH.RefreshToken)
