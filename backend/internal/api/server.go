@@ -1,7 +1,9 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"log/slog"
 	"math"
 	"net/http"
 	"time"
@@ -33,16 +35,22 @@ type ServerConfig struct {
 	AppURL       string
 	CORSOrigin   string
 	StartTime    time.Time
+	Logger       *slog.Logger
 }
 
 // NewServer builds and returns the chi router wired up with all handlers.
-func NewServer(cfg ServerConfig) http.Handler {
+func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
+	log := cfg.Logger
+	if log == nil {
+		log = slog.Default()
+	}
+
 	pg := store.New(cfg.Queries)
 
-	authService := authsvc.New(pg, []byte(cfg.JWTSecret), cfg.EmailClient, cfg.AppURL)
-	checkinService := checkinsvc.New(pg, cfg.AIClient)
+	authService := authsvc.New(pg, []byte(cfg.JWTSecret), cfg.EmailClient, cfg.AppURL, log)
+	checkinService := checkinsvc.New(pg, cfg.AIClient, log)
 	insightService := insightsvc.New(pg)
-	billingService := billingsvc.New(pg)
+	billingService := billingsvc.New(pg, log)
 
 	authH := handler.NewAuthHandler(authService)
 	checkinH := handler.NewCheckinHandler(checkinService)

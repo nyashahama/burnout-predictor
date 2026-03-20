@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
+	"github.com/nyasha-hama/burnout-predictor-api/internal/reqid"
 )
 
 // billingStore is the data-access contract for the billing service.
@@ -31,10 +32,11 @@ type billingStore interface {
 // Service handles Paddle webhook processing.
 type Service struct {
 	store billingStore
+	log   *slog.Logger
 }
 
-func New(store billingStore) *Service {
-	return &Service{store: store}
+func New(store billingStore, log *slog.Logger) *Service {
+	return &Service{store: store, log: log}
 }
 
 // ── Paddle payload types ───────────────────────────────────────────────────────
@@ -154,7 +156,7 @@ func (s *Service) ProcessEvent(ctx context.Context, event PaddleEvent, rawBody [
 func (s *Service) handleSubscriptionUpsert(ctx context.Context, eventType string, sub paddleSubscriptionData) {
 	user, err := s.resolveUserFromPaddleEvent(ctx, sub.CustomerID, sub.CustomData)
 	if err != nil {
-		log.Printf("billing/sub-upsert: resolve user (customer=%s): %v", sub.CustomerID, err)
+		s.log.ErrorContext(ctx, "sub upsert: resolve user failed", "request_id", reqid.FromCtx(ctx), "customer_id", sub.CustomerID, "err", err)
 		return
 	}
 
@@ -189,7 +191,7 @@ func (s *Service) handleSubscriptionUpsert(ctx context.Context, eventType string
 	}
 
 	if _, err := s.store.UpsertSubscription(ctx, params); err != nil {
-		log.Printf("billing/sub-upsert: upsert subscription %s: %v", sub.ID, err)
+		s.log.ErrorContext(ctx, "sub upsert: db failed", "request_id", reqid.FromCtx(ctx), "subscription_id", sub.ID, "err", err)
 		return
 	}
 
@@ -199,7 +201,7 @@ func (s *Service) handleSubscriptionUpsert(ctx context.Context, eventType string
 
 func (s *Service) handleSubscriptionCancelled(ctx context.Context, sub paddleSubscriptionData) {
 	if err := s.store.CancelSubscription(ctx, sub.ID); err != nil {
-		log.Printf("billing/sub-cancel: cancel %s: %v", sub.ID, err)
+		s.log.ErrorContext(ctx, "sub cancel: db failed", "request_id", reqid.FromCtx(ctx), "subscription_id", sub.ID, "err", err)
 		return
 	}
 
@@ -214,7 +216,7 @@ func (s *Service) handleSubscriptionCancelled(ctx context.Context, sub paddleSub
 
 func (s *Service) handleSubscriptionPaused(ctx context.Context, sub paddleSubscriptionData) {
 	if err := s.store.SetSubscriptionPastDue(ctx, sub.ID); err != nil {
-		log.Printf("billing/sub-pause: set past due %s: %v", sub.ID, err)
+		s.log.ErrorContext(ctx, "sub pause: set past due failed", "request_id", reqid.FromCtx(ctx), "subscription_id", sub.ID, "err", err)
 	}
 
 	user, err := s.resolveUserFromPaddleEvent(ctx, sub.CustomerID, sub.CustomData)
@@ -230,7 +232,7 @@ func (s *Service) handleTransactionCompleted(ctx context.Context, txn paddleTran
 
 	user, err := s.resolveUserFromPaddleEvent(ctx, txn.CustomerID, txn.CustomData)
 	if err != nil {
-		log.Printf("billing/txn: resolve user (customer=%s): %v", txn.CustomerID, err)
+		s.log.ErrorContext(ctx, "txn: resolve user failed", "request_id", reqid.FromCtx(ctx), "customer_id", txn.CustomerID, "err", err)
 		return
 	}
 
