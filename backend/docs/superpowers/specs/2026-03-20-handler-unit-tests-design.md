@@ -121,14 +121,14 @@ func decodeJSON(t *testing.T, w *httptest.ResponseRecorder, v any)
 | Endpoint | What is tested |
 |---|---|
 | Upsert | invalid JSON → 400; note too long → 400; `ErrInvalidStress` → 400 (returned by service, mapped via `respond.ServiceError`); success → 200 |
-| GetScoreCard | success → 200 |
-| List | success → 200 |
+| GetScoreCard | service error → 500 (via `respond.ServiceError`); success → 200 |
+| List | service error → 500 (via `respond.ServiceError`); success → 200 |
 
 ### `insight_test.go`
 
 | Endpoint | What is tested |
 |---|---|
-| Get | success → 200 |
+| Get | service error → 500 (via `respond.ServiceError`); success → 200 |
 | DismissComponent | invalid JSON → 400; `ErrInvalidComponent` → 400 (returned by service, mapped via `respond.ServiceError`); success → 200 |
 
 ### `user_test.go`
@@ -136,33 +136,35 @@ func decodeJSON(t *testing.T, w *httptest.ResponseRecorder, v any)
 | Endpoint | What is tested |
 |---|---|
 | GetProfile | success → 200 |
-| UpdateProfile | invalid JSON → 400; bad role → 400; bad sleep_baseline → 400; bad timezone → 400; success → 200 |
+| UpdateProfile | invalid JSON → 400; bad role → 400; bad sleep_baseline → 400; bad timezone → 400; service error → 500 (via `respond.ServiceError`); success → 200 |
 
 ### `followup_test.go`
 
 | Endpoint | What is tested |
 |---|---|
-| GetToday | success → 200 |
-| Dismiss | malformed UUID path param → 400; store error → 500; success → 200 |
+| GetToday | store error (no follow-up found) → 200 with `{"follow_up": null}`; success → 200 with follow-up object |
+| Dismiss | malformed UUID path param → 400; store error → 500 (via `respond.Error` directly — any `error` value suffices in the mock, `HTTPStatus()` is not consulted); success → 200 |
 
 ### `notifprefs_test.go`
 
 | Endpoint | What is tested |
 |---|---|
-| Get | success → 200 |
-| Update | invalid JSON → 400; bad `reminder_time` → 400; success → 200 |
+| Get | `GetNotificationPrefs` error → `CreateDefaultNotificationPrefs` called → 200; success (prefs exist) → 200 |
+| Update | invalid JSON → 400; bad `reminder_time` → 400; `UpsertNotificationPrefs` error → 500; success → 200 |
+
+Note: the `mockNotifPrefsStore` must expose a `CreateDefaultNotificationPrefsFn` function field — `Get` calls `CreateDefaultNotificationPrefs` on any `GetNotificationPrefs` error, so both paths need to be exercisable in tests.
 
 ### `subscription_test.go`
 
 | Endpoint | What is tested |
 |---|---|
-| Get | success → 200 |
+| Get | store error (no active subscription) → 200 with `{"subscription": null}`; success → 200 with subscription object |
 
 ### `export_test.go`
 
 | Endpoint | What is tested |
 |---|---|
-| Get | success → 200 |
+| Get | store error → 500; success → 200 |
 
 ### `webhook_test.go`
 
@@ -173,7 +175,8 @@ Special: test file includes a local `paddleSignatureHeader(secret []byte, body [
 | No secret configured | signature check skipped → 200 |
 | Valid signature | 200 |
 | Invalid signature | 401 |
-| Invalid JSON body | 400 |
+| Malformed JSON body | 400 |
+| Valid JSON with empty `event_id` | 400 (the handler checks `event.EventID == ""` after unmarshal) |
 | `alreadyProcessed = true` | 200 with `"already processed"` |
 | Service error | 500 |
 
