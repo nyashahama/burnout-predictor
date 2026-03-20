@@ -1,11 +1,14 @@
 package api
 
 import (
+	"encoding/json"
+	"math"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/nyasha-hama/burnout-predictor-api/internal/ai"
 	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
@@ -21,12 +24,15 @@ import (
 
 // ServerConfig holds all dependencies needed to build the HTTP handler.
 type ServerConfig struct {
-	Queries       *db.Queries
-	JWTSecret     string
-	EmailClient   *eml.Client
-	AIClient      *ai.Client
-	PaddleSecret  string
-	AppURL        string
+	Queries      *db.Queries
+	Pool         *pgxpool.Pool
+	JWTSecret    string
+	EmailClient  *eml.Client
+	AIClient     *ai.Client
+	PaddleSecret string
+	AppURL       string
+	CORSOrigin   string
+	StartTime    time.Time
 }
 
 // NewServer builds and returns the chi router wired up with all handlers.
@@ -44,14 +50,26 @@ func NewServer(cfg ServerConfig) http.Handler {
 	followUpH := handler.NewFollowUpHandler(pg)
 	userH := handler.NewUserHandler(authService)
 	webhookH := handler.NewWebhookHandler(billingService, []byte(cfg.PaddleSecret))
+	notifH := handler.NewNotifPrefsHandler(pg)
+	subH := handler.NewSubscriptionHandler(pg)
+	exportH := handler.NewExportHandler(pg)
 
 	secret := authService.JWTSecret()
 	authMW := middleware.Auth(pg, secret)
+
+	corsOrigin := cfg.CORSOrigin
+	if corsOrigin == "" {
+		corsOrigin = "*"
+	}
 
 	r := chi.NewRouter()
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.Timeout(30 * time.Second))
+	r.Use(corsMiddleware(corsOrigin))
+
+	// Health check — no auth, no rate limit.
+	r.Get("/health", healthHandler(cfg.Pool, cfg.StartTime))
 
 	// Public webhook.
 	r.Post("/api/webhooks/paddle", webhookH.Paddle)
@@ -76,6 +94,14 @@ func NewServer(cfg ServerConfig) http.Handler {
 
 		r.Get("/api/user", userH.GetProfile)
 		r.Patch("/api/user", userH.UpdateProfile)
+		r.Patch("/api/user/password", authH.ChangePassword)
+		r.Patch("/api/user/email", authH.ChangeEmail)
+		r.Delete("/api/user", authH.DeleteAccount)
+		r.Get("/api/user/subscription", subH.Get)
+		r.Get("/api/user/export", exportH.Get)
+
+		r.Get("/api/notifications/prefs", notifH.Get)
+		r.Patch("/api/notifications/prefs", notifH.Update)
 
 		r.Get("/api/score", checkinH.GetScoreCard)
 		r.Post("/api/checkins", checkinH.Upsert)
@@ -89,4 +115,42 @@ func NewServer(cfg ServerConfig) http.Handler {
 	})
 
 	return r
+}
+
+// corsMiddleware adds CORS headers to every response and handles OPTIONS preflight.
+func corsMiddleware(origin string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+			w.Header().Set("Access-Control-Max-Age", "86400")
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// healthHandler returns a handler that checks the DB pool and reports uptime.
+func healthHandler(pool *pgxpool.Pool, start time.Time) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		dbStatus := "ok"
+		httpStatus := http.StatusOK
+		if pool != nil {
+			if err := pool.Ping(r.Context()); err != nil {
+				dbStatus = "unreachable"
+				httpStatus = http.StatusServiceUnavailable
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(httpStatus)
+		json.NewEncoder(w).Encode(map[string]any{
+			"status":         func() string { if httpStatus == http.StatusOK { return "ok" }; return "degraded" }(),
+			"db":             dbStatus,
+			"uptime_seconds": math.Round(time.Since(start).Seconds()),
+		})
+	}
 }
