@@ -233,7 +233,9 @@ func (s *Service) Refresh(ctx context.Context, req RefreshRequest) (RefreshResul
 }
 
 func (s *Service) Logout(ctx context.Context, userID uuid.UUID) error {
-	_ = s.store.RevokeAllUserRefreshTokens(ctx, userID)
+	if err := s.store.RevokeAllUserRefreshTokens(ctx, userID); err != nil {
+		s.log.WarnContext(ctx, "logout: revoke tokens failed", "user_id", userID, "err", err)
+	}
 	return nil
 }
 
@@ -302,8 +304,12 @@ func (s *Service) ResetPassword(ctx context.Context, req ResetPasswordRequest) e
 	}); err != nil {
 		return fmt.Errorf("update password: %w", err)
 	}
-	_ = s.store.MarkPasswordResetUsed(ctx, hash)
-	_ = s.store.RevokeAllUserRefreshTokens(ctx, pr.UserID)
+	if err := s.store.MarkPasswordResetUsed(ctx, hash); err != nil {
+		s.log.WarnContext(ctx, "reset password: mark used failed", "err", err)
+	}
+	if err := s.store.RevokeAllUserRefreshTokens(ctx, pr.UserID); err != nil {
+		s.log.WarnContext(ctx, "reset password: revoke tokens failed", "user_id", pr.UserID, "err", err)
+	}
 	return nil
 }
 
@@ -359,7 +365,9 @@ func (s *Service) ChangePassword(ctx context.Context, user db.User, req ChangePa
 	}); err != nil {
 		return fmt.Errorf("update password: %w", err)
 	}
-	_ = s.store.RevokeAllUserRefreshTokens(ctx, user.ID)
+	if err := s.store.RevokeAllUserRefreshTokens(ctx, user.ID); err != nil {
+		s.log.WarnContext(ctx, "change password: revoke tokens failed", "user_id", user.ID, "err", err)
+	}
 	return nil
 }
 
@@ -384,7 +392,9 @@ func (s *Service) ChangeEmail(ctx context.Context, user db.User, req ChangeEmail
 }
 
 func (s *Service) DeleteAccount(ctx context.Context, userID uuid.UUID) error {
-	_ = s.store.RevokeAllUserRefreshTokens(ctx, userID)
+	if err := s.store.RevokeAllUserRefreshTokens(ctx, userID); err != nil {
+		s.log.WarnContext(ctx, "delete account: revoke tokens failed", "user_id", userID, "err", err)
+	}
 	return s.store.SoftDeleteUser(ctx, userID)
 }
 
