@@ -120,7 +120,7 @@ func decodeJSON(t *testing.T, w *httptest.ResponseRecorder, v any)
 
 | Endpoint | What is tested |
 |---|---|
-| Upsert | invalid JSON → 400; note too long → 400; `ErrInvalidStress` → 400; success → 200 |
+| Upsert | invalid JSON → 400; note too long → 400; `ErrInvalidStress` → 400 (returned by service, mapped via `respond.ServiceError`); success → 200 |
 | GetScoreCard | success → 200 |
 | List | success → 200 |
 
