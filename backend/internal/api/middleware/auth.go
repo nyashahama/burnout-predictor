@@ -77,3 +77,9 @@ func Auth(store userGetter, secret []byte) func(http.Handler) http.Handler {
 func UserFromCtx(ctx context.Context) db.User {
 	return ctx.Value(userContextKey).(db.User)
 }
+
+// SetUserInCtx stores a user in context — mirrors what the Auth middleware does.
+// Used by handler tests to simulate an authenticated request without running JWT validation.
+func SetUserInCtx(ctx context.Context, user db.User) context.Context {
+	return context.WithValue(ctx, userContextKey, user)
+}
