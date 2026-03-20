@@ -129,21 +129,21 @@ func decodeJSON(t *testing.T, w *httptest.ResponseRecorder, v any)
 | Endpoint | What is tested |
 |---|---|
 | Get | success → 200 |
-| DismissComponent | invalid JSON → 400; `ErrInvalidComponent` → 400; success → 200 |
+| DismissComponent | invalid JSON → 400; `ErrInvalidComponent` → 400 (returned by service, mapped via `respond.ServiceError`); success → 200 |
 
 ### `user_test.go`
 
 | Endpoint | What is tested |
 |---|---|
 | GetProfile | success → 200 |
-| UpdateProfile | invalid JSON → 400; bad timezone → 400; success → 200 |
+| UpdateProfile | invalid JSON → 400; bad role → 400; bad sleep_baseline → 400; bad timezone → 400; success → 200 |
 
 ### `followup_test.go`
 
 | Endpoint | What is tested |
 |---|---|
 | GetToday | success → 200 |
-| Dismiss | malformed UUID path param → 400 or 404; success → 200 |
+| Dismiss | malformed UUID path param → 400; store error → 500; success → 200 |
 
 ### `notifprefs_test.go`
 
@@ -166,7 +166,7 @@ func decodeJSON(t *testing.T, w *httptest.ResponseRecorder, v any)
 
 ### `webhook_test.go`
 
-Special: test file includes a local `paddleSignatureHeader(secret []byte, body []byte, ts string) string` helper that computes a valid HMAC-SHA256 `Paddle-Signature` header.
+Special: test file includes a local `paddleSignatureHeader(secret []byte, body []byte, ts string) string` helper that computes a valid HMAC-SHA256 `Paddle-Signature` header. The returned string must be in the format `"ts=<ts>;h1=<lowercase-hex-hmac>"` — the production `verifyPaddleSignature` parser splits on `;`, trims whitespace, and expects exactly the `ts=` and `h1=` prefixes.
 
 | Scenario | What is tested |
 |---|---|
@@ -193,7 +193,7 @@ func TestAuthHandler_Register_Success(t *testing.T) { ... }
 
 ## Notes
 
-- `followup.go` and `subscription.go` access the store directly (not through a service interface). Their handlers accept the store as an interface — mocks follow the same function-field pattern.
-- `export.go` also accesses the store directly — same approach.
+- `followup.go`, `subscription.go`, `export.go`, and `notifprefs.go` all access the store directly (no service layer). Their handlers accept a store interface — mocks follow the same function-field pattern.
+- `export.go` declares an unused `exportUserService` interface alongside `exportStore`. The handler only uses `exportStore`; no mock for `exportUserService` is needed.
 - Tests do not assert on response body content beyond status code and JSON shape for success paths. Exact field values are service-layer concerns, already covered by score engine tests.
 - `go test ./internal/api/handler/...` must pass with zero failures after this work.
