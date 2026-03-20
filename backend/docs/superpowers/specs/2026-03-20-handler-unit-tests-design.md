@@ -114,13 +114,13 @@ func decodeJSON(t *testing.T, w *httptest.ResponseRecorder, v any)
 | ResetPassword | missing `token`/`password` → 400; `ErrInvalidToken` → 400; success → 200 |
 | ChangePassword | invalid JSON → 400; short password → 400; `ErrInvalidCredentials` → 401; success → 200 |
 | ChangeEmail | invalid JSON → 400; bad email → 400; `ErrEmailInUse` → 409; success → 200 |
-| DeleteAccount | service error → 500; success → 204 |
+| DeleteAccount | service error → 500 (via `respond.Error` directly — hardcoded, not mapped through `respond.ServiceError`); success → 204 |
 
 ### `checkin_test.go`
 
 | Endpoint | What is tested |
 |---|---|
-| Upsert | invalid JSON → 400; note too long → 400; `ErrInvalidStress` → 400 (returned by service, mapped via `respond.ServiceError`); success → 200 |
+| Upsert | invalid JSON → 400; note too long → 400; `ErrInvalidStress` → 400 (returned by service, mapped via `respond.ServiceError`; mock `UpsertFn` must return the real `checkinsvc.ErrInvalidStress` sentinel — plain `errors.New` would produce 500); success → 200 |
 | GetScoreCard | service error → 500 (via `respond.ServiceError`); success → 200 |
 | List | service error → 500 (via `respond.ServiceError`); success → 200 |
 
@@ -129,7 +129,7 @@ func decodeJSON(t *testing.T, w *httptest.ResponseRecorder, v any)
 | Endpoint | What is tested |
 |---|---|
 | Get | service error → 500 (via `respond.ServiceError`); success → 200 |
-| DismissComponent | invalid JSON → 400; `ErrInvalidComponent` → 400 (returned by service, mapped via `respond.ServiceError`); success → 200 |
+| DismissComponent | invalid JSON → 400; `ErrInvalidComponent` → 400 (returned by service, mapped via `respond.ServiceError`; mock `DismissComponentFn` must return the real `insightsvc.ErrInvalidComponent` sentinel); success → 200 |
 
 ### `user_test.go`
 
@@ -142,8 +142,10 @@ func decodeJSON(t *testing.T, w *httptest.ResponseRecorder, v any)
 
 | Endpoint | What is tested |
 |---|---|
-| GetToday | store error (no follow-up found) → 200 with `{"follow_up": null}`; success → 200 with follow-up object |
+| GetToday | store error (no follow-up) → 200 with `{"follow_up": null}`; success with unsurfaced follow-up (`SurfacedAt.Valid = false`) → 200 with follow-up object (and `MarkFollowUpSurfaced` called); success with already-surfaced follow-up (`SurfacedAt.Valid = true`) → 200 with follow-up object (and `MarkFollowUpSurfaced` NOT called) |
 | Dismiss | malformed UUID path param → 400; store error → 500 (via `respond.Error` directly — any `error` value suffices in the mock, `HTTPStatus()` is not consulted); success → 200 |
+
+Note for `followup_test.go`: `mockFollowUpStore` must expose a `MarkFollowUpSurfacedFn` function field — `GetToday` calls `MarkFollowUpSurfaced` when the returned follow-up has `SurfacedAt.Valid = false`.
 
 ### `notifprefs_test.go`
 
@@ -152,7 +154,9 @@ func decodeJSON(t *testing.T, w *httptest.ResponseRecorder, v any)
 | Get | `GetNotificationPrefs` error → `CreateDefaultNotificationPrefs` called → 200; success (prefs exist) → 200 |
 | Update | invalid JSON → 400; bad `reminder_time` → 400; `UpsertNotificationPrefs` error → 500; success → 200 |
 
-Note: the `mockNotifPrefsStore` must expose a `CreateDefaultNotificationPrefsFn` function field — `Get` calls `CreateDefaultNotificationPrefs` on any `GetNotificationPrefs` error, so both paths need to be exercisable in tests.
+Notes for `notifprefs_test.go`:
+- `mockNotifPrefsStore` must expose a `CreateDefaultNotificationPrefsFn` function field — `Get` calls `CreateDefaultNotificationPrefs` on any `GetNotificationPrefs` error.
+- `CreateDefaultNotificationPrefs` error is silently discarded (`prefs, _ = ...`): if both store calls fail, `toPrefsResponse` is called with a zero-value `db.UserNotificationPref` and the handler still returns 200. Tests need not cover this sub-case, but must not assert that a `CreateDefaultNotificationPrefs` failure produces a non-200.
 
 ### `subscription_test.go`
 
@@ -164,11 +168,13 @@ Note: the `mockNotifPrefsStore` must expose a `CreateDefaultNotificationPrefsFn`
 
 | Endpoint | What is tested |
 |---|---|
-| Get | store error → 500; success → 200 |
+| Get | store error → 500; success → 200 with `Content-Disposition: attachment; filename="overload-export.json"` header set |
+
+Note: `export.go` does not use `respond.JSON` — it calls `json.NewEncoder(w).Encode(payload)` directly after setting response headers. The success test should assert `Content-Disposition` is present in addition to the 200 status.
 
 ### `webhook_test.go`
 
-Special: test file includes a local `paddleSignatureHeader(secret []byte, body []byte, ts string) string` helper that computes a valid HMAC-SHA256 `Paddle-Signature` header. The returned string must be in the format `"ts=<ts>;h1=<lowercase-hex-hmac>"` — the production `verifyPaddleSignature` parser splits on `;`, trims whitespace, and expects exactly the `ts=` and `h1=` prefixes.
+Special: test file includes a local `paddleSignatureHeader(secret []byte, body []byte, ts string) string` helper that computes a valid HMAC-SHA256 `Paddle-Signature` header. The returned string must be in the format `"ts=<ts>;h1=<lowercase-hex-hmac>"` — the production `verifyPaddleSignature` parser splits on `;`, trims whitespace per segment, and expects exactly the `ts=` and `h1=` prefixes. Both `"ts=1234;h1=abc"` (no space) and `"ts=1234; h1=abc"` (space after `;`) are accepted by the parser; the helper may produce either form.
 
 | Scenario | What is tested |
 |---|---|
@@ -199,4 +205,5 @@ func TestAuthHandler_Register_Success(t *testing.T) { ... }
 - `followup.go`, `subscription.go`, `export.go`, and `notifprefs.go` all access the store directly (no service layer). Their handlers accept a store interface — mocks follow the same function-field pattern.
 - `export.go` declares an unused `exportUserService` interface alongside `exportStore`. The handler only uses `exportStore`; no mock for `exportUserService` is needed.
 - Tests do not assert on response body content beyond status code and JSON shape for success paths. Exact field values are service-layer concerns, already covered by score engine tests.
+- The unauthenticated `auth.go` endpoints (`Register`, `Login`, `RefreshToken`, `ForgotPassword`, `ResetPassword`, `VerifyEmail`) do not call `middleware.UserFromCtx`; the `withUser` helper is not needed for those tests. All other handlers require `withUser` to inject the authenticated user.
 - `go test ./internal/api/handler/...` must pass with zero failures after this work.
