@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -20,7 +22,7 @@ type rlWindow struct {
 	resetAt time.Time
 }
 
-func newRateLimiter(max int, period time.Duration) *rateLimiter {
+func newRateLimiter(ctx context.Context, max int, period time.Duration) *rateLimiter {
 	rl := &rateLimiter{
 		windows: make(map[string]*rlWindow),
 		max:     max,
@@ -29,8 +31,13 @@ func newRateLimiter(max int, period time.Duration) *rateLimiter {
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
-		for range ticker.C {
-			rl.cleanup()
+		for {
+			select {
+			case <-ticker.C:
+				rl.cleanup()
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 	return rl
@@ -64,11 +71,13 @@ func (rl *rateLimiter) cleanup() {
 }
 
 // RateLimit returns a Chi middleware that limits requests per IP.
-func RateLimit(max int, window time.Duration) func(http.Handler) http.Handler {
-	rl := newRateLimiter(max, window)
+// The cleanup goroutine exits when ctx is cancelled.
+func RateLimit(ctx context.Context, max int, window time.Duration) func(http.Handler) http.Handler {
+	rl := newRateLimiter(ctx, max, window)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !rl.allow(realIP(r)) {
+				w.Header().Set("Retry-After", strconv.Itoa(int(window.Seconds())))
 				respond.Error(w, http.StatusTooManyRequests, "too many requests — try again in a minute")
 				return
 			}
