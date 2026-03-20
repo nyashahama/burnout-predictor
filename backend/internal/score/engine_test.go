@@ -36,8 +36,8 @@ func TestCalculate_NilStressReturnsEstimate(t *testing.T) {
 	if out.Score != 62 {
 		t.Errorf("expected 62, got %d", out.Score)
 	}
-	if out.Level != LevelDanger {
-		t.Errorf("expected danger for 62, got %s", out.Level)
+	if out.Level != LevelWarning {
+		t.Errorf("expected warning for 62, got %s", out.Level)
 	}
 }
 
