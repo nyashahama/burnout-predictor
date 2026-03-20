@@ -72,11 +72,14 @@ func (rl *rateLimiter) cleanup() {
 
 // RateLimit returns a Chi middleware that limits requests per IP.
 // The cleanup goroutine exits when ctx is cancelled.
-func RateLimit(ctx context.Context, max int, window time.Duration) func(http.Handler) http.Handler {
+// Set trustProxy to true only when the server is behind a trusted reverse proxy
+// (e.g. nginx, Cloudflare) that sets X-Forwarded-For; otherwise leave false to
+// avoid IP spoofing via attacker-controlled headers.
+func RateLimit(ctx context.Context, max int, window time.Duration, trustProxy bool) func(http.Handler) http.Handler {
 	rl := newRateLimiter(ctx, max, window)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if !rl.allow(realIP(r)) {
+			if !rl.allow(realIP(r, trustProxy)) {
 				w.Header().Set("Retry-After", strconv.Itoa(int(window.Seconds())))
 				respond.Error(w, http.StatusTooManyRequests, "too many requests — try again in a minute")
 				return
@@ -86,17 +89,19 @@ func RateLimit(ctx context.Context, max int, window time.Duration) func(http.Han
 	}
 }
 
-func realIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		for i := 0; i < len(xff); i++ {
-			if xff[i] == ',' {
-				return xff[:i]
+func realIP(r *http.Request, trustProxy bool) string {
+	if trustProxy {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			for i := 0; i < len(xff); i++ {
+				if xff[i] == ',' {
+					return xff[:i]
+				}
 			}
+			return xff
 		}
-		return xff
-	}
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
+		if xri := r.Header.Get("X-Real-IP"); xri != "" {
+			return xri
+		}
 	}
 	addr := r.RemoteAddr
 	for i := len(addr) - 1; i >= 0; i-- {

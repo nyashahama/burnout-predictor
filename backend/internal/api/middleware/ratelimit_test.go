@@ -12,7 +12,7 @@ import (
 
 func TestRateLimit_AllowsFirstRequest(t *testing.T) {
 	ctx := context.Background()
-	mw := middleware.RateLimit(ctx, 2, time.Minute)
+	mw := middleware.RateLimit(ctx, 2, time.Minute, false)
 	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -27,7 +27,7 @@ func TestRateLimit_AllowsFirstRequest(t *testing.T) {
 
 func TestRateLimit_BlocksAfterLimit(t *testing.T) {
 	ctx := context.Background()
-	mw := middleware.RateLimit(ctx, 1, time.Minute)
+	mw := middleware.RateLimit(ctx, 1, time.Minute, false)
 	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -55,7 +55,7 @@ func TestRateLimit_BlocksAfterLimit(t *testing.T) {
 func TestRateLimit_CtxCancelStopsCleanup(t *testing.T) {
 	// Verify the goroutine exits cleanly — no panic, no hang.
 	ctx, cancel := context.WithCancel(context.Background())
-	middleware.RateLimit(ctx, 10, time.Minute)
+	middleware.RateLimit(ctx, 10, time.Minute, false)
 	cancel() // Should stop the cleanup goroutine.
 	// If this test hangs, the goroutine is not respecting ctx.Done().
 }
