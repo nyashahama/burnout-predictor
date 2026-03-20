@@ -9,7 +9,9 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/respond"
 	billingsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/billing"
@@ -81,6 +83,10 @@ func verifyPaddleSignature(secret []byte, header string, body []byte) bool {
 		}
 	}
 	if ts == "" || sig == "" {
+		return false
+	}
+	tsUnix, err := strconv.ParseInt(ts, 10, 64)
+	if err != nil || time.Since(time.Unix(tsUnix, 0)).Abs() > 5*time.Minute {
 		return false
 	}
 	mac := hmac.New(sha256.New, secret)

@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/handler"
 	billingsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/billing"
@@ -56,7 +57,7 @@ func TestWebhookHandler_Paddle_NoSecret_SkipsSignatureCheck(t *testing.T) {
 
 func TestWebhookHandler_Paddle_ValidSignature(t *testing.T) {
 	secret := []byte("webhook-secret")
-	ts := "1700000000"
+	ts := fmt.Sprintf("%d", time.Now().Unix())
 	body := []byte(validEventBody)
 	h := handler.NewWebhookHandler(&mockBillingService{}, secret)
 	rec := httptest.NewRecorder()
