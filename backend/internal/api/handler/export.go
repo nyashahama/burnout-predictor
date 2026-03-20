@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -86,5 +87,7 @@ func (h *ExportHandler) Get(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", `attachment; filename="overload-export.json"`)
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(payload)
+	if err := json.NewEncoder(w).Encode(payload); err != nil {
+		slog.Default().ErrorContext(r.Context(), "export: encode response failed", "err", err)
+	}
 }
