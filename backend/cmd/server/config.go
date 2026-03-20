@@ -1,21 +1,21 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"os"
 )
 
 // Config holds all configuration loaded from environment variables.
 type Config struct {
-	DatabaseURL   string
-	JWTSecret     string
-	Port          string
-	ResendAPIKey  string
-	EmailFrom     string
-	OpenAIAPIKey  string
-	PaddleSecret  string
-	AppURL        string
-	CORSOrigin    string
+	DatabaseURL  string
+	JWTSecret    string
+	Port         string
+	ResendAPIKey string
+	EmailFrom    string
+	OpenAIAPIKey string
+	PaddleSecret string
+	AppURL       string
+	CORSOrigin   string
 }
 
 // Load reads configuration from environment variables. Fatal if required vars are missing.
@@ -32,10 +32,12 @@ func Load() Config {
 		CORSOrigin:   os.Getenv("CORS_ORIGIN"),
 	}
 	if cfg.DatabaseURL == "" {
-		log.Fatal("DATABASE_URL is required")
+		slog.Default().Error("DATABASE_URL is required")
+		os.Exit(1)
 	}
 	if cfg.JWTSecret == "" {
-		log.Fatal("JWT_SECRET is required")
+		slog.Default().Error("JWT_SECRET is required")
+		os.Exit(1)
 	}
 	if cfg.Port == "" {
 		cfg.Port = "8080"

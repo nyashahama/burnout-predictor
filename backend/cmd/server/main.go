@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -20,6 +21,9 @@ import (
 )
 
 func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
 	cfg := Load()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
@@ -27,43 +31,45 @@ func main() {
 
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("connect db: %v", err)
+		slog.Default().Error("connect db", "err", err)
+		os.Exit(1)
 	}
 	defer pool.Close()
 	if err := pool.Ping(ctx); err != nil {
-		log.Fatalf("ping db: %v", err)
+		slog.Default().Error("ping db", "err", err)
+		os.Exit(1)
 	}
 
 	var emailClient *email.Client
 	if cfg.ResendAPIKey != "" {
 		emailClient = email.New(cfg.ResendAPIKey, cfg.EmailFrom)
-		log.Println("email: Resend enabled")
+		slog.Default().Info("email enabled", "provider", "resend")
 	} else {
-		log.Println("email: disabled")
+		slog.Default().Info("email disabled")
 	}
 
 	var aiClient *ai.Client
 	if cfg.OpenAIAPIKey != "" {
 		aiClient = ai.New(cfg.OpenAIAPIKey)
-		log.Println("ai: OpenAI enabled")
+		slog.Default().Info("ai enabled", "provider", "openai")
 	} else {
-		log.Println("ai: disabled")
+		slog.Default().Info("ai disabled")
 	}
 
 	if cfg.PaddleSecret == "" {
-		log.Println("paddle: webhook signature check disabled")
+		slog.Default().Warn("paddle webhook signature check disabled")
 	}
 
 	startTime := time.Now()
 	queries := db.New(pool)
 	pg := store.New(queries)
 
-	notifSvc := notificationsvc.New(pg, emailClient, aiClient)
+	notifSvc := notificationsvc.New(pg, emailClient, aiClient, logger)
 	go worker.Run(ctx, notifSvc)
 
 	srv := &http.Server{
 		Addr: ":" + cfg.Port,
-		Handler: api.NewServer(api.ServerConfig{
+		Handler: api.NewServer(ctx, api.ServerConfig{
 			Queries:      queries,
 			Pool:         pool,
 			JWTSecret:    cfg.JWTSecret,
@@ -73,23 +79,25 @@ func main() {
 			AppURL:       cfg.AppURL,
 			CORSOrigin:   cfg.CORSOrigin,
 			StartTime:    startTime,
+			Logger:       logger,
 		}),
 	}
 
 	go func() {
-		log.Printf("listening on :%s", cfg.Port)
+		slog.Default().Info("listening", "port", cfg.Port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %v", err)
+			slog.Default().Error("listen", "err", err)
+			os.Exit(1)
 		}
 	}()
 
 	<-ctx.Done()
-	log.Println("shutting down")
+	slog.Default().Info("shutting down")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("shutdown: %v", err)
+		slog.Default().Error("shutdown", "err", err)
 	}
-	log.Println("server stopped")
+	slog.Default().Info("server stopped")
 }

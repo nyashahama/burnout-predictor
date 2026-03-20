@@ -3,7 +3,7 @@ package checkin
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -12,6 +12,7 @@ import (
 
 	"github.com/nyasha-hama/burnout-predictor-api/internal/ai"
 	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
+	"github.com/nyasha-hama/burnout-predictor-api/internal/reqid"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/score"
 )
 
@@ -33,10 +34,11 @@ type checkinStore interface {
 type Service struct {
 	store checkinStore
 	ai    *ai.Client // nil = AI disabled
+	log   *slog.Logger
 }
 
-func New(store checkinStore, aiClient *ai.Client) *Service {
-	return &Service{store: store, ai: aiClient}
+func New(store checkinStore, aiClient *ai.Client, log *slog.Logger) *Service {
+	return &Service{store: store, ai: aiClient, log: log}
 }
 
 // ── Request / Response types ──────────────────────────────────────────────────
@@ -365,7 +367,7 @@ func (s *Service) scheduleFollowUps(ctx context.Context, checkinID uuid.UUID, us
 		})
 		cancel()
 		if err != nil {
-			log.Printf("checkin: create follow-up for %s: %v", userID, err)
+			s.log.ErrorContext(ctx, "create follow-up failed", "request_id", reqid.FromCtx(ctx), "user_id", userID, "err", err)
 		}
 		break // only one follow-up per day
 	}

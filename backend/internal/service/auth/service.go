@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -15,6 +15,7 @@ import (
 
 	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
 	eml "github.com/nyasha-hama/burnout-predictor-api/internal/email"
+	"github.com/nyasha-hama/burnout-predictor-api/internal/reqid"
 )
 
 // authStore is the data-access contract for the auth service.
@@ -48,10 +49,11 @@ type Service struct {
 	secret []byte
 	email  *eml.Client // nil = email disabled
 	appURL string
+	log    *slog.Logger
 }
 
-func New(store authStore, secret []byte, emailClient *eml.Client, appURL string) *Service {
-	return &Service{store: store, secret: secret, email: emailClient, appURL: appURL}
+func New(store authStore, secret []byte, emailClient *eml.Client, appURL string, log *slog.Logger) *Service {
+	return &Service{store: store, secret: secret, email: emailClient, appURL: appURL, log: log}
 }
 
 // ── Request / Response types ──────────────────────────────────────────────────
@@ -432,14 +434,15 @@ func (s *Service) sendWelcomeEmail(to, name string) {
 	defer cancel()
 	subject, html := eml.Welcome(name)
 	if _, err := s.email.Send(ctx, eml.Params{To: to, Subject: subject, HTML: html}); err != nil {
-		log.Printf("auth: welcome email to %s: %v", to, err)
+		s.log.WarnContext(ctx, "welcome email failed", "request_id", reqid.FromCtx(ctx), "to", to, "err", err)
 	}
 }
 
 func (s *Service) sendVerificationEmail(to, name string, userID uuid.UUID) {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
-		log.Printf("auth: gen verify token: %v", err)
+		ctx := context.Background()
+		s.log.ErrorContext(ctx, "gen verify token", "request_id", reqid.FromCtx(ctx), "err", err)
 		return
 	}
 	rawToken := fmt.Sprintf("%x", raw)
@@ -455,21 +458,22 @@ func (s *Service) sendVerificationEmail(to, name string, userID uuid.UUID) {
 		ExpiresAt: pgtype.Timestamptz{Time: time.Now().Add(24 * time.Hour), Valid: true},
 	})
 	if err != nil {
-		log.Printf("auth: store verify token for %s: %v", to, err)
+		s.log.ErrorContext(ctx, "store verify token", "request_id", reqid.FromCtx(ctx), "to", to, "err", err)
 		return
 	}
 
 	verifyURL := s.appURL + "/verify-email?token=" + rawToken
 	subject, html := eml.VerifyEmail(name, verifyURL)
 	if _, err := s.email.Send(ctx, eml.Params{To: to, Subject: subject, HTML: html}); err != nil {
-		log.Printf("auth: verify email to %s: %v", to, err)
+		s.log.WarnContext(ctx, "verify email failed", "request_id", reqid.FromCtx(ctx), "to", to, "err", err)
 	}
 }
 
 func (s *Service) sendPasswordResetEmail(to, name string, userID uuid.UUID) {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
-		log.Printf("auth: gen reset token: %v", err)
+		ctx := context.Background()
+		s.log.ErrorContext(ctx, "gen reset token", "request_id", reqid.FromCtx(ctx), "err", err)
 		return
 	}
 	rawToken := fmt.Sprintf("%x", raw)
@@ -484,14 +488,14 @@ func (s *Service) sendPasswordResetEmail(to, name string, userID uuid.UUID) {
 		ExpiresAt: pgtype.Timestamptz{Time: time.Now().Add(time.Hour), Valid: true},
 	})
 	if err != nil {
-		log.Printf("auth: store reset token for %s: %v", to, err)
+		s.log.ErrorContext(ctx, "store reset token", "request_id", reqid.FromCtx(ctx), "to", to, "err", err)
 		return
 	}
 
 	resetURL := s.appURL + "/reset-password?token=" + rawToken
 	subject, html := eml.PasswordReset(name, resetURL)
 	if _, err := s.email.Send(ctx, eml.Params{To: to, Subject: subject, HTML: html}); err != nil {
-		log.Printf("auth: reset email to %s: %v", to, err)
+		s.log.WarnContext(ctx, "reset email failed", "request_id", reqid.FromCtx(ctx), "to", to, "err", err)
 	}
 }
 

@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,6 +14,7 @@ import (
 	"github.com/nyasha-hama/burnout-predictor-api/internal/ai"
 	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
 	eml "github.com/nyasha-hama/burnout-predictor-api/internal/email"
+	"github.com/nyasha-hama/burnout-predictor-api/internal/reqid"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/score"
 )
 
@@ -48,10 +49,11 @@ type Service struct {
 	store notificationStore
 	email *eml.Client
 	ai    *ai.Client
+	log   *slog.Logger
 }
 
-func New(store notificationStore, emailClient *eml.Client, aiClient *ai.Client) *Service {
-	return &Service{store: store, email: emailClient, ai: aiClient}
+func New(store notificationStore, emailClient *eml.Client, aiClient *ai.Client, log *slog.Logger) *Service {
+	return &Service{store: store, email: emailClient, ai: aiClient, log: log}
 }
 
 // RunMinutely evaluates all time-gated notification queries and sends emails as needed.
@@ -74,7 +76,7 @@ func (s *Service) BackfillAIPlans(ctx context.Context) {
 	}
 	checkins, err := s.store.ListCheckInsNeedingAIPlan(ctx)
 	if err != nil {
-		log.Printf("notification/ai: list: %v", err)
+		s.log.ErrorContext(ctx, "ai backfill: list check-ins failed", "request_id", reqid.FromCtx(ctx), "err", err)
 		return
 	}
 	for _, ci := range checkins {
@@ -84,7 +86,7 @@ func (s *Service) BackfillAIPlans(ctx context.Context) {
 		}
 		plan, err := s.ai.GenerateRecoveryPlan(ctx, int(ci.Stress), note, ci.RoleSnapshot)
 		if err != nil {
-			log.Printf("notification/ai: generate for %s: %v", ci.ID, err)
+			s.log.WarnContext(ctx, "ai backfill: generate plan failed", "request_id", reqid.FromCtx(ctx), "checkin_id", ci.ID, "err", err)
 			continue
 		}
 		planJSON, err := json.Marshal(plan)
@@ -96,7 +98,7 @@ func (s *Service) BackfillAIPlans(ctx context.Context) {
 			UserID:         ci.UserID,
 			AiRecoveryPlan: planJSON,
 		}); err != nil {
-			log.Printf("notification/ai: store for %s: %v", ci.ID, err)
+			s.log.WarnContext(ctx, "ai backfill: store plan failed", "request_id", reqid.FromCtx(ctx), "checkin_id", ci.ID, "err", err)
 		}
 	}
 }
@@ -105,20 +107,20 @@ func (s *Service) BackfillAIPlans(ctx context.Context) {
 // and old dismissal cleanup. Should be called every hour.
 func (s *Service) RunMaintenance(ctx context.Context) {
 	if err := s.store.ExpireStaleFollowUps(ctx); err != nil {
-		log.Printf("notification/maintenance: expire follow-ups: %v", err)
+		s.log.ErrorContext(ctx, "maintenance: expire follow-ups failed", "request_id", reqid.FromCtx(ctx), "err", err)
 	}
 
 	expired, err := s.store.ListExpiredSubscriptions(ctx)
 	if err != nil {
-		log.Printf("notification/maintenance: list expired subscriptions: %v", err)
+		s.log.ErrorContext(ctx, "maintenance: list expired subscriptions failed", "request_id", reqid.FromCtx(ctx), "err", err)
 	}
 	for _, sub := range expired {
 		if err := s.store.CancelSubscription(ctx, sub.PaddleSubscriptionID); err != nil {
-			log.Printf("notification/maintenance: cancel sub %s: %v", sub.PaddleSubscriptionID, err)
+			s.log.ErrorContext(ctx, "maintenance: cancel subscription failed", "request_id", reqid.FromCtx(ctx), "subscription_id", sub.PaddleSubscriptionID, "err", err)
 			continue
 		}
 		if err := s.store.SetUserTier(ctx, db.SetUserTierParams{ID: sub.Uid, Tier: "free"}); err != nil {
-			log.Printf("notification/maintenance: downgrade user %s: %v", sub.Uid, err)
+			s.log.ErrorContext(ctx, "maintenance: downgrade user failed", "request_id", reqid.FromCtx(ctx), "user_id", sub.Uid, "err", err)
 		}
 	}
 
@@ -132,7 +134,7 @@ func (s *Service) RunMaintenance(ctx context.Context) {
 func (s *Service) sendCheckinReminders(ctx context.Context) {
 	users, err := s.store.ListUsersForCheckinReminder(ctx)
 	if err != nil {
-		log.Printf("notification/reminder: list: %v", err)
+		s.log.ErrorContext(ctx, "reminder: list users failed", "request_id", reqid.FromCtx(ctx), "err", err)
 		return
 	}
 	for _, u := range users {
@@ -160,7 +162,7 @@ func (s *Service) sendCheckinReminders(ctx context.Context) {
 func (s *Service) sendStreakAlerts(ctx context.Context) {
 	users, err := s.store.ListUsersForStreakAlert(ctx)
 	if err != nil {
-		log.Printf("notification/streak: list: %v", err)
+		s.log.ErrorContext(ctx, "streak alert: list users failed", "request_id", reqid.FromCtx(ctx), "err", err)
 		return
 	}
 	for _, u := range users {
@@ -185,7 +187,7 @@ func (s *Service) sendStreakAlerts(ctx context.Context) {
 func (s *Service) sendMondayDebriefs(ctx context.Context) {
 	users, err := s.store.ListUsersForMondayDebrief(ctx)
 	if err != nil {
-		log.Printf("notification/debrief: list: %v", err)
+		s.log.ErrorContext(ctx, "monday debrief: list users failed", "request_id", reqid.FromCtx(ctx), "err", err)
 		return
 	}
 	for _, u := range users {
@@ -236,7 +238,7 @@ func (s *Service) sendMondayDebriefs(ctx context.Context) {
 func (s *Service) sendReEngagements(ctx context.Context) {
 	users, err := s.store.ListUsersForReengagement(ctx)
 	if err != nil {
-		log.Printf("notification/reengage: list: %v", err)
+		s.log.ErrorContext(ctx, "re-engage: list users failed", "request_id", reqid.FromCtx(ctx), "err", err)
 		return
 	}
 	for _, u := range users {
@@ -264,7 +266,7 @@ func (s *Service) send(ctx context.Context, userID uuid.UUID, to, template, dedu
 	status := "sent"
 	if err != nil {
 		status = "failed"
-		log.Printf("notification/email: %s → %s: %v", template, to, err)
+		s.log.WarnContext(ctx, "email send failed", "request_id", reqid.FromCtx(ctx), "template", template, "to", to, "err", err)
 	}
 
 	logEntry, logErr := s.store.CreateEmailLog(ctx, db.CreateEmailLogParams{
