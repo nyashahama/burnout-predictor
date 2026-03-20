@@ -10,6 +10,7 @@ import (
 	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/middleware"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/respond"
+	"github.com/nyasha-hama/burnout-predictor-api/internal/api/validate"
 	authsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/auth"
 )
 
@@ -38,6 +39,24 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respond.Error(w, http.StatusBadRequest, "invalid request body")
 		return
+	}
+	if req.Role != nil {
+		if err := validate.Role(*req.Role); err != nil {
+			respond.Error(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+	if req.SleepBaseline != nil {
+		if err := validate.SleepBaseline(*req.SleepBaseline); err != nil {
+			respond.Error(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+	if req.Timezone != nil {
+		if err := validate.Timezone(*req.Timezone); err != nil {
+			respond.Error(w, http.StatusBadRequest, err.Error())
+			return
+		}
 	}
 	result, err := h.svc.UpdateProfile(r.Context(), user.ID, req)
 	if err != nil {
