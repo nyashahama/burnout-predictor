@@ -114,29 +114,7 @@ func (s *Service) Upsert(ctx context.Context, user db.User, req UpsertRequest) (
 		return UpsertResult{}, err
 	}
 
-	// Exclude today from recent — it's being replaced now.
-	recentStresses := make([]int, 0, len(recent))
-	for _, c := range recent {
-		if c.CheckedInDate.Time.Equal(today) {
-			continue
-		}
-		recentStresses = append(recentStresses, int(c.Stress))
-	}
-
-	var estScore *int
-	if user.EstimatedScore.Valid {
-		v := int(user.EstimatedScore.Int16)
-		estScore = &v
-	}
-
-	in := score.Input{
-		TodayStress:    &req.Stress,
-		Role:           score.Role(user.Role),
-		SleepBaseline:  score.SleepBaseline(user.SleepBaseline),
-		RecentStresses: recentStresses,
-		EstimatedScore: estScore,
-		MeetingCount:   -1,
-	}
+	in := BuildScoreInput(user, recent, &req.Stress, today)
 	out := score.Calculate(in)
 
 	note := pgtype.Text{}
@@ -206,7 +184,7 @@ func (s *Service) Upsert(ctx context.Context, user db.User, req UpsertRequest) (
 			Score:                 out.Score,
 			TodayStress:           &req.Stress,
 			ConsecutiveDangerDays: int(danger),
-			RecentStresses:        recentStresses,
+			RecentStresses:        in.RecentStresses,
 		}),
 		Suggestion:   score.BuildSuggestion(out.Score, true, int(danger)),
 		RecoveryPlan: recoveryPlan,
