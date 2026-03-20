@@ -11,6 +11,7 @@ import (
 	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/middleware"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/respond"
+	"github.com/nyasha-hama/burnout-predictor-api/internal/api/validate"
 	authsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/auth"
 )
 
@@ -23,6 +24,9 @@ type authService interface {
 	ResendVerification(ctx context.Context, user db.User) error
 	ForgotPassword(ctx context.Context, req authsvc.ForgotPasswordRequest) error
 	ResetPassword(ctx context.Context, req authsvc.ResetPasswordRequest) error
+	ChangePassword(ctx context.Context, user db.User, req authsvc.ChangePasswordRequest) error
+	ChangeEmail(ctx context.Context, user db.User, req authsvc.ChangeEmailRequest) (authsvc.UserResponse, error)
+	DeleteAccount(ctx context.Context, userID uuid.UUID) error
 }
 
 // AuthHandler handles all auth endpoints.
@@ -38,6 +42,28 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req authsvc.RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respond.Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := validate.Email(req.Email); err != nil {
+		respond.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validate.Password(req.Password); err != nil {
+		respond.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validate.Role(req.Role); err != nil {
+		respond.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if req.SleepBaseline != 0 {
+		if err := validate.SleepBaseline(req.SleepBaseline); err != nil {
+			respond.Error(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+	if err := validate.Timezone(req.Timezone); err != nil {
+		respond.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	result, err := h.svc.Register(r.Context(), req)
@@ -125,4 +151,50 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respond.JSON(w, http.StatusOK, map[string]string{"status": "password reset"})
+}
+
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromCtx(r.Context())
+	var req authsvc.ChangePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respond.Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := validate.Password(req.NewPassword); err != nil {
+		respond.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.svc.ChangePassword(r.Context(), user, req); err != nil {
+		respond.ServiceError(w, err)
+		return
+	}
+	respond.JSON(w, http.StatusOK, map[string]string{"status": "password updated"})
+}
+
+func (h *AuthHandler) ChangeEmail(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromCtx(r.Context())
+	var req authsvc.ChangeEmailRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respond.Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := validate.Email(req.Email); err != nil {
+		respond.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	result, err := h.svc.ChangeEmail(r.Context(), user, req)
+	if err != nil {
+		respond.ServiceError(w, err)
+		return
+	}
+	respond.JSON(w, http.StatusOK, result)
+}
+
+func (h *AuthHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromCtx(r.Context())
+	if err := h.svc.DeleteAccount(r.Context(), user.ID); err != nil {
+		respond.Error(w, http.StatusInternalServerError, "failed to delete account")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
