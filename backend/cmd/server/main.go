@@ -54,6 +54,7 @@ func main() {
 		log.Println("paddle: webhook signature check disabled")
 	}
 
+	startTime := time.Now()
 	queries := db.New(pool)
 	pg := store.New(queries)
 
@@ -64,11 +65,14 @@ func main() {
 		Addr: ":" + cfg.Port,
 		Handler: api.NewServer(api.ServerConfig{
 			Queries:      queries,
+			Pool:         pool,
 			JWTSecret:    cfg.JWTSecret,
 			EmailClient:  emailClient,
 			AIClient:     aiClient,
 			PaddleSecret: cfg.PaddleSecret,
 			AppURL:       cfg.AppURL,
+			CORSOrigin:   cfg.CORSOrigin,
+			StartTime:    startTime,
 		}),
 	}
 
