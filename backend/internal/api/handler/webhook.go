@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -52,7 +52,7 @@ func (h *WebhookHandler) Paddle(w http.ResponseWriter, r *http.Request) {
 
 	alreadyProcessed, err := h.billing.ProcessEvent(r.Context(), event, body)
 	if err != nil {
-		log.Printf("webhook/paddle: process event %s: %v", event.EventID, err)
+		slog.Default().ErrorContext(r.Context(), "webhook/paddle: process event failed", "event_id", event.EventID, "err", err)
 		respond.Error(w, http.StatusInternalServerError, "server error")
 		return
 	}
