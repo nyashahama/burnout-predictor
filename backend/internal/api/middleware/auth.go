@@ -74,8 +74,10 @@ func Auth(store userGetter, secret []byte) func(http.Handler) http.Handler {
 }
 
 // UserFromCtx extracts the authenticated user from the request context.
+// Returns a zero-value db.User if the key is absent (e.g. middleware ordering bug).
 func UserFromCtx(ctx context.Context) db.User {
-	return ctx.Value(userContextKey).(db.User)
+	u, _ := ctx.Value(userContextKey).(db.User)
+	return u
 }
 
 // SetUserInCtx stores a user in context — mirrors what the Auth middleware does.
