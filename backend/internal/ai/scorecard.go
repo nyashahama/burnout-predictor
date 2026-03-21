@@ -66,8 +66,8 @@ func (c *Client) GenerateScoreCard(ctx context.Context, in ScoreCardInput, histo
 	}
 	if in.TodayNote != "" {
 		snippet := in.TodayNote
-		if len(snippet) > 60 {
-			snippet = snippet[:60] + "..."
+		if len([]rune(snippet)) > 60 {
+			snippet = string([]rune(snippet)[:60]) + "..."
 		}
 		todayParts = append(todayParts, fmt.Sprintf("note=%q", snippet))
 	}
@@ -122,7 +122,10 @@ Be direct. No preamble, no reassurance. Output ONLY valid JSON.`
 	}
 	defer resp.Body.Close()
 
-	raw, _ := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ScoreCardNarrative{}, fmt.Errorf("openai: read response body: %w", err)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return ScoreCardNarrative{}, fmt.Errorf("openai: %d — %s", resp.StatusCode, string(raw))
 	}
@@ -134,8 +137,11 @@ Be direct. No preamble, no reassurance. Output ONLY valid JSON.`
 			} `json:"message"`
 		} `json:"choices"`
 	}
-	if err := json.Unmarshal(raw, &chatResp); err != nil || len(chatResp.Choices) == 0 {
+	if err := json.Unmarshal(raw, &chatResp); err != nil {
 		return ScoreCardNarrative{}, fmt.Errorf("openai: parse response: %w", err)
+	}
+	if len(chatResp.Choices) == 0 {
+		return ScoreCardNarrative{}, fmt.Errorf("openai: empty choices in response")
 	}
 
 	var narrative ScoreCardNarrative
@@ -184,8 +190,8 @@ func CompressHistory(rows []db.ListRecentCheckInsRow) string {
 
 		if r.Note.Valid && r.Note.String != "" {
 			snippet := r.Note.String
-			if len(snippet) > 60 {
-				snippet = snippet[:60] + "..."
+			if len([]rune(snippet)) > 60 {
+				snippet = string([]rune(snippet)[:60]) + "..."
 			}
 			parts = append(parts, fmt.Sprintf("note=%q", snippet))
 		}
