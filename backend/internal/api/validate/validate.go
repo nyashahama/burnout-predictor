@@ -13,6 +13,11 @@ var validRoles = map[string]bool{
 	"manager": true, "founder": true, "other": true,
 }
 
+var validSymptoms = map[string]bool{
+	"headache": true, "muscle_tension": true, "fatigue": true,
+	"trouble_sleeping": true, "appetite_changes": true,
+}
+
 func Email(s string) error {
 	at := strings.LastIndex(s, "@")
 	if at < 1 {
@@ -79,17 +84,13 @@ func ReminderTime(s string) error {
 // Returns an error describing the first invalid field, or nil.
 func CheckinSignals(energy, focus *int, hours *float64, symptoms []string) error {
 	if energy != nil && (*energy < 1 || *energy > 5) {
-		return fmt.Errorf("energy_level must be between 1 and 5")
+		return errors.New("energy_level must be between 1 and 5")
 	}
 	if focus != nil && (*focus < 1 || *focus > 5) {
-		return fmt.Errorf("focus_quality must be between 1 and 5")
+		return errors.New("focus_quality must be between 1 and 5")
 	}
 	if hours != nil && (*hours < 0 || *hours > 24) {
-		return fmt.Errorf("hours_worked must be between 0 and 24")
-	}
-	validSymptoms := map[string]bool{
-		"headache": true, "muscle_tension": true, "fatigue": true,
-		"trouble_sleeping": true, "appetite_changes": true,
+		return errors.New("hours_worked must be between 0 and 24")
 	}
 	for _, s := range symptoms {
 		if !validSymptoms[s] {

@@ -40,3 +40,21 @@ func TestCheckinSignals_allNil(t *testing.T) {
 		t.Errorf("expected no error for all-nil inputs, got: %v", err)
 	}
 }
+
+func TestCheckinSignals_invalidFocus(t *testing.T) {
+	focus := 0
+	if err := validate.CheckinSignals(nil, &focus, nil, nil); err == nil {
+		t.Error("expected error for focus_quality=0")
+	}
+}
+
+func TestCheckinSignals_hoursBoundaries(t *testing.T) {
+	zero := 0.0
+	if err := validate.CheckinSignals(nil, nil, &zero, nil); err != nil {
+		t.Errorf("expected hours_worked=0 to be valid, got: %v", err)
+	}
+	max := 24.0
+	if err := validate.CheckinSignals(nil, nil, &max, nil); err != nil {
+		t.Errorf("expected hours_worked=24 to be valid, got: %v", err)
+	}
+}
