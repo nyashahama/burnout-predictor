@@ -2,7 +2,7 @@ package checkin
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -44,8 +44,12 @@ func New(store checkinStore, aiClient *ai.Client, log *slog.Logger) *Service {
 // ── Request / Response types ──────────────────────────────────────────────────
 
 type UpsertRequest struct {
-	Stress int    `json:"stress"`
-	Note   string `json:"note"`
+	Stress           int      `json:"stress"`
+	Note             string   `json:"note"`
+	EnergyLevel      *int     `json:"energy_level,omitempty"`
+	FocusQuality     *int     `json:"focus_quality,omitempty"`
+	HoursWorked      *float64 `json:"hours_worked,omitempty"`
+	PhysicalSymptoms []string `json:"physical_symptoms,omitempty"`
 }
 
 type UpsertResult struct {
@@ -122,14 +126,36 @@ func (s *Service) Upsert(ctx context.Context, user db.User, req UpsertRequest) (
 		note = pgtype.Text{String: req.Note, Valid: true}
 	}
 
+	var energyLevel, focusQuality pgtype.Int2
+	if req.EnergyLevel != nil {
+		energyLevel = pgtype.Int2{Int16: int16(*req.EnergyLevel), Valid: true}
+	}
+	if req.FocusQuality != nil {
+		focusQuality = pgtype.Int2{Int16: int16(*req.FocusQuality), Valid: true}
+	}
+	var hoursWorked pgtype.Numeric
+	if req.HoursWorked != nil {
+		if err := hoursWorked.Scan(fmt.Sprintf("%.1f", *req.HoursWorked)); err == nil {
+			hoursWorked.Valid = true
+		}
+	}
+	var physicalSymptoms []string
+	if len(req.PhysicalSymptoms) > 0 {
+		physicalSymptoms = req.PhysicalSymptoms
+	}
+
 	checkin, err := s.store.UpsertCheckIn(ctx, db.UpsertCheckInParams{
-		UserID:        user.ID,
-		CheckedInDate: pgtype.Date{Time: today, Valid: true},
-		Stress:        int16(req.Stress),
-		Note:          note,
-		Score:         int16(out.Score),
-		RoleSnapshot:  user.Role,
-		SleepSnapshot: user.SleepBaseline,
+		UserID:           user.ID,
+		CheckedInDate:    pgtype.Date{Time: today, Valid: true},
+		Stress:           int16(req.Stress),
+		Note:             note,
+		Score:            int16(out.Score),
+		RoleSnapshot:     user.Role,
+		SleepSnapshot:    user.SleepBaseline,
+		EnergyLevel:      energyLevel,
+		FocusQuality:     focusQuality,
+		HoursWorked:      hoursWorked,
+		PhysicalSymptoms: physicalSymptoms,
 	})
 	if err != nil {
 		return UpsertResult{}, err
@@ -142,51 +168,76 @@ func (s *Service) Upsert(ctx context.Context, user db.User, req UpsertRequest) (
 		go s.scheduleFollowUps(bgCtx, checkin.ID, user.ID, req.Note, today)
 	}
 
+	// Rule-based recovery plan — used when AI is disabled; also final fallback if AI fails.
 	var recoveryPlan []score.PlanSection
-	if req.Stress >= 4 {
-		planInput := score.RecoveryPlanInput{
+	if s.ai == nil && req.Stress >= 4 {
+		recoveryPlan = score.BuildDynamicRecoveryPlan(score.RecoveryPlanInput{
 			Note:            req.Note,
 			Stress:          req.Stress,
 			ConsecutiveDays: int(danger),
 			Role:            score.Role(user.Role),
+		})
+	}
+
+	// Build narrative — AI if available, silent rule-based fallback on any error.
+	explanation := score.BuildScoreExplanation(score.ExplanationInput{
+		Score:                 out.Score,
+		TodayStress:           &req.Stress,
+		ConsecutiveDangerDays: int(danger),
+		RecentStresses:        in.RecentStresses,
+	})
+	suggestion := score.BuildSuggestion(out.Score, true, int(danger))
+
+	if s.ai != nil {
+		history30, _ := s.store.ListRecentCheckIns(ctx, db.ListRecentCheckInsParams{
+			UserID:  user.ID,
+			Column2: 30,
+		})
+		count, _ := s.store.CountCheckIns(ctx, user.ID)
+
+		scIn := ai.ScoreCardInput{
+			Role:          user.Role,
+			SleepBaseline: int(user.SleepBaseline),
+			CheckInCount:  count,
+			TodayStress:   req.Stress,
+			TodayEnergy:   req.EnergyLevel,
+			TodayFocus:    req.FocusQuality,
+			TodayHours:    req.HoursWorked,
+			TodaySymptoms: req.PhysicalSymptoms,
+			TodayNote:     req.Note,
+			TodayScore:    out.Score,
 		}
-		if s.ai != nil {
-			aiCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-			aiPlan, aiErr := s.ai.GenerateRecoveryPlan(aiCtx, req.Stress, req.Note, user.Role)
-			cancel()
-			if aiErr == nil {
-				recoveryPlan = aiPlan
-				bgCtx := context.WithoutCancel(ctx)
-				go func(planSections []score.PlanSection) {
-					planJSON, err := json.Marshal(planSections)
-					if err != nil {
-						return
-					}
-					tCtx, tCancel := context.WithTimeout(bgCtx, 5*time.Second)
-					defer tCancel()
-					_ = s.store.SetAIRecoveryPlan(tCtx, db.SetAIRecoveryPlanParams{
-						ID:             checkin.ID,
-						UserID:         checkin.UserID,
-						AiRecoveryPlan: planJSON,
-					})
-				}(recoveryPlan)
+
+		aiCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		narrative, aiErr := s.ai.GenerateScoreCard(aiCtx, scIn, history30)
+		cancel()
+		if aiErr == nil {
+			explanation = narrative.Explanation
+			suggestion = narrative.Suggestion
+			out.Signals = narrative.Signals
+			if len(narrative.RecoveryPlan) > 0 {
+				recoveryPlan = narrative.RecoveryPlan
 			}
-		}
-		if recoveryPlan == nil {
-			recoveryPlan = score.BuildDynamicRecoveryPlan(planInput)
+		} else {
+			s.log.WarnContext(ctx, "ai score card failed, using fallback", "err", aiErr)
 		}
 	}
 
+	// Final fallback: if AI was enabled but failed and stress >= 4, still provide a plan.
+	if recoveryPlan == nil && req.Stress >= 4 {
+		recoveryPlan = score.BuildDynamicRecoveryPlan(score.RecoveryPlanInput{
+			Note:            req.Note,
+			Stress:          req.Stress,
+			ConsecutiveDays: int(danger),
+			Role:            score.Role(user.Role),
+		})
+	}
+
 	return UpsertResult{
-		CheckIn: checkin,
-		Score:   out,
-		Explanation: score.BuildScoreExplanation(score.ExplanationInput{
-			Score:                 out.Score,
-			TodayStress:           &req.Stress,
-			ConsecutiveDangerDays: int(danger),
-			RecentStresses:        in.RecentStresses,
-		}),
-		Suggestion:   score.BuildSuggestion(out.Score, true, int(danger)),
+		CheckIn:      checkin,
+		Score:        out,
+		Explanation:  explanation,
+		Suggestion:   suggestion,
 		RecoveryPlan: recoveryPlan,
 	}, nil
 }
@@ -227,19 +278,71 @@ func (s *Service) GetScoreCard(ctx context.Context, user db.User) (ScoreCardResu
 		},
 	})
 
+	explanation := score.BuildScoreExplanation(score.ExplanationInput{
+		Score:                 out.Score,
+		TodayStress:           todayStress,
+		ConsecutiveDangerDays: int(danger),
+		RecentStresses:        in.RecentStresses,
+	})
+	suggestion := score.BuildSuggestion(out.Score, hasTodayCI, int(danger))
+
+	if s.ai != nil && hasTodayCI {
+		history30, _ := s.store.ListRecentCheckIns(ctx, db.ListRecentCheckInsParams{
+			UserID:  user.ID,
+			Column2: 30,
+		})
+
+		var todayEnergy, todayFocus *int
+		if todayCI.EnergyLevel.Valid {
+			v := int(todayCI.EnergyLevel.Int16)
+			todayEnergy = &v
+		}
+		if todayCI.FocusQuality.Valid {
+			v := int(todayCI.FocusQuality.Int16)
+			todayFocus = &v
+		}
+		var todayHours *float64
+		if todayCI.HoursWorked.Valid {
+			f, err := todayCI.HoursWorked.Float64Value()
+			if err == nil && f.Valid {
+				todayHours = &f.Float64
+			}
+		}
+
+		scIn := ai.ScoreCardInput{
+			Role:          user.Role,
+			SleepBaseline: int(user.SleepBaseline),
+			CheckInCount:  count,
+			TodayStress:   int(todayCI.Stress),
+			TodayEnergy:   todayEnergy,
+			TodayFocus:    todayFocus,
+			TodayHours:    todayHours,
+			TodaySymptoms: todayCI.PhysicalSymptoms,
+			TodayNote:     todayCI.Note.String,
+			TodayScore:    out.Score,
+		}
+
+		aiCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		narrative, aiErr := s.ai.GenerateScoreCard(aiCtx, scIn, history30)
+		cancel()
+		if aiErr == nil {
+			explanation = narrative.Explanation
+			suggestion = narrative.Suggestion
+			out.Signals = narrative.Signals
+			// recovery_plan intentionally discarded — only surfaced post-check-in via UpsertResult
+		} else {
+			s.log.WarnContext(ctx, "ai score card failed, using fallback", "err", aiErr)
+		}
+	}
+
 	return ScoreCardResult{
-		Score: out,
-		Explanation: score.BuildScoreExplanation(score.ExplanationInput{
-			Score:                 out.Score,
-			TodayStress:           todayStress,
-			ConsecutiveDangerDays: int(danger),
-			RecentStresses:        in.RecentStresses,
-		}),
-		Suggestion: score.BuildSuggestion(out.Score, hasTodayCI, int(danger)),
-		Trajectory: trajectory,
-		Accuracy:   score.AccuracyLabel(int(count)),
-		Streak:     streak,
-		HasCheckIn: hasTodayCI,
+		Score:       out,
+		Explanation: explanation,
+		Suggestion:  suggestion,
+		Trajectory:  trajectory,
+		Accuracy:    score.AccuracyLabel(int(count)),
+		Streak:      streak,
+		HasCheckIn:  hasTodayCI,
 	}, nil
 }
 
