@@ -191,7 +191,10 @@ func (s *Service) Upsert(ctx context.Context, user db.User, req UpsertRequest) (
 			UserID:  user.ID,
 			Column2: 30,
 		})
-		count, _ := s.store.CountCheckIns(ctx, user.ID)
+		count, countErr := s.store.CountCheckIns(ctx, user.ID)
+		if countErr != nil {
+			s.log.WarnContext(ctx, "count check-ins failed", "err", countErr)
+		}
 
 		scIn := ai.ScoreCardInput{
 			Role:          user.Role,
@@ -438,8 +441,25 @@ func (s *Service) scheduleFollowUps(ctx context.Context, checkinID uuid.UUID, us
 }
 
 func extractSnippet(note, keyword string) string {
-	lower := strings.ToLower(note)
-	idx := strings.Index(lower, strings.ToLower(keyword))
+	runes := []rune(note)
+	lowerRunes := []rune(strings.ToLower(note))
+	kwRunes := []rune(strings.ToLower(keyword))
+
+	// Find keyword position in rune space to avoid mid-rune slicing.
+	idx := -1
+	for i := 0; i <= len(lowerRunes)-len(kwRunes); i++ {
+		match := true
+		for j, r := range kwRunes {
+			if lowerRunes[i+j] != r {
+				match = false
+				break
+			}
+		}
+		if match {
+			idx = i
+			break
+		}
+	}
 	if idx < 0 {
 		return note
 	}
@@ -447,15 +467,15 @@ func extractSnippet(note, keyword string) string {
 	if start < 0 {
 		start = 0
 	}
-	end := idx + len(keyword) + 40
-	if end > len(note) {
-		end = len(note)
+	end := idx + len(kwRunes) + 40
+	if end > len(runes) {
+		end = len(runes)
 	}
-	snippet := strings.TrimSpace(note[start:end])
+	snippet := strings.TrimSpace(string(runes[start:end]))
 	if start > 0 {
 		snippet = "…" + snippet
 	}
-	if end < len(note) {
+	if end < len(runes) {
 		snippet = snippet + "…"
 	}
 	return snippet
