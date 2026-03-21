@@ -135,9 +135,7 @@ func (s *Service) Upsert(ctx context.Context, user db.User, req UpsertRequest) (
 	}
 	var hoursWorked pgtype.Numeric
 	if req.HoursWorked != nil {
-		if err := hoursWorked.Scan(fmt.Sprintf("%.1f", *req.HoursWorked)); err == nil {
-			hoursWorked.Valid = true
-		}
+		_ = hoursWorked.Scan(fmt.Sprintf("%.1f", *req.HoursWorked)) // Scan sets Valid on success
 	}
 	var physicalSymptoms []string
 	if len(req.PhysicalSymptoms) > 0 {
@@ -251,15 +249,18 @@ func (s *Service) GetScoreCard(ctx context.Context, user db.User) (ScoreCardResu
 	})
 	hasTodayCI := todayErr == nil
 
-	recent, _ := s.store.ListRecentCheckIns(ctx, db.ListRecentCheckInsParams{
+	recent, err := s.store.ListRecentCheckIns(ctx, db.ListRecentCheckInsParams{
 		UserID:  user.ID,
 		Column2: 7,
 	})
+	if err != nil {
+		s.log.WarnContext(ctx, "list recent check-ins failed", "err", err)
+	}
 
 	var todayStress *int
 	if hasTodayCI {
-		s := int(todayCI.Stress)
-		todayStress = &s
+		stressVal := int(todayCI.Stress)
+		todayStress = &stressVal
 	}
 
 	in := BuildScoreInput(user, recent, todayStress, today)
@@ -267,7 +268,10 @@ func (s *Service) GetScoreCard(ctx context.Context, user db.User) (ScoreCardResu
 
 	danger, _ := s.store.GetConsecutiveDangerDays(ctx, user.ID)
 	streak, _ := s.store.GetCheckInStreak(ctx, user.ID)
-	count, _ := s.store.CountCheckIns(ctx, user.ID)
+	count, countErr := s.store.CountCheckIns(ctx, user.ID)
+	if countErr != nil {
+		s.log.WarnContext(ctx, "count check-ins failed", "err", countErr)
+	}
 
 	trajectory := score.BuildTrajectoryInsight(score.TrajectoryInput{
 		Score:                 out.Score,
