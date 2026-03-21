@@ -108,7 +108,10 @@ Be direct. No preamble, no reassurance. Output ONLY valid JSON.`
 	}
 	req.ResponseFormat.Type = "json_object"
 
-	body, _ := json.Marshal(req)
+	body, err := json.Marshal(req)
+	if err != nil {
+		return ScoreCardNarrative{}, fmt.Errorf("marshal request: %w", err)
+	}
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(body))
 	if err != nil {
 		return ScoreCardNarrative{}, err
