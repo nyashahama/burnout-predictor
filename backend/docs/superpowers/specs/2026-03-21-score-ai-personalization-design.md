@@ -40,7 +40,7 @@ The check-in expands based on stress level.
 
 **Why adaptive matters:** A stress-4 with energy-4 + 6 hours worked + no symptoms is a completely different situation from stress-4 + energy-1 + 11 hours + three symptoms. Without extra signal, the AI cannot distinguish them. With it, the generated narrative diverges meaningfully.
 
-**New DB columns (nullable):** `energy_level INT`, `focus_quality INT`, `hours_worked FLOAT`, `physical_symptoms TEXT[]` on the `check_ins` table.
+**New DB columns (nullable):** `energy_level INT`, `focus_quality INT`, `hours_worked NUMERIC`, `physical_symptoms TEXT[]` on the `check_ins` table. In pgx/v5 these map to: `pgtype.Int4` (energy, focus), `pgtype.Numeric` (hours), `pgtype.Array[pgtype.Text]` (symptoms). All nullable — omitted on low-stress days.
 
 ---
 
@@ -48,13 +48,21 @@ The check-in expands based on stress level.
 
 ### AI Input
 
-**Compressed 30-day history** — one row per day:
-- Date, stress, energy, focus, hours worked, symptoms, computed score, note snippet (60 chars)
-- Pre-computed stats: avg stress, avg score, highest-strain days, recurring note keywords, consecutive danger days
+**Compressed 30-day history** — supplied by `ai.CompressHistory()` from the result of `store.ListRecentCheckIns(ctx, userID, 30)`. That query already orders by date descending and is parameterised for row count; passing 30 instead of 7 is the only change needed. `CompressHistory` formats one compact line per day:
 
-**Today's check-in** — all collected signals
+```
+2026-03-20 s=4 e=2 f=2 h=10.5 score=71 symptoms=[fatigue,headache] note="deadline crunch..."
+```
 
-**User profile** — role, sleep baseline, total check-in count (so AI knows how much history to reference)
+Pre-computed stats appended as a header block: avg stress, avg score, highest-strain days of week, recurring note keywords, consecutive danger days.
+
+**Token budget:** Input target ≤ 1,200 tokens (30 rows × ~25 tokens + stats header ~150 tokens + today's check-in ~50 tokens + system prompt ~200 tokens). Output capped at `MaxTokens: 600` (explanation + 4 signals + suggestion + 3-section recovery plan fits comfortably). Total: ~1,800 tokens per call. `CompressHistory` must truncate note snippets to 60 chars and drop symptoms older than 14 days if the budget is exceeded.
+
+**Today's check-in** — all collected signals for today.
+
+**User profile** — role, sleep baseline, total check-in count.
+
+**Cold-start handling:** When a user has fewer than 3 check-ins, `CompressHistory` returns an empty string and the prompt explicitly tells the model: "This user is new — no history is available yet. Generate a score card based only on today's signals and their profile." This prevents the model from hallucinating patterns.
 
 ### AI Output (structured JSON)
 ```json
@@ -63,7 +71,7 @@ The check-in expands based on stress level.
   "signals": [
     {
       "label": "string",
-      "value": "string",
+      "val": "string",
       "detail": "string",
       "level": "ok | warning | danger"
     }
@@ -74,6 +82,8 @@ The check-in expands based on stress level.
   ]
 }
 ```
+
+Note: the `val` field matches the existing `score.Signal` struct field name (`Val`). The AI-generated signals replace `score.Output.Signals` in place — `UpsertResult.Score.Signals` is overwritten with the AI signals before the response is returned. No new field is added to `UpsertResult`.
 
 ### What makes this personal
 The AI sees that *this specific user* mentioned "deadline" four times this week, slept 5h two nights running, and scores highest on Wednesdays for three consecutive weeks. The explanation it generates cannot be given to any other user. Signals reflect what's actually happening in their data, not which bucket their inputs fall into.
@@ -86,22 +96,23 @@ Unchanged. Formula-based, deterministic, always fast. AI only generates the narr
 ## Section 3: Codebase Changes
 
 ### New
-- `ai.GenerateScoreCard(ctx, profile, history, today) (ScoreCardNarrative, error)` — single AI call replacing the four static narrative functions
-- `ai.CompressHistory(rows []db.CheckIn) string` — converts 30-day history into a token-efficient string; keeps prompt size predictable
-- New DB migration: nullable columns on `check_ins`
+- `ai.GenerateScoreCard(ctx, profile, history, today) (ScoreCardNarrative, error)` — single AI call returning explanation, signals, suggestion, and recovery plan
+- `ai.CompressHistory(rows []db.CheckIn) string` — converts rows into a token-efficient string; enforces token budget by truncating note snippets and dropping old symptom data
+- New DB migration: nullable columns on `check_ins` (see Section 1 for types)
 
 ### Modified
-- `checkin/service.go Upsert()` — after computing numeric score, calls `ai.GenerateScoreCard()` instead of the four static functions; falls back to static on error
+- `checkin/service.go Upsert()` — after computing numeric score, calls `ai.GenerateScoreCard()`; on success overwrites `scoreOutput.Signals`, `explanation`, `suggestion`, and `recoveryPlan` with AI values; on error falls back to static functions silently
+- `checkin/service.go GetScoreCard()` — also calls `ai.GenerateScoreCard()` when a check-in exists for today, so the dashboard view stays consistent with what was shown post-check-in. Only explanation, signals, and suggestion are used from the AI response — the recovery plan is discarded, since `ScoreCardResult` has no `RecoveryPlan` field and the recovery plan is only surfaced immediately post-check-in via `UpsertResult`. When no check-in exists for today, stays rule-based (no history context worth sending for a pending check-in).
 - `UpsertRequest` — adds `EnergyLevel *int`, `FocusQuality *int`, `HoursWorked *float64`, `PhysicalSymptoms []string`
 
 ### Kept as fallback (not deleted)
-- `score.BuildScoreExplanation()`
-- `score.BuildSuggestion()`
-- `score.BuildDynamicRecoveryPlan()`
-- `score.buildSignals()` (static version)
+These functions in `internal/score/` remain and are called when AI is unavailable:
+- `BuildScoreExplanation()` and `BuildSuggestion()` (in `explanation.go`)
+- `BuildDynamicRecoveryPlan()` (in `plan.go`)
+- `buildSignals()` (in `signals.go`)
 
 ### Unchanged
-- Score engine (`engine.go`, `patterns.go`, `arc.go`, `session.go`, `explanation.go`) — numeric score and long-term insight patterns are not touched
+- Score engine: `engine.go`, `patterns.go`, `arc.go`, `session.go` — numeric score and long-term insight patterns are not touched
 - Insight service — pattern detection, arc narrative, "what works" all unchanged
 
 ---
@@ -109,15 +120,15 @@ Unchanged. Formula-based, deterministic, always fast. AI only generates the narr
 ## Section 4: Fallback Strategy & Cost
 
 ### Fallback chain
-1. AI call succeeds → AI-generated score card
+1. AI call succeeds → AI-generated score card (explanation, signals, suggestion, recovery plan)
 2. AI call fails (timeout / API error / rate limit) → existing rule-based functions; user sees nothing different
-3. No `OPENAI_API_KEY` → rule-based only, same as today
+3. No `OPENAI_API_KEY` configured → rule-based only, same as today
 
 ### Timeout
-10 seconds (matches current recovery plan timeout). Fallback triggers automatically on exceed.
+Context timeout: 10 seconds (matches current recovery plan call in `service.go`). The `http.Client` transport timeout in `openai.go` is currently 20 seconds — this remains unchanged since the context deadline fires first. If latency proves problematic at the larger prompt size, the transport timeout can be tuned independently without spec changes.
 
 ### Cost
-GPT-4o-mini at ~2,000 tokens per call ≈ $0.001 per check-in. At 100 DAU: ~$3/month. Not a concern until significant scale.
+GPT-4o-mini at ~1,800 tokens per call ≈ $0.001 per check-in. At 100 DAU: ~$3/month. Not a concern until significant scale.
 
 ### Async option (future)
 Return score number immediately with rule-based narrative, update score card once AI responds. Keeps check-in feel instant. Deferred — synchronous is fine for now.
