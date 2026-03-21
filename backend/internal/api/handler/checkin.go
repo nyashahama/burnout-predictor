@@ -40,6 +40,10 @@ func (h *CheckinHandler) Upsert(w http.ResponseWriter, r *http.Request) {
 		respond.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if err := validate.CheckinSignals(req.EnergyLevel, req.FocusQuality, req.HoursWorked, req.PhysicalSymptoms); err != nil {
+		respond.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	result, err := h.svc.Upsert(r.Context(), user, req)
 	if err != nil {
 		respond.ServiceError(w, err)
