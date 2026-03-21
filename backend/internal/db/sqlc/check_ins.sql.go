@@ -56,7 +56,7 @@ INSERT INTO check_ins (
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8
 )
-RETURNING id, user_id, checked_in_date, stress, note, score, role_snapshot, sleep_snapshot, meeting_count, ai_recovery_plan, ai_generated_at, created_at, updated_at
+RETURNING id, user_id, checked_in_date, stress, note, score, role_snapshot, sleep_snapshot, meeting_count, ai_recovery_plan, ai_generated_at, created_at, updated_at, energy_level, focus_quality, hours_worked, physical_symptoms
 `
 
 type CreateCheckInParams struct {
@@ -96,6 +96,10 @@ func (q *Queries) CreateCheckIn(ctx context.Context, arg CreateCheckInParams) (C
 		&i.AiGeneratedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EnergyLevel,
+		&i.FocusQuality,
+		&i.HoursWorked,
+		&i.PhysicalSymptoms,
 	)
 	return i, err
 }
@@ -157,7 +161,7 @@ func (q *Queries) ExportUserCheckIns(ctx context.Context, userID uuid.UUID) ([]E
 }
 
 const getCheckInByID = `-- name: GetCheckInByID :one
-SELECT id, user_id, checked_in_date, stress, note, score, role_snapshot, sleep_snapshot, meeting_count, ai_recovery_plan, ai_generated_at, created_at, updated_at FROM check_ins
+SELECT id, user_id, checked_in_date, stress, note, score, role_snapshot, sleep_snapshot, meeting_count, ai_recovery_plan, ai_generated_at, created_at, updated_at, energy_level, focus_quality, hours_worked, physical_symptoms FROM check_ins
 WHERE id = $1
   AND user_id = $2
 `
@@ -184,6 +188,10 @@ func (q *Queries) GetCheckInByID(ctx context.Context, arg GetCheckInByIDParams) 
 		&i.AiGeneratedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EnergyLevel,
+		&i.FocusQuality,
+		&i.HoursWorked,
+		&i.PhysicalSymptoms,
 	)
 	return i, err
 }
@@ -305,7 +313,7 @@ func (q *Queries) GetScoreTrendVs7DaysAgo(ctx context.Context, arg GetScoreTrend
 }
 
 const getTodayCheckIn = `-- name: GetTodayCheckIn :one
-SELECT id, user_id, checked_in_date, stress, note, score, role_snapshot, sleep_snapshot, meeting_count, ai_recovery_plan, ai_generated_at, created_at, updated_at FROM check_ins
+SELECT id, user_id, checked_in_date, stress, note, score, role_snapshot, sleep_snapshot, meeting_count, ai_recovery_plan, ai_generated_at, created_at, updated_at, energy_level, focus_quality, hours_worked, physical_symptoms FROM check_ins
 WHERE user_id = $1
   AND checked_in_date = $2
 `
@@ -332,12 +340,16 @@ func (q *Queries) GetTodayCheckIn(ctx context.Context, arg GetTodayCheckInParams
 		&i.AiGeneratedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EnergyLevel,
+		&i.FocusQuality,
+		&i.HoursWorked,
+		&i.PhysicalSymptoms,
 	)
 	return i, err
 }
 
 const getYesterdayCheckIn = `-- name: GetYesterdayCheckIn :one
-SELECT id, user_id, checked_in_date, stress, note, score, role_snapshot, sleep_snapshot, meeting_count, ai_recovery_plan, ai_generated_at, created_at, updated_at FROM check_ins
+SELECT id, user_id, checked_in_date, stress, note, score, role_snapshot, sleep_snapshot, meeting_count, ai_recovery_plan, ai_generated_at, created_at, updated_at, energy_level, focus_quality, hours_worked, physical_symptoms FROM check_ins
 WHERE user_id = $1
   AND checked_in_date = $2 - INTERVAL '1 day'
 `
@@ -364,12 +376,16 @@ func (q *Queries) GetYesterdayCheckIn(ctx context.Context, arg GetYesterdayCheck
 		&i.AiGeneratedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EnergyLevel,
+		&i.FocusQuality,
+		&i.HoursWorked,
+		&i.PhysicalSymptoms,
 	)
 	return i, err
 }
 
 const listCheckIns = `-- name: ListCheckIns :many
-SELECT id, user_id, checked_in_date, stress, note, score, role_snapshot, sleep_snapshot, meeting_count, ai_recovery_plan, ai_generated_at, created_at, updated_at FROM check_ins
+SELECT id, user_id, checked_in_date, stress, note, score, role_snapshot, sleep_snapshot, meeting_count, ai_recovery_plan, ai_generated_at, created_at, updated_at, energy_level, focus_quality, hours_worked, physical_symptoms FROM check_ins
 WHERE user_id = $1
 ORDER BY checked_in_date DESC
 LIMIT $2
@@ -406,6 +422,10 @@ func (q *Queries) ListCheckIns(ctx context.Context, arg ListCheckInsParams) ([]C
 			&i.AiGeneratedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.EnergyLevel,
+			&i.FocusQuality,
+			&i.HoursWorked,
+			&i.PhysicalSymptoms,
 		); err != nil {
 			return nil, err
 		}
@@ -462,7 +482,7 @@ func (q *Queries) ListCheckInsForDayOfWeek(ctx context.Context, arg ListCheckIns
 }
 
 const listCheckInsInRange = `-- name: ListCheckInsInRange :many
-SELECT id, user_id, checked_in_date, stress, note, score, role_snapshot, sleep_snapshot, meeting_count, ai_recovery_plan, ai_generated_at, created_at, updated_at FROM check_ins
+SELECT id, user_id, checked_in_date, stress, note, score, role_snapshot, sleep_snapshot, meeting_count, ai_recovery_plan, ai_generated_at, created_at, updated_at, energy_level, focus_quality, hours_worked, physical_symptoms FROM check_ins
 WHERE user_id = $1
   AND checked_in_date BETWEEN $2 AND $3
 ORDER BY checked_in_date ASC
@@ -498,6 +518,10 @@ func (q *Queries) ListCheckInsInRange(ctx context.Context, arg ListCheckInsInRan
 			&i.AiGeneratedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.EnergyLevel,
+			&i.FocusQuality,
+			&i.HoursWorked,
+			&i.PhysicalSymptoms,
 		); err != nil {
 			return nil, err
 		}
@@ -510,7 +534,7 @@ func (q *Queries) ListCheckInsInRange(ctx context.Context, arg ListCheckInsInRan
 }
 
 const listCheckInsNeedingAIPlan = `-- name: ListCheckInsNeedingAIPlan :many
-SELECT id, user_id, checked_in_date, stress, note, score, role_snapshot, sleep_snapshot, meeting_count, ai_recovery_plan, ai_generated_at, created_at, updated_at FROM check_ins
+SELECT id, user_id, checked_in_date, stress, note, score, role_snapshot, sleep_snapshot, meeting_count, ai_recovery_plan, ai_generated_at, created_at, updated_at, energy_level, focus_quality, hours_worked, physical_symptoms FROM check_ins
 WHERE ai_recovery_plan IS NULL
   AND note IS NOT NULL
   AND stress >= 4
@@ -545,6 +569,10 @@ func (q *Queries) ListCheckInsNeedingAIPlan(ctx context.Context) ([]CheckIn, err
 			&i.AiGeneratedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.EnergyLevel,
+			&i.FocusQuality,
+			&i.HoursWorked,
+			&i.PhysicalSymptoms,
 		); err != nil {
 			return nil, err
 		}
@@ -561,7 +589,11 @@ SELECT
     checked_in_date,
     stress,
     score,
-    note
+    note,
+    energy_level,
+    focus_quality,
+    hours_worked,
+    physical_symptoms
 FROM check_ins
 WHERE user_id = $1
   AND checked_in_date >= CURRENT_DATE - $2::INT
@@ -574,14 +606,17 @@ type ListRecentCheckInsParams struct {
 }
 
 type ListRecentCheckInsRow struct {
-	CheckedInDate pgtype.Date `db:"checked_in_date" json:"checked_in_date"`
-	Stress        int16       `db:"stress" json:"stress"`
-	Score         int16       `db:"score" json:"score"`
-	Note          pgtype.Text `db:"note" json:"note"`
+	CheckedInDate    pgtype.Date    `db:"checked_in_date" json:"checked_in_date"`
+	Stress           int16          `db:"stress" json:"stress"`
+	Score            int16          `db:"score" json:"score"`
+	Note             pgtype.Text    `db:"note" json:"note"`
+	EnergyLevel      pgtype.Int2    `db:"energy_level" json:"energy_level"`
+	FocusQuality     pgtype.Int2    `db:"focus_quality" json:"focus_quality"`
+	HoursWorked      pgtype.Numeric `db:"hours_worked" json:"hours_worked"`
+	PhysicalSymptoms []string       `db:"physical_symptoms" json:"physical_symptoms"`
 }
 
-// Last N days of check-ins for the score engine's recentStresses input.
-// Also used to compute streak and consecutive danger days.
+// Last N days of check-ins for the score engine's recentStresses input and AI history compression.
 func (q *Queries) ListRecentCheckIns(ctx context.Context, arg ListRecentCheckInsParams) ([]ListRecentCheckInsRow, error) {
 	rows, err := q.db.Query(ctx, listRecentCheckIns, arg.UserID, arg.Column2)
 	if err != nil {
@@ -596,6 +631,10 @@ func (q *Queries) ListRecentCheckIns(ctx context.Context, arg ListRecentCheckIns
 			&i.Stress,
 			&i.Score,
 			&i.Note,
+			&i.EnergyLevel,
+			&i.FocusQuality,
+			&i.HoursWorked,
+			&i.PhysicalSymptoms,
 		); err != nil {
 			return nil, err
 		}
@@ -635,18 +674,26 @@ INSERT INTO check_ins (
     score,
     role_snapshot,
     sleep_snapshot,
-    meeting_count
+    meeting_count,
+    energy_level,
+    focus_quality,
+    hours_worked,
+    physical_symptoms
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
 )
 ON CONFLICT (user_id, checked_in_date)
 DO UPDATE SET
-    stress          = EXCLUDED.stress,
-    note            = EXCLUDED.note,
-    score           = EXCLUDED.score,
-    role_snapshot   = EXCLUDED.role_snapshot,
-    sleep_snapshot  = EXCLUDED.sleep_snapshot,
-    meeting_count   = EXCLUDED.meeting_count,
+    stress             = EXCLUDED.stress,
+    note               = EXCLUDED.note,
+    score              = EXCLUDED.score,
+    role_snapshot      = EXCLUDED.role_snapshot,
+    sleep_snapshot     = EXCLUDED.sleep_snapshot,
+    meeting_count      = EXCLUDED.meeting_count,
+    energy_level       = EXCLUDED.energy_level,
+    focus_quality      = EXCLUDED.focus_quality,
+    hours_worked       = EXCLUDED.hours_worked,
+    physical_symptoms  = EXCLUDED.physical_symptoms,
     -- reset AI plan when check-in is meaningfully edited
     ai_recovery_plan    = CASE
                             WHEN check_ins.stress != EXCLUDED.stress
@@ -661,18 +708,22 @@ DO UPDATE SET
                         ELSE check_ins.ai_generated_at
                       END,
     updated_at      = NOW()
-RETURNING id, user_id, checked_in_date, stress, note, score, role_snapshot, sleep_snapshot, meeting_count, ai_recovery_plan, ai_generated_at, created_at, updated_at
+RETURNING id, user_id, checked_in_date, stress, note, score, role_snapshot, sleep_snapshot, meeting_count, ai_recovery_plan, ai_generated_at, created_at, updated_at, energy_level, focus_quality, hours_worked, physical_symptoms
 `
 
 type UpsertCheckInParams struct {
-	UserID        uuid.UUID   `db:"user_id" json:"user_id"`
-	CheckedInDate pgtype.Date `db:"checked_in_date" json:"checked_in_date"`
-	Stress        int16       `db:"stress" json:"stress"`
-	Note          pgtype.Text `db:"note" json:"note"`
-	Score         int16       `db:"score" json:"score"`
-	RoleSnapshot  string      `db:"role_snapshot" json:"role_snapshot"`
-	SleepSnapshot int16       `db:"sleep_snapshot" json:"sleep_snapshot"`
-	MeetingCount  pgtype.Int2 `db:"meeting_count" json:"meeting_count"`
+	UserID           uuid.UUID      `db:"user_id" json:"user_id"`
+	CheckedInDate    pgtype.Date    `db:"checked_in_date" json:"checked_in_date"`
+	Stress           int16          `db:"stress" json:"stress"`
+	Note             pgtype.Text    `db:"note" json:"note"`
+	Score            int16          `db:"score" json:"score"`
+	RoleSnapshot     string         `db:"role_snapshot" json:"role_snapshot"`
+	SleepSnapshot    int16          `db:"sleep_snapshot" json:"sleep_snapshot"`
+	MeetingCount     pgtype.Int2    `db:"meeting_count" json:"meeting_count"`
+	EnergyLevel      pgtype.Int2    `db:"energy_level" json:"energy_level"`
+	FocusQuality     pgtype.Int2    `db:"focus_quality" json:"focus_quality"`
+	HoursWorked      pgtype.Numeric `db:"hours_worked" json:"hours_worked"`
+	PhysicalSymptoms []string       `db:"physical_symptoms" json:"physical_symptoms"`
 }
 
 // Allows editing today's check-in (score recomputed by the server before call).
@@ -686,6 +737,10 @@ func (q *Queries) UpsertCheckIn(ctx context.Context, arg UpsertCheckInParams) (C
 		arg.RoleSnapshot,
 		arg.SleepSnapshot,
 		arg.MeetingCount,
+		arg.EnergyLevel,
+		arg.FocusQuality,
+		arg.HoursWorked,
+		arg.PhysicalSymptoms,
 	)
 	var i CheckIn
 	err := row.Scan(
@@ -702,6 +757,10 @@ func (q *Queries) UpsertCheckIn(ctx context.Context, arg UpsertCheckInParams) (C
 		&i.AiGeneratedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EnergyLevel,
+		&i.FocusQuality,
+		&i.HoursWorked,
+		&i.PhysicalSymptoms,
 	)
 	return i, err
 }

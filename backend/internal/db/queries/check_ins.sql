@@ -23,18 +23,26 @@ INSERT INTO check_ins (
     score,
     role_snapshot,
     sleep_snapshot,
-    meeting_count
+    meeting_count,
+    energy_level,
+    focus_quality,
+    hours_worked,
+    physical_symptoms
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
 )
 ON CONFLICT (user_id, checked_in_date)
 DO UPDATE SET
-    stress          = EXCLUDED.stress,
-    note            = EXCLUDED.note,
-    score           = EXCLUDED.score,
-    role_snapshot   = EXCLUDED.role_snapshot,
-    sleep_snapshot  = EXCLUDED.sleep_snapshot,
-    meeting_count   = EXCLUDED.meeting_count,
+    stress             = EXCLUDED.stress,
+    note               = EXCLUDED.note,
+    score              = EXCLUDED.score,
+    role_snapshot      = EXCLUDED.role_snapshot,
+    sleep_snapshot     = EXCLUDED.sleep_snapshot,
+    meeting_count      = EXCLUDED.meeting_count,
+    energy_level       = EXCLUDED.energy_level,
+    focus_quality      = EXCLUDED.focus_quality,
+    hours_worked       = EXCLUDED.hours_worked,
+    physical_symptoms  = EXCLUDED.physical_symptoms,
     -- reset AI plan when check-in is meaningfully edited
     ai_recovery_plan    = CASE
                             WHEN check_ins.stress != EXCLUDED.stress
@@ -82,13 +90,16 @@ WHERE user_id = $1
 ORDER BY checked_in_date ASC;
 
 -- name: ListRecentCheckIns :many
--- Last N days of check-ins for the score engine's recentStresses input.
--- Also used to compute streak and consecutive danger days.
+-- Last N days of check-ins for the score engine's recentStresses input and AI history compression.
 SELECT
     checked_in_date,
     stress,
     score,
-    note
+    note,
+    energy_level,
+    focus_quality,
+    hours_worked,
+    physical_symptoms
 FROM check_ins
 WHERE user_id = $1
   AND checked_in_date >= CURRENT_DATE - $2::INT

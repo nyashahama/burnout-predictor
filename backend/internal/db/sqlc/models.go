@@ -30,6 +30,14 @@ type CheckIn struct {
 	AiGeneratedAt  pgtype.Timestamptz `db:"ai_generated_at" json:"ai_generated_at"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	// Self-reported energy (1=depleted … 5=high). Only collected when stress >= 3.
+	EnergyLevel pgtype.Int2 `db:"energy_level" json:"energy_level"`
+	// Self-reported focus quality (1=scattered … 5=sharp). Only collected when stress >= 3.
+	FocusQuality pgtype.Int2 `db:"focus_quality" json:"focus_quality"`
+	// Hours worked today, one decimal place. Only collected when stress >= 3.
+	HoursWorked pgtype.Numeric `db:"hours_worked" json:"hours_worked"`
+	// Array of reported symptoms. Valid values: headache, muscle_tension, fatigue, trouble_sleeping, appetite_changes. Only collected when stress >= 4. Element validation is enforced in the application layer (CheckinSignals validator), not in the schema.
+	PhysicalSymptoms []string `db:"physical_symptoms" json:"physical_symptoms"`
 }
 
 // Records which ephemeral UI cards the user has dismissed, cross-device.
