@@ -3,6 +3,7 @@ package validate
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -70,6 +71,30 @@ func ReminderTime(s string) error {
 	}
 	if _, err := time.Parse("15:04", s); err != nil {
 		return errors.New("reminder_time must be a valid time in HH:MM format")
+	}
+	return nil
+}
+
+// CheckinSignals validates the optional adaptive check-in fields.
+// Returns an error describing the first invalid field, or nil.
+func CheckinSignals(energy, focus *int, hours *float64, symptoms []string) error {
+	if energy != nil && (*energy < 1 || *energy > 5) {
+		return fmt.Errorf("energy_level must be between 1 and 5")
+	}
+	if focus != nil && (*focus < 1 || *focus > 5) {
+		return fmt.Errorf("focus_quality must be between 1 and 5")
+	}
+	if hours != nil && (*hours < 0 || *hours > 24) {
+		return fmt.Errorf("hours_worked must be between 0 and 24")
+	}
+	validSymptoms := map[string]bool{
+		"headache": true, "muscle_tension": true, "fatigue": true,
+		"trouble_sleeping": true, "appetite_changes": true,
+	}
+	for _, s := range symptoms {
+		if !validSymptoms[s] {
+			return fmt.Errorf("unknown symptom: %s", s)
+		}
 	}
 	return nil
 }
