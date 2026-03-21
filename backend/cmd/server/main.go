@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 
 	"github.com/nyasha-hama/burnout-predictor-api/internal/ai"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api"
@@ -21,6 +22,8 @@ import (
 )
 
 func main() {
+	_ = godotenv.Load()
+
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
