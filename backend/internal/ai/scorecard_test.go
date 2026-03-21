@@ -68,10 +68,22 @@ func TestCompressHistory_noteTruncation(t *testing.T) {
 		if strings.Contains(line, "note=") {
 			noteStart := strings.Index(line, "note=")
 			noteVal := line[noteStart:]
-			if len(noteVal) > 80 {
+			if len(noteVal) > 75 {
 				t.Errorf("note snippet too long in output line: %s", noteVal)
 			}
 		}
+	}
+}
+
+func TestCompressHistory_symptomsIncluded(t *testing.T) {
+	rows := []db.ListRecentCheckInsRow{
+		{CheckedInDate: makeDate(1), Stress: 4, Score: 68, PhysicalSymptoms: []string{"fatigue", "headache"}},
+		{CheckedInDate: makeDate(2), Stress: 3, Score: 55},
+		{CheckedInDate: makeDate(3), Stress: 3, Score: 50},
+	}
+	result := CompressHistory(rows)
+	if !strings.Contains(result, "symptoms=[fatigue,headache]") {
+		t.Errorf("expected symptoms in output, got: %s", result)
 	}
 }
 
@@ -90,5 +102,8 @@ func TestCompressHistory_statsHeader(t *testing.T) {
 	}
 	if !strings.Contains(result, "avg_score=") {
 		t.Errorf("expected avg_score in stats header, got: %s", result)
+	}
+	if !strings.Contains(result, "entries=7") {
+		t.Errorf("expected entries=7 in stats header, got: %s", result)
 	}
 }

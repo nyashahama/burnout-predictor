@@ -1,4 +1,4 @@
-// Package ai wraps the OpenAI Chat Completions API for recovery plan generation.
+// Package ai wraps the OpenAI Chat Completions API for recovery plan and score card generation.
 package ai
 
 import (
