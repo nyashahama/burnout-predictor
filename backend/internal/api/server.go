@@ -68,6 +68,7 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 	corsOrigin := cfg.CORSOrigin
 	if corsOrigin == "" {
 		corsOrigin = "*"
+		log.Warn("CORS_ORIGIN not set — defaulting to wildcard (*). Set CORS_ORIGIN explicitly in production.")
 	}
 
 	r := chi.NewRouter()
