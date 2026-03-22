@@ -1,6 +1,9 @@
 package email
 
-import "fmt"
+import (
+	"fmt"
+	htmlpkg "html"
+)
 
 // Each function returns (subject, html) for one email template.
 // HTML is deliberately minimal — no heavy CSS, no images, works everywhere.
@@ -23,7 +26,7 @@ func Welcome(name string) (subject, html string) {
   <p style="font-size:12px;color:#bbb;margin:48px 0 0">You're receiving this because you created an Overload account. Manage preferences at overload.app/dashboard/settings</p>
 </div>
 </body>
-</html>`, name)
+</html>`, htmlpkg.EscapeString(name))
 	return
 }
 
@@ -43,7 +46,7 @@ func CheckinReminder(title, body string) (subject, html string) {
   <p style="font-size:12px;color:#bbb;margin:48px 0 0">Manage reminder preferences at overload.app/dashboard/settings</p>
 </div>
 </body>
-</html>`, title, title, body)
+</html>`, htmlpkg.EscapeString(title), htmlpkg.EscapeString(title), htmlpkg.EscapeString(body))
 	return
 }
 
@@ -67,7 +70,7 @@ func MondayDebrief(name string, avgScore int, scoreDelta int, topPattern string)
 		patternBlock = fmt.Sprintf(`
   <div style="background:#f7f7f7;border-left:3px solid #1a1a1a;border-radius:0 8px 8px 0;padding:16px 20px;margin:0 0 32px">
     <p style="font-size:15px;line-height:1.6;margin:0;color:#333">%s</p>
-  </div>`, topPattern)
+  </div>`, htmlpkg.EscapeString(topPattern))
 	}
 
 	html = fmt.Sprintf(`<!DOCTYPE html>
@@ -89,7 +92,7 @@ func MondayDebrief(name string, avgScore int, scoreDelta int, topPattern string)
   <p style="font-size:12px;color:#bbb;margin:48px 0 0">Manage email preferences at overload.app/dashboard/settings</p>
 </div>
 </body>
-</html>`, name, avgScore, trendLine, patternBlock)
+</html>`, htmlpkg.EscapeString(name), avgScore, trendLine, patternBlock)
 	return
 }
 
@@ -110,7 +113,7 @@ func StreakAlert(name string, streak int) (subject, html string) {
   <p style="font-size:12px;color:#bbb;margin:48px 0 0">Manage email preferences at overload.app/dashboard/settings</p>
 </div>
 </body>
-</html>`, subject, streak, name)
+</html>`, htmlpkg.EscapeString(subject), streak, htmlpkg.EscapeString(name))
 	return
 }
 
@@ -131,7 +134,7 @@ func VerifyEmail(name, verifyURL string) (subject, html string) {
   <p style="font-size:12px;color:#bbb;margin:48px 0 0">This link expires in 24 hours. If it's expired, request a new one from your dashboard.</p>
 </div>
 </body>
-</html>`, name, verifyURL)
+</html>`, htmlpkg.EscapeString(name), htmlpkg.EscapeString(verifyURL))
 	return
 }
 
@@ -152,7 +155,7 @@ func PasswordReset(name, resetURL string) (subject, html string) {
   <p style="font-size:12px;color:#bbb;margin:48px 0 0">If the button doesn't work, copy this link: %s</p>
 </div>
 </body>
-</html>`, name, resetURL, resetURL)
+</html>`, htmlpkg.EscapeString(name), htmlpkg.EscapeString(resetURL), htmlpkg.EscapeString(resetURL))
 	return
 }
 
@@ -174,6 +177,6 @@ func ReEngage(name string) (subject, html string) {
   <p style="font-size:12px;color:#bbb;margin:48px 0 0">Manage email preferences at overload.app/dashboard/settings</p>
 </div>
 </body>
-</html>`, subject, name)
+</html>`, htmlpkg.EscapeString(subject), htmlpkg.EscapeString(name))
 	return
 }

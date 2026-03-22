@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -355,5 +354,3 @@ func (p *Postgres) UpsertSubscription(ctx context.Context, arg db.UpsertSubscrip
 	return p.q.UpsertSubscription(ctx, arg)
 }
 
-// Ensure json import is used (needed for json.RawMessage in CreatePaddleEvent params).
-var _ = json.Marshal

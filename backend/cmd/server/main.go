@@ -71,7 +71,11 @@ func main() {
 	go worker.Run(ctx, notifSvc)
 
 	srv := &http.Server{
-		Addr: ":" + cfg.Port,
+		Addr:              ":" + cfg.Port,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
 		Handler: api.NewServer(ctx, api.ServerConfig{
 			Queries:      queries,
 			Pool:         pool,
