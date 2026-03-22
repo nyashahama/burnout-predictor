@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Instrument_Serif, DM_Sans } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const instrumentSerif = Instrument_Serif({
   weight: ["400"],
@@ -49,7 +50,11 @@ export default function RootLayout({
         />
         {/* If you need other fonts from your previous app, keep them too */}
       </head>
-      <body>{children}</body>
+      <body>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </body>
     </html>
   );
 }
