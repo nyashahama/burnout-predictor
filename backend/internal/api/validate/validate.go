@@ -4,6 +4,7 @@ package validate
 import (
 	"errors"
 	"fmt"
+	"net/mail"
 	"strings"
 	"time"
 )
@@ -19,12 +20,21 @@ var validSymptoms = map[string]bool{
 }
 
 func Email(s string) error {
-	at := strings.LastIndex(s, "@")
-	if at < 1 {
-		return errors.New("email must contain @")
+	if s == "" {
+		return errors.New("email is required")
 	}
-	if strings.LastIndex(s[at:], ".") < 2 {
-		return errors.New("email must have a domain with a dot after @")
+	addr, err := mail.ParseAddress(s)
+	if err != nil {
+		return errors.New("invalid email address")
+	}
+	// ParseAddress accepts "Name <email>" — we only want bare addresses.
+	if addr.Address != s {
+		return errors.New("invalid email address")
+	}
+	// Require a dot in the domain part.
+	at := strings.LastIndex(addr.Address, "@")
+	if at < 0 || !strings.Contains(addr.Address[at+1:], ".") {
+		return errors.New("email must have a domain with a dot")
 	}
 	return nil
 }
