@@ -55,7 +55,7 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 	authH := handler.NewAuthHandler(authService)
 	checkinH := handler.NewCheckinHandler(checkinService)
 	insightH := handler.NewInsightHandler(insightService)
-	followUpH := handler.NewFollowUpHandler(pg)
+	followUpH := handler.NewFollowUpHandler(pg, log)
 	userH := handler.NewUserHandler(authService)
 	webhookH := handler.NewWebhookHandler(billingService, []byte(cfg.PaddleSecret))
 	notifH := handler.NewNotifPrefsHandler(pg)
