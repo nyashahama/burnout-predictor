@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { ForecastDay, scoreColor, scoreLabel } from "@/app/dashboard/data";
+import { scoreColor, scoreLabel } from "@/app/dashboard/data";
+
+type ForecastDay = {
+  day: string;
+  date: string;
+  score: number;
+  level: "ok" | "warning" | "danger";
+};
 
 const BAR_H = 120;
 const THRESHOLD = 65;
@@ -63,12 +70,16 @@ function buildNarrative(data: ForecastDay[]): string {
 export default function ForecastChart({ data }: { data: ForecastDay[] }) {
   const [hovered, setHovered] = useState<number | null>(null);
 
+  if (!data || data.length === 0) {
+    return <div className="forecast-empty">No data yet</div>;
+  }
+
   const narrative = buildNarrative(data);
 
   return (
     <div className="dash-card forecast">
       <div className="forecast-header">
-        <div className="forecast-title">7-day forecast</div>
+        <div className="forecast-title">Last 7 days</div>
         <div className="forecast-narrative">{narrative}</div>
       </div>
 

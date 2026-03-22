@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { mockUser } from "@/app/dashboard/data";
 
 function timeGreeting() {
   const h = new Date().getHours();
@@ -230,7 +229,7 @@ function getPlanOutcomeFeedback(todayScore: number): string | null {
 }
 
 export default function UserGreeting({ liveScore }: { liveScore?: number }) {
-  const [name,    setName]    = useState(mockUser.name);
+  const [name,    setName]    = useState("");
   const [streak,  setStreak]  = useState<number | null>(null);
   const [insight, setInsight] = useState<string | null>(null);
 

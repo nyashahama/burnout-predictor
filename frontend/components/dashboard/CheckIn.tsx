@@ -7,6 +7,8 @@ import {
   getFollowUpForToday,
   clearFollowUpForToday,
 } from "@/app/dashboard/data";
+import { useAuth } from "@/contexts/AuthContext";
+import type { CheckIn, UpsertCheckInResult } from "@/lib/types";
 
 const stressLevels = [
   { value: 1, label: "Very calm",   level: "ok"      },
@@ -16,59 +18,26 @@ const stressLevels = [
   { value: 5, label: "Overwhelmed", level: "danger"   },
 ];
 
-function todayKey() {
-  return `checkin-${new Date().toISOString().split("T")[0]}`;
+interface Props {
+  checkins: CheckIn[];
+  streakFromApi: number;
+  onComplete?: (result: UpsertCheckInResult) => void;
 }
 
-/** How many consecutive past days (not including today) had stress ≥ 4 */
-function getConsecutiveHighStress(): number {
+/** How many consecutive past days (not including today) had score > 65 */
+function getConsecutiveHighStress(checkins: CheckIn[]): number {
   let count = 0;
   const now = new Date();
-  for (let i = 1; i <= 30; i++) {
+  for (let i = 1; i <= 3; i++) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
-    const raw = localStorage.getItem(`checkin-${d.toISOString().split("T")[0]}`);
-    if (!raw) break;
-    try {
-      const parsed = JSON.parse(raw);
-      if (parsed.stress >= 4) count++;
-      else break;
-    } catch { break; }
+    const dateStr = d.toISOString().split("T")[0];
+    const ci = checkins.find(c => c.checked_in_date === dateStr);
+    if (!ci) break;
+    if (ci.score > 65) count++;
+    else break;
   }
   return count;
-}
-
-/**
- * Reads past check-ins for the same day of week and returns a short
- * context line if there's a clear pattern (≥2 data points).
- */
-function getDayPatternHint(): string | null {
-  const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-  const now = new Date();
-  const todayDow = now.getDay();
-  const dayName  = DAY_NAMES[todayDow];
-  const stresses: number[] = [];
-
-  for (let week = 1; week <= 6; week++) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - week * 7);
-    if (d.getDay() !== todayDow) continue;
-    const raw = localStorage.getItem(`checkin-${d.toISOString().split("T")[0]}`);
-    if (!raw) continue;
-    try {
-      const parsed = JSON.parse(raw);
-      if (typeof parsed.stress === "number") stresses.push(parsed.stress);
-    } catch {}
-  }
-
-  if (stresses.length < 2) return null;
-  const avg = stresses.reduce((a, b) => a + b, 0) / stresses.length;
-
-  if (avg >= 4.2) return `Your ${dayName}s have been consistently hard. Take that into account.`;
-  if (avg >= 3.6) return `${dayName}s tend to run heavier for you. Head's up.`;
-  if (avg <= 1.8) return `${dayName}s are usually good to you. Let's see if that holds.`;
-  if (avg <= 2.4) return `${dayName}s tend to be easy. Let's keep it that way.`;
-  return null;
 }
 
 /**
@@ -192,18 +161,6 @@ function getYesterdayContext(): { question: string; context: string | null } {
   return { question: "How are you carrying it today?", context: null };
 }
 
-/** Check-in streak — consecutive days with any check-in, including today */
-function getStreak(): number {
-  let s = 0;
-  const now = new Date();
-  for (let i = 0; i < 365; i++) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    if (localStorage.getItem(`checkin-${d.toISOString().split("T")[0]}`)) s++;
-    else break;
-  }
-  return s;
-}
 
 /** The note label question that responds to the selected stress level. */
 function getFollowUpQuestion(stress: number | null): string {
@@ -288,14 +245,6 @@ function getRoleContext(stress: number, role: string): string {
   return "";
 }
 
-/** Counts all check-in keys in localStorage — used to detect first-ever submission. */
-function getTotalCheckinCount(): number {
-  let count = 0;
-  for (let i = 0; i < localStorage.length; i++) {
-    if (localStorage.key(i)?.startsWith("checkin-")) count++;
-  }
-  return count;
-}
 
 function getPersonalizedResponse(
   stress: number,
@@ -372,17 +321,22 @@ function getPersonalizedResponse(
 }
 
 export default function CheckIn({
-  onCheckin,
-}: {
-  onCheckin?: (stress: number) => void;
-}) {
+  checkins,
+  streakFromApi,
+  onComplete,
+}: Props) {
+  const { api } = useAuth();
+
+  const today = new Date().toISOString().split("T")[0];
+  const todayCheckin = checkins.find(c => c.checked_in_date === today);
+
   const [stress, setStress]                   = useState<number | null>(null);
   const [note, setNote]                       = useState("");
   const [submitted, setSubmitted]             = useState(false);
-  const [submittedStress, setSubmittedStress] = useState<number | null>(null);
+  const [submitting, setSubmitting]           = useState(false);
+  const [submittedStress, setSubmittedStress] = useState<number | null>(todayCheckin?.stress ?? null);
   const [updating, setUpdating]               = useState(false);
   const [response, setResponse]               = useState("");
-  const [dayHint, setDayHint]                 = useState<string | null>(null);
   const [yesterdayCtx, setYesterdayCtx]       = useState<{ question: string; context: string | null }>({ question: "How are you carrying it today?", context: null });
   const [memoryNote, setMemoryNote]           = useState<{ dateLabel: string; note: string } | null>(null);
   const [echoPattern, setEchoPattern]         = useState<string | null>(null);
@@ -392,6 +346,11 @@ export default function CheckIn({
   const [sleepBaseline, setSleepBaseline]     = useState("8");
   const [followUp, setFollowUp]               = useState<{ event: string; question: string; snippet: string } | null>(null);
 
+  // Mark as submitted on mount if today's check-in already exists in the API data
+  useEffect(() => {
+    if (todayCheckin) setSubmitted(true);
+  }, [todayCheckin?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const savedRole  = localStorage.getItem("overload-role")  || "engineer";
     const savedSleep = localStorage.getItem("overload-sleep") || "8";
@@ -400,26 +359,6 @@ export default function CheckIn({
 
     setFollowUp(getFollowUpForToday());
     setYesterdayCtx(getYesterdayContext());
-    setDayHint(getDayPatternHint());
-    const saved = localStorage.getItem(todayKey());
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (typeof parsed.stress === "number") {
-          setSubmittedStress(parsed.stress);
-          setResponse(
-            getPersonalizedResponse(
-              parsed.stress,
-              getConsecutiveHighStress(),
-              getStreak(),
-              savedRole,
-            ),
-          );
-          setPreviousOutcome(findPreviousOutcome(parsed.stress, savedRole, savedSleep));
-        }
-      } catch {}
-      setSubmitted(true);
-    }
   }, []);
 
   function handleStressSelect(value: number) {
@@ -427,20 +366,14 @@ export default function CheckIn({
     setMemoryNote(getComparableNote(value));
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!stress) return;
-    const priorHigh    = getConsecutiveHighStress();
-    const streak       = getStreak();
-    const isFirst      = getTotalCheckinCount() === 0;
+    const priorHigh    = getConsecutiveHighStress(checkins);
+    const streak       = streakFromApi;
+    const isFirst      = checkins.length === 0;
     const todayDateStr = new Date().toISOString().split("T")[0];
 
-    localStorage.setItem(todayKey(), JSON.stringify({ stress, note, ts: Date.now() }));
-    setSubmittedStress(stress);
-    setSubmittedNote(!!note.trim());
-    setResponse(getPersonalizedResponse(stress, priorHigh, streak, role, isFirst));
-    setPreviousOutcome(findPreviousOutcome(stress, role, sleepBaseline));
-
-    // Parse note for future events and clear any surfaced follow-up
+    // Parse note for future events and clear any surfaced follow-up (kept for local UX)
     if (note.trim()) parseFollowUpSignals(note, todayDateStr);
     if (followUp) clearFollowUpForToday();
 
@@ -451,11 +384,25 @@ export default function CheckIn({
 
     // The "beat" — a pause before the response appears
     setUpdating(true);
-    setTimeout(() => {
+    setSubmitting(true);
+
+    try {
+      const result = await api.post<UpsertCheckInResult>("/api/checkins", {
+        stress,
+        note: note.trim() || "",
+      });
+      setSubmittedStress(stress);
+      setSubmittedNote(!!note.trim());
+      setResponse(getPersonalizedResponse(stress, priorHigh, streak, role, isFirst));
+      setPreviousOutcome(findPreviousOutcome(stress, role, sleepBaseline));
+      onComplete?.(result);
       setSubmitted(true);
+    } catch (e) {
+      console.error("Check-in failed:", e);
+    } finally {
       setUpdating(false);
-      onCheckin?.(stress);
-    }, 900);
+      setSubmitting(false);
+    }
   }
 
   // Submitted state
@@ -502,10 +449,6 @@ export default function CheckIn({
         </>
       )}
 
-      {!followUp && !yesterdayCtx.context && dayHint && (
-        <p className="checkin-day-hint">{dayHint}</p>
-      )}
-
       <div className="checkin-stress">
         {stressLevels.map((s) => (
           <button
@@ -544,7 +487,7 @@ export default function CheckIn({
 
       <button
         className={`checkin-submit${updating ? " checkin-submit--updating" : ""}`}
-        disabled={!stress || updating}
+        disabled={!stress || updating || submitting}
         onClick={handleSubmit}
       >
         {updating ? "Noted…" : "Log check-in"}
