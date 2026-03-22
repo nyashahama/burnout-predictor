@@ -6,10 +6,6 @@ import type { CheckIn } from "@/lib/types";
 import {
   scoreColor,
   scoreLabel,
-  detectPatterns,
-  computePersonalSignature,
-  buildSignatureNarrative,
-  buildLongArcNarrative,
 } from "../data";
 import HistoryChart from "@/components/dashboard/HistoryChart";
 
@@ -31,8 +27,6 @@ export default function HistoryPage() {
   const { api } = useAuth();
   const [checkins, setCheckins] = useState<CheckIn[]>([]);
   const [loading, setLoading] = useState(true);
-  const [signature, setSignature] = useState<ReturnType<typeof computePersonalSignature>>(null);
-  const [arcStory, setArcStory] = useState<string | null>(null);
 
   useEffect(() => {
     if (!api) return;
@@ -41,11 +35,6 @@ export default function HistoryPage() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [api]);
-
-  useEffect(() => {
-    setSignature(computePersonalSignature());
-    setArcStory(buildLongArcNarrative());
-  }, []);
 
   // Map API checkins (newest first) to chart shape (oldest first for 30-day view)
   const historyDays = checkins
@@ -60,7 +49,8 @@ export default function HistoryPage() {
       score: c.score,
     }));
 
-  const scores = checkins.map((c) => c.score);
+  const last30 = checkins.slice(0, 30); // checkins are newest-first from API
+  const scores = last30.map((c) => c.score);
   const avg = scores.length
     ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
     : 0;
@@ -70,10 +60,6 @@ export default function HistoryPage() {
 
   const checkinCount = checkins.length;
   const isEmpty = checkinCount === 0;
-
-  const realDays = historyDays; // all fetched days are real (no ghost)
-  const patterns = !isEmpty && realDays.length >= 7 ? detectPatterns(realDays) : [];
-  const PATTERN_ICONS = ["📈", "🗓", "⚡"];
 
   if (loading) {
     return (
@@ -95,36 +81,6 @@ export default function HistoryPage() {
             : `${checkinCount} check-in${checkinCount !== 1 ? "s" : ""} — this is what the data has learned`}
         </p>
       </header>
-
-      {/* Long arc story — narrates the past 2+ months when enough data exists */}
-      {arcStory && (
-        <div className="hist-arc-story">
-          <p className="hist-arc-text">{arcStory}</p>
-        </div>
-      )}
-
-      {/* Pattern callouts — only shown when there's enough real data */}
-      {patterns.length > 0 && (
-        <div className="hist-patterns">
-          <div className="hist-patterns-label">What the data says</div>
-          <div className="pattern-callouts">
-            {patterns.map((p, i) => (
-              <div key={i} className="pattern-callout">
-                <span className="pattern-callout-icon">{PATTERN_ICONS[i] ?? "💡"}</span>
-                <span className="pattern-callout-text">{p}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Personal signature — shown when ≥14 real check-ins */}
-      {signature && (
-        <div className="hist-signature">
-          <div className="hist-signature-label">Your signature</div>
-          <p className="hist-signature-prose">{buildSignatureNarrative(signature)}</p>
-        </div>
-      )}
 
       {/* Stats row */}
       {isEmpty ? (
