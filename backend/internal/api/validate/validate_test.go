@@ -58,3 +58,29 @@ func TestCheckinSignals_hoursBoundaries(t *testing.T) {
 		t.Errorf("expected hours_worked=24 to be valid, got: %v", err)
 	}
 }
+
+func TestEmail(t *testing.T) {
+	valid := []string{
+		"user@example.com",
+		"user+tag@sub.domain.org",
+		"user.name@example.co.uk",
+	}
+	invalid := []string{
+		"",
+		"notanemail",
+		"@nodomain.com",
+		"x@y",            // no TLD — currently passes, must fail
+		"missingat.com",
+		"double@@example.com",
+	}
+	for _, e := range valid {
+		if err := validate.Email(e); err != nil {
+			t.Errorf("Email(%q) got error %v, want nil", e, err)
+		}
+	}
+	for _, e := range invalid {
+		if err := validate.Email(e); err == nil {
+			t.Errorf("Email(%q) got nil, want error", e)
+		}
+	}
+}
