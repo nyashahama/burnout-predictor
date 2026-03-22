@@ -68,7 +68,7 @@ func main() {
 	pg := store.New(queries)
 
 	notifSvc := notificationsvc.New(pg, emailClient, aiClient, logger)
-	go worker.Run(ctx, notifSvc)
+	go worker.Run(ctx, logger, notifSvc)
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
