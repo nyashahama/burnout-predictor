@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
+import type { AuthResult } from "@/lib/types";
+import { setOnboardedCookie } from "@/lib/auth";
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 
@@ -30,10 +33,6 @@ const openingOptions = [
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function setCookie(name: string, value: string, days = 7) {
-  document.cookie = `${name}=${value}; path=/; max-age=${days * 86400}; SameSite=Lax`;
-}
 
 function estimateScore(lastFelt: string, role: string, sleep: string): number {
   const base: Record<string, number> = {
@@ -182,26 +181,56 @@ const TOTAL_STEPS = 4; // steps 0–3 before reveal
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { login, api } = useAuth();
   const [step, setStep]         = useState(0);
   const [name, setName]         = useState("");
   const [lastFelt, setLastFelt] = useState("");
   const [role, setRole]         = useState("");
   const [sleep, setSleep]       = useState("");
   const [score, setScore]       = useState(0);
+  const [error, setError]       = useState("");
+  const [loading, setLoading]   = useState(false);
 
   function handleCalculate() {
     setScore(estimateScore(lastFelt, role, sleep));
     setStep(4);
   }
 
-  function handleFinish() {
-    localStorage.setItem("overload-name",            name.trim() || "there");
-    localStorage.setItem("overload-role",            role);
-    localStorage.setItem("overload-sleep",           sleep);
-    localStorage.setItem("overload-last-felt",       lastFelt);
-    localStorage.setItem("overload-estimated-score", String(score));
-    setCookie("overload-onboarded", "1");
-    router.push("/dashboard");
+  async function handleFinish() {
+    setLoading(true);
+    setError("");
+    try {
+      const pending = JSON.parse(
+        sessionStorage.getItem("overload-pending-register") ?? "{}"
+      ) as { email?: string; password?: string; name?: string };
+
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+
+      const result = await api.post<AuthResult>("/api/auth/register", {
+        email: pending.email ?? "",
+        password: pending.password ?? "",
+        name: pending.name ?? "there",
+        role,
+        sleep_baseline: parseInt(sleep, 10),
+        timezone: tz,
+      });
+
+      sessionStorage.removeItem("overload-pending-register");
+      login(result);
+
+      localStorage.setItem("overload-name", result.user.name);
+      localStorage.setItem("overload-role", result.user.role);
+      localStorage.setItem("overload-sleep", String(result.user.sleep_baseline));
+      localStorage.setItem("overload-last-felt", lastFelt);
+
+      setOnboardedCookie();
+      router.push("/dashboard");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Registration failed. Please try again.";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const level = scoreLevel(score);
@@ -382,8 +411,10 @@ export default function OnboardingPage() {
             <p className="onb-reveal-context-body">{body}</p>
           </div>
 
-          <button className="onb-btn" onClick={handleFinish}>
-            Let&apos;s start tracking →
+          {error && <div className="auth-error">{error}</div>}
+
+          <button className="onb-btn" onClick={handleFinish} disabled={loading}>
+            {loading ? "Just a moment…" : "Let's start tracking →"}
           </button>
 
           <p className="onb-reveal-note">
