@@ -148,6 +148,10 @@ func (s *Service) ProcessEvent(ctx context.Context, event PaddleEvent, rawBody [
 		return true, nil
 	}
 
+	// Handlers are fire-and-forget: errors are logged internally but not returned.
+	// Paddle treats any 2xx response as success and will NOT retry the event.
+	// If handler errors need Paddle retries in the future, return errors from
+	// handlers and propagate them back through ProcessEvent.
 	switch event.EventType {
 	case "subscription.created", "subscription.updated":
 		var sub paddleSubscriptionData
