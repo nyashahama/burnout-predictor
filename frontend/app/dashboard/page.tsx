@@ -203,7 +203,11 @@ export default function DashboardPage() {
             trajectory={scoreCard?.trajectory ?? undefined}
           />
           <ForecastChart data={liveForecast} />
-          <CheckInComponent onComplete={handleCheckInComplete} />
+          <CheckInComponent
+            checkins={checkins}
+            streakFromApi={scoreCard?.streak ?? 0}
+            onComplete={handleCheckInComplete}
+          />
         </div>
       </div>
 
