@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
-import { mockUser } from "@/app/dashboard/data";
 import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
@@ -175,8 +174,8 @@ export default function DashboardShell({
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
-  const [name,   setName]   = useState(mockUser.name);
-  const [streak, setStreak] = useState(mockUser.streak);
+  const [name,   setName]   = useState("");
+  const [streak, setStreak] = useState(0);
   const [hasCheckedIn, setHasCheckedIn] = useState(false);
 
   useEffect(() => {
