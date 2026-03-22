@@ -79,7 +79,7 @@ Be direct. No reassurance, no preamble. Output ONLY valid JSON.`
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // unactionable after body is read
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {

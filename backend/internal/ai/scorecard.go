@@ -123,7 +123,7 @@ Be direct. No preamble, no reassurance. Output ONLY valid JSON.`
 	if err != nil {
 		return ScoreCardNarrative{}, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // unactionable after body is read
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {

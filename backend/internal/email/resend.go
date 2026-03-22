@@ -57,7 +57,7 @@ func (c *Client) Send(ctx context.Context, p Params) (msgID string, err error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // unactionable after body is read
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
