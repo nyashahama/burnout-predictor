@@ -3,7 +3,7 @@ version: "2"
 linters:
   enable:
     - errcheck        # catches silently discarded errors (io.ReadAll, etc.)
-    - staticcheck     # broad correctness checks, replaces megacheck
+    - staticcheck     # broad correctness checks
     - unused          # dead code
     - govet           # same as go vet
     - ineffassign     # assignments whose value is never used
@@ -13,25 +13,19 @@ linters:
     - misspell        # common English spelling mistakes in comments/strings
     - godot           # checks that comments end with a period
 
-linters-settings:
-  errcheck:
-    # Ignore intentional discards: tx.Rollback in defer (no-op after commit),
-    # json encoder writes to http.ResponseWriter (already committed status).
-    exclude-functions:
-      - (*github.com/jackc/pgx/v5.Tx).Rollback
-      - (*encoding/json.Encoder).Encode
+  settings:
+    errcheck:
+      # Ignore intentional discards: tx.Rollback in defer (no-op after commit),
+      # json encoder writes to http.ResponseWriter (already committed status).
+      exclude-functions:
+        - (*github.com/jackc/pgx/v5.Tx).Rollback
+        - (*encoding/json.Encoder).Encode
 
-  exhaustive:
-    # Only enforce exhaustiveness on switches that have a default case already —
-    # avoids false positives on open-ended string switches.
-    default-signifies-exhaustive: true
+    exhaustive:
+      # Only enforce exhaustiveness on switches that have a default case already —
+      # avoids false positives on open-ended string switches.
+      default-signifies-exhaustive: true
 
-  godot:
-    # Only check exported (doc) comments, not inline comments.
-    scope: declarations
-
-issues:
-  # Don't report issues in generated files.
-  exclude-dirs:
-    - internal/db/sqlc
-
+    godot:
+      # Only check exported (doc) comments, not inline comments.
+      scope: declarations
