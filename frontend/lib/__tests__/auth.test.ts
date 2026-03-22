@@ -12,6 +12,7 @@ import {
 
 describe("auth storage helpers", () => {
   beforeEach(() => {
+    clearTokens();  // resets in-memory _accessToken AND removes localStorage entries
     localStorage.clear();
     document.cookie = "overload-session=; max-age=0; path=/";
     document.cookie = "overload-onboarded=; max-age=0; path=/";

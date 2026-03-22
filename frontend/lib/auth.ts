@@ -1,24 +1,21 @@
 // frontend/lib/auth.ts
-//
-// Access token is stored in localStorage so that test environments calling
-// localStorage.clear() between tests get a clean slate. In production the
-// token is short-lived (15 min) and never sent outside the origin, which is
-// the same threat model as an in-memory variable in a browser tab.
 
 const REFRESH_TOKEN_KEY = "overload-refresh-token";
-const ACCESS_TOKEN_KEY = "overload-access-token";
+
+/** In-memory access token — NOT persisted to storage. XSS cannot access this. */
+let _accessToken: string | null = null;
 
 export function storeTokens(accessToken: string, refreshToken: string) {
-  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  _accessToken = accessToken;
   localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
 }
 
 export function getAccessToken(): string | null {
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
+  return _accessToken;
 }
 
 export function setAccessToken(token: string) {
-  localStorage.setItem(ACCESS_TOKEN_KEY, token);
+  _accessToken = token;
 }
 
 export function getRefreshToken(): string | null {
@@ -26,7 +23,7 @@ export function getRefreshToken(): string | null {
 }
 
 export function clearTokens() {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  _accessToken = null;
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem("overload-name");
   localStorage.removeItem("overload-role");
