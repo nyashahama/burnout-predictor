@@ -59,7 +59,10 @@ func (c *Client) Send(ctx context.Context, p Params) (msgID string, err error) {
 	}
 	defer resp.Body.Close()
 
-	raw, _ := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("resend: read body: %w", err)
+	}
 	if resp.StatusCode >= 300 {
 		return "", fmt.Errorf("resend: %d — %s", resp.StatusCode, string(raw))
 	}
@@ -67,6 +70,8 @@ func (c *Client) Send(ctx context.Context, p Params) (msgID string, err error) {
 	var result struct {
 		ID string `json:"id"`
 	}
-	json.Unmarshal(raw, &result)
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return "", fmt.Errorf("resend: parse response: %w", err)
+	}
 	return result.ID, nil
 }

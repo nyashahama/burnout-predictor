@@ -20,11 +20,11 @@ func Run(ctx context.Context, notif *notificationsvc.Service) {
 	for {
 		select {
 		case <-minuteTicker.C:
-			notif.RunMinutely(ctx)
+			notif.RunMinutely(context.WithoutCancel(ctx))
 		case <-aiTicker.C:
-			notif.BackfillAIPlans(ctx)
+			notif.BackfillAIPlans(context.WithoutCancel(ctx))
 		case <-hourlyTicker.C:
-			notif.RunMaintenance(ctx)
+			notif.RunMaintenance(context.WithoutCancel(ctx))
 		case <-ctx.Done():
 			return
 		}

@@ -35,8 +35,8 @@ func Load() Config {
 		slog.Default().Error("DATABASE_URL is required")
 		os.Exit(1)
 	}
-	if cfg.JWTSecret == "" {
-		slog.Default().Error("JWT_SECRET is required")
+	if len(cfg.JWTSecret) < 32 {
+		slog.Default().Error("JWT_SECRET must be at least 32 characters")
 		os.Exit(1)
 	}
 	if cfg.Port == "" {

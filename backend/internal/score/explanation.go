@@ -126,7 +126,7 @@ func BuildTrajectoryInsight(in TrajectoryInput) string {
 	trendingDown := len(last3) >= 2 && float64(last3[0]) < float64(last3[len(last3)-1])-0.4
 
 	peakDay := in.DayName(2)
-	clearDay := in.DayName(2)
+	clearDay := in.DayName(3)
 
 	switch {
 	case in.ConsecutiveDangerDays >= 4:

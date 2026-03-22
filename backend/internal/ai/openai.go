@@ -81,7 +81,10 @@ Be direct. No reassurance, no preamble. Output ONLY valid JSON.`
 	}
 	defer resp.Body.Close()
 
-	raw, _ := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("openai: read body: %w", err)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("openai: %d — %s", resp.StatusCode, string(raw))
 	}
@@ -93,8 +96,11 @@ Be direct. No reassurance, no preamble. Output ONLY valid JSON.`
 			} `json:"message"`
 		} `json:"choices"`
 	}
-	if err := json.Unmarshal(raw, &chatResp); err != nil || len(chatResp.Choices) == 0 {
+	if err := json.Unmarshal(raw, &chatResp); err != nil {
 		return nil, fmt.Errorf("openai: parse response: %w", err)
+	}
+	if len(chatResp.Choices) == 0 {
+		return nil, fmt.Errorf("openai: empty choices in response")
 	}
 
 	// The model returns {"sections": [...]}
