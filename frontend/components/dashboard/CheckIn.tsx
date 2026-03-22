@@ -7,6 +7,8 @@ import {
   getFollowUpForToday,
   clearFollowUpForToday,
 } from "@/app/dashboard/data";
+import { useAuth } from "@/contexts/AuthContext";
+import type { UpsertCheckInResult } from "@/lib/types";
 
 const stressLevels = [
   { value: 1, label: "Very calm",   level: "ok"      },
@@ -373,12 +375,17 @@ function getPersonalizedResponse(
 
 export default function CheckIn({
   onCheckin,
+  onComplete,
 }: {
   onCheckin?: (stress: number) => void;
+  onComplete?: (result: UpsertCheckInResult) => void;
 }) {
+  const { api } = useAuth();
+
   const [stress, setStress]                   = useState<number | null>(null);
   const [note, setNote]                       = useState("");
   const [submitted, setSubmitted]             = useState(false);
+  const [submitting, setSubmitting]           = useState(false);
   const [submittedStress, setSubmittedStress] = useState<number | null>(null);
   const [updating, setUpdating]               = useState(false);
   const [response, setResponse]               = useState("");
@@ -427,20 +434,14 @@ export default function CheckIn({
     setMemoryNote(getComparableNote(value));
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!stress) return;
     const priorHigh    = getConsecutiveHighStress();
     const streak       = getStreak();
     const isFirst      = getTotalCheckinCount() === 0;
     const todayDateStr = new Date().toISOString().split("T")[0];
 
-    localStorage.setItem(todayKey(), JSON.stringify({ stress, note, ts: Date.now() }));
-    setSubmittedStress(stress);
-    setSubmittedNote(!!note.trim());
-    setResponse(getPersonalizedResponse(stress, priorHigh, streak, role, isFirst));
-    setPreviousOutcome(findPreviousOutcome(stress, role, sleepBaseline));
-
-    // Parse note for future events and clear any surfaced follow-up
+    // Parse note for future events and clear any surfaced follow-up (kept for local UX)
     if (note.trim()) parseFollowUpSignals(note, todayDateStr);
     if (followUp) clearFollowUpForToday();
 
@@ -451,11 +452,26 @@ export default function CheckIn({
 
     // The "beat" — a pause before the response appears
     setUpdating(true);
-    setTimeout(() => {
-      setSubmitted(true);
-      setUpdating(false);
+    setSubmitting(true);
+
+    try {
+      const result = await api.post<UpsertCheckInResult>("/api/checkins", {
+        stress,
+        note: note.trim() || "",
+      });
+      setSubmittedStress(stress);
+      setSubmittedNote(!!note.trim());
+      setResponse(getPersonalizedResponse(stress, priorHigh, streak, role, isFirst));
+      setPreviousOutcome(findPreviousOutcome(stress, role, sleepBaseline));
+      onComplete?.(result);
       onCheckin?.(stress);
-    }, 900);
+      setSubmitted(true);
+    } catch (e) {
+      console.error("Check-in failed:", e);
+    } finally {
+      setUpdating(false);
+      setSubmitting(false);
+    }
   }
 
   // Submitted state
@@ -544,7 +560,7 @@ export default function CheckIn({
 
       <button
         className={`checkin-submit${updating ? " checkin-submit--updating" : ""}`}
-        disabled={!stress || updating}
+        disabled={!stress || updating || submitting}
         onClick={handleSubmit}
       >
         {updating ? "Noted…" : "Log check-in"}

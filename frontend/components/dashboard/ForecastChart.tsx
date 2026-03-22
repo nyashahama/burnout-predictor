@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { ForecastDay, scoreColor, scoreLabel } from "@/app/dashboard/data";
+import { scoreColor, scoreLabel } from "@/app/dashboard/data";
+
+type ForecastDay = {
+  day: string;
+  date: string;
+  score: number;
+  level: "ok" | "warning" | "danger";
+};
 
 const BAR_H = 120;
 const THRESHOLD = 65;
