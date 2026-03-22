@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/reqid"
@@ -32,11 +34,31 @@ type billingStore interface {
 // Service handles Paddle webhook processing.
 type Service struct {
 	store billingStore
+	pool  *pgxpool.Pool
 	log   *slog.Logger
 }
 
-func New(store billingStore, log *slog.Logger) *Service {
-	return &Service{store: store, log: log}
+func New(store billingStore, pool *pgxpool.Pool, log *slog.Logger) *Service {
+	return &Service{store: store, pool: pool, log: log}
+}
+
+// withTx runs fn inside a pgx transaction. Rolls back on any error.
+// fn receives a *db.Queries bound to the transaction via db.New(tx).
+// Note: sqlc generates *db.Queries (not a Querier interface) and db.New(tx) is the
+// correct constructor for a transaction-bound querier.
+func (s *Service) withTx(ctx context.Context, fn func(*db.Queries) error) error {
+	if s.pool == nil {
+		return fmt.Errorf("billing: pool not configured")
+	}
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("billing: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }() // no-op if already committed
+	if err := fn(db.New(tx)); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // ── Paddle payload types ───────────────────────────────────────────────────────
@@ -170,6 +192,7 @@ func (s *Service) handleSubscriptionUpsert(ctx context.Context, eventType string
 	}
 
 	planName, currency, unitPriceCents := extractPlanDetails(sub)
+	tier := tierFromStatus(sub.Status, planName)
 
 	params := db.UpsertSubscriptionParams{
 		UserID:               user.ID,
@@ -192,44 +215,65 @@ func (s *Service) handleSubscriptionUpsert(ctx context.Context, eventType string
 		params.TrialEndsAt = pgtype.Timestamptz{Time: sub.TrialDates.EndsAt, Valid: true}
 	}
 
-	if _, err := s.store.UpsertSubscription(ctx, params); err != nil {
-		s.log.ErrorContext(ctx, "sub upsert: db failed", "request_id", reqid.FromCtx(ctx), "subscription_id", sub.ID, "err", err)
-		return
-	}
-
-	tier := tierFromStatus(sub.Status, planName)
-	if err := s.store.SetUserTier(ctx, db.SetUserTierParams{ID: user.ID, Tier: tier}); err != nil {
-		s.log.WarnContext(ctx, "sub upsert: set user tier failed", "request_id", reqid.FromCtx(ctx), "user_id", user.ID, "err", err)
+	if err := s.withTx(ctx, func(q *db.Queries) error {
+		if _, err := q.UpsertSubscription(ctx, params); err != nil {
+			return fmt.Errorf("upsert subscription: %w", err)
+		}
+		return q.SetUserTier(ctx, db.SetUserTierParams{ID: user.ID, Tier: tier})
+	}); err != nil {
+		s.log.ErrorContext(ctx, "sub upsert: transaction failed", "request_id", reqid.FromCtx(ctx), "subscription_id", sub.ID, "err", err)
 	}
 }
 
 func (s *Service) handleSubscriptionCancelled(ctx context.Context, sub paddleSubscriptionData) {
-	if err := s.store.CancelSubscription(ctx, sub.ID); err != nil {
-		s.log.ErrorContext(ctx, "sub cancel: db failed", "request_id", reqid.FromCtx(ctx), "subscription_id", sub.ID, "err", err)
+	shouldDowngradeNow := sub.CurrentBilling == nil || time.Now().After(sub.CurrentBilling.EndsAt)
+
+	if !shouldDowngradeNow {
+		// Subscription access still valid until period end; just mark cancelled.
+		if err := s.store.CancelSubscription(ctx, sub.ID); err != nil {
+			s.log.ErrorContext(ctx, "sub cancel: db failed", "request_id", reqid.FromCtx(ctx), "subscription_id", sub.ID, "err", err)
+		}
 		return
 	}
 
-	shouldDowngradeNow := sub.CurrentBilling == nil || time.Now().After(sub.CurrentBilling.EndsAt)
-	if shouldDowngradeNow {
-		user, err := s.resolveUserFromPaddleEvent(ctx, sub.CustomerID, sub.CustomData)
-		if err == nil {
-			if err := s.store.SetUserTier(ctx, db.SetUserTierParams{ID: user.ID, Tier: "free"}); err != nil {
-				s.log.WarnContext(ctx, "sub cancel: set user tier failed", "request_id", reqid.FromCtx(ctx), "user_id", user.ID, "err", err)
-			}
+	user, err := s.resolveUserFromPaddleEvent(ctx, sub.CustomerID, sub.CustomData)
+	if err != nil {
+		s.log.ErrorContext(ctx, "sub cancel: resolve user failed", "request_id", reqid.FromCtx(ctx), "customer_id", sub.CustomerID, "err", err)
+		// Still try to cancel the subscription record even without the user.
+		if err := s.store.CancelSubscription(ctx, sub.ID); err != nil {
+			s.log.ErrorContext(ctx, "sub cancel: db failed", "request_id", reqid.FromCtx(ctx), "subscription_id", sub.ID, "err", err)
 		}
+		return
+	}
+
+	if err := s.withTx(ctx, func(q *db.Queries) error {
+		if err := q.CancelSubscription(ctx, sub.ID); err != nil {
+			return fmt.Errorf("cancel subscription: %w", err)
+		}
+		return q.SetUserTier(ctx, db.SetUserTierParams{ID: user.ID, Tier: "free"})
+	}); err != nil {
+		s.log.ErrorContext(ctx, "sub cancel: transaction failed", "request_id", reqid.FromCtx(ctx), "subscription_id", sub.ID, "err", err)
 	}
 }
 
 func (s *Service) handleSubscriptionPaused(ctx context.Context, sub paddleSubscriptionData) {
-	if err := s.store.SetSubscriptionPastDue(ctx, sub.ID); err != nil {
-		s.log.ErrorContext(ctx, "sub pause: set past due failed", "request_id", reqid.FromCtx(ctx), "subscription_id", sub.ID, "err", err)
+	user, err := s.resolveUserFromPaddleEvent(ctx, sub.CustomerID, sub.CustomData)
+	if err != nil {
+		s.log.ErrorContext(ctx, "sub pause: resolve user failed", "request_id", reqid.FromCtx(ctx), "customer_id", sub.CustomerID, "err", err)
+		// Still mark past due even if user lookup failed.
+		if err := s.store.SetSubscriptionPastDue(ctx, sub.ID); err != nil {
+			s.log.ErrorContext(ctx, "sub pause: set past due failed", "request_id", reqid.FromCtx(ctx), "subscription_id", sub.ID, "err", err)
+		}
+		return
 	}
 
-	user, err := s.resolveUserFromPaddleEvent(ctx, sub.CustomerID, sub.CustomData)
-	if err == nil {
-		if err := s.store.SetUserTier(ctx, db.SetUserTierParams{ID: user.ID, Tier: "free"}); err != nil {
-			s.log.WarnContext(ctx, "sub pause: set user tier failed", "request_id", reqid.FromCtx(ctx), "user_id", user.ID, "err", err)
+	if err := s.withTx(ctx, func(q *db.Queries) error {
+		if err := q.SetSubscriptionPastDue(ctx, sub.ID); err != nil {
+			return fmt.Errorf("set past due: %w", err)
 		}
+		return q.SetUserTier(ctx, db.SetUserTierParams{ID: user.ID, Tier: "free"})
+	}); err != nil {
+		s.log.ErrorContext(ctx, "sub pause: transaction failed", "request_id", reqid.FromCtx(ctx), "subscription_id", sub.ID, "err", err)
 	}
 }
 
