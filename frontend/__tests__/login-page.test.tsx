@@ -85,7 +85,7 @@ describe("LoginPage", () => {
         target: { value: "user@example.com" },
       });
       fireEvent.change(screen.getByLabelText(/password/i), {
-        target: { value: "secret123" },
+        target: { value: "hunter2" },
       });
 
       await act(async () => {
@@ -136,7 +136,7 @@ describe("LoginPage", () => {
 
       fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
       fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "user@example.com" } });
-      fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "secret123" } });
+      fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "hunter2" } });
 
       await act(async () => {
         fireEvent.submit(screen.getByText(/sign in →/i).closest("form")!);
@@ -174,7 +174,7 @@ describe("LoginPage", () => {
         target: { value: "new@example.com" },
       });
       fireEvent.change(screen.getByLabelText(/password/i), {
-        target: { value: "password123" },
+        target: { value: "hunter2" },
       });
 
       await act(async () => {
@@ -196,7 +196,7 @@ describe("LoginPage", () => {
         target: { value: "bob@example.com" },
       });
       fireEvent.change(screen.getByLabelText(/password/i), {
-        target: { value: "password123" },
+        target: { value: "hunter2" },
       });
 
       await act(async () => {
@@ -211,7 +211,7 @@ describe("LoginPage", () => {
         sessionStorage.getItem("overload-pending-register") ?? "{}"
       );
       expect(pending.email).toBe("bob@example.com");
-      expect(pending.password).toBe("password123");
+      expect(pending.password).toBe("hunter2");
       expect(pending.name).toBe("Bob");
     });
   });
