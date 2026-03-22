@@ -68,7 +68,7 @@ func (h *WebhookHandler) Paddle(w http.ResponseWriter, r *http.Request) {
 
 // verifyPaddleSignature validates the Paddle-Signature header (HMAC-SHA256).
 // Header format: ts=<unix>;<whitespace>h1=<hex-hmac>
-// Signed payload: "<ts>:<raw body>"
+// Signed payload: "<ts>:<raw body>".
 func verifyPaddleSignature(secret []byte, header string, body []byte) bool {
 	if header == "" {
 		return false

@@ -12,16 +12,12 @@ import (
 	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/middleware"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/respond"
-	authsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/auth"
 )
 
 type exportStore interface {
 	ExportUserCheckIns(ctx context.Context, userID uuid.UUID) ([]db.ExportUserCheckInsRow, error)
 }
 
-type exportUserService interface {
-	GetProfile(ctx context.Context, user db.User) authsvc.UserResponse
-}
 
 type exportCheckIn struct {
 	Date  string `json:"date"`

@@ -343,6 +343,8 @@ func BuildSignatureNarrative(sig SignatureData) string {
 		sentences = append(sentences, "Your load has been coming down. Whatever you've changed — it's showing up in the data.")
 	case TrendWorsening:
 		sentences = append(sentences, "The trend is climbing. This is the kind of thing that doesn't reverse on its own.")
+	case TrendStable:
+		// Stable trend adds no additional sentence — the other signals are sufficient.
 	}
 
 	if len(sentences) == 0 {
