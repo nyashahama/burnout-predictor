@@ -78,13 +78,14 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 	r.Use(corsMiddleware(corsOrigin))
 
 	// Health check — no auth, no rate limit.
-	r.Get("/health", healthHandler(cfg.Pool, cfg.StartTime))
+	r.With(requestBodyLimit(1 << 20)).Get("/health", healthHandler(cfg.Pool, cfg.StartTime))
 
 	// Public webhook.
 	r.Post("/api/webhooks/paddle", webhookH.Paddle)
 
 	// Public auth routes with per-IP rate limiting.
 	r.Group(func(r chi.Router) {
+		r.Use(requestBodyLimit(1 << 20)) // 1 MB cap — excludes Paddle webhook
 		r.Use(middleware.RateLimit(ctx, 20, time.Minute, false))
 		r.Post("/api/auth/register", authH.Register)
 		r.Post("/api/auth/login", authH.Login)
@@ -96,6 +97,7 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 
 	// Authenticated routes.
 	r.Group(func(r chi.Router) {
+		r.Use(requestBodyLimit(1 << 20)) // 1 MB cap — excludes Paddle webhook
 		r.Use(authMW)
 
 		r.Post("/api/auth/logout", authH.Logout)
@@ -138,6 +140,18 @@ func corsMiddleware(origin string) func(http.Handler) http.Handler {
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// requestBodyLimit caps incoming request bodies at the given byte limit using
+// http.MaxBytesReader. Requests that exceed the limit receive 413 and the body
+// reader returns an error, stopping decoder processing immediately.
+func requestBodyLimit(limit int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r.Body = http.MaxBytesReader(w, r.Body, limit)
 			next.ServeHTTP(w, r)
 		})
 	}
