@@ -68,6 +68,9 @@ func (m *mockCheckinStore) CountCheckIns(ctx context.Context, id uuid.UUID) (int
 	return 0, nil
 }
 func (m *mockCheckinStore) SetAIRecoveryPlan(ctx context.Context, p db.SetAIRecoveryPlanParams) error {
+	if m.setAIRecoveryPlan != nil {
+		return m.setAIRecoveryPlan(ctx, p)
+	}
 	return nil
 }
 func (m *mockCheckinStore) CreateFollowUp(ctx context.Context, p db.CreateFollowUpParams) (db.FollowUp, error) {
