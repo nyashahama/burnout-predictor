@@ -113,7 +113,7 @@ describe("OnboardingPage", () => {
     // Seed sessionStorage with pending registration data
     sessionStorage.setItem(
       "overload-pending-register",
-      JSON.stringify({ email: "bob@example.com", password: "pass123", name: "Bob" })
+      JSON.stringify({ email: "bob@example.com", password: "hunter2", name: "Bob" })
     );
 
     await renderOnboardingPage();
@@ -125,7 +125,7 @@ describe("OnboardingPage", () => {
 
     expect(capturedBody).toMatchObject({
       email: "bob@example.com",
-      password: "pass123",
+      password: "hunter2",
       name: "Bob",
       role: "engineer",
       sleep_baseline: 8,
@@ -141,7 +141,7 @@ describe("OnboardingPage", () => {
 
     sessionStorage.setItem(
       "overload-pending-register",
-      JSON.stringify({ email: "bob@example.com", password: "pass123", name: "Bob" })
+      JSON.stringify({ email: "bob@example.com", password: "hunter2", name: "Bob" })
     );
 
     await renderOnboardingPage();
@@ -161,7 +161,7 @@ describe("OnboardingPage", () => {
 
     sessionStorage.setItem(
       "overload-pending-register",
-      JSON.stringify({ email: "bob@example.com", password: "pass123", name: "Bob" })
+      JSON.stringify({ email: "bob@example.com", password: "hunter2", name: "Bob" })
     );
 
     await renderOnboardingPage();
@@ -183,7 +183,7 @@ describe("OnboardingPage", () => {
 
     sessionStorage.setItem(
       "overload-pending-register",
-      JSON.stringify({ email: "bob@example.com", password: "pass123", name: "Bob" })
+      JSON.stringify({ email: "bob@example.com", password: "hunter2", name: "Bob" })
     );
 
     await renderOnboardingPage();
@@ -203,7 +203,7 @@ describe("OnboardingPage", () => {
 
     sessionStorage.setItem(
       "overload-pending-register",
-      JSON.stringify({ email: "bob@example.com", password: "pass123", name: "Bob" })
+      JSON.stringify({ email: "bob@example.com", password: "hunter2", name: "Bob" })
     );
 
     await renderOnboardingPage();
