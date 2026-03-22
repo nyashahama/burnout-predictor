@@ -1,78 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import type { CheckIn } from "@/lib/types";
 import {
   scoreColor,
   scoreLabel,
   detectPatterns,
-  stressToScore,
   computePersonalSignature,
   buildSignatureNarrative,
   buildLongArcNarrative,
-  type HistoryDay,
-  type CheckInEntry,
 } from "../data";
 import HistoryChart from "@/components/dashboard/HistoryChart";
-
-// ── Real data builders ─────────────────────────────────────────────────────────
-
-function buildRealHistory(): HistoryDay[] {
-  const role  = localStorage.getItem("overload-role")  || "engineer";
-  const sleep = localStorage.getItem("overload-sleep") || "8";
-  const days: HistoryDay[] = [];
-  const now = new Date();
-
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const key     = `checkin-${d.toISOString().split("T")[0]}`;
-    const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    const raw     = localStorage.getItem(key);
-
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        days.push({ date: dateStr, score: stressToScore(parsed.stress, role, sleep) });
-      } catch {
-        days.push({ date: dateStr, score: 0, ghost: true });
-      }
-    } else {
-      days.push({ date: dateStr, score: 0, ghost: true });
-    }
-  }
-  return days;
-}
-
-const STRESS_LABELS: Record<number, string> = {
-  1: "Very calm", 2: "Relaxed", 3: "Moderate", 4: "Stressed", 5: "Overwhelmed",
-};
-
-function buildRealEntries(): CheckInEntry[] {
-  const role  = localStorage.getItem("overload-role")  || "engineer";
-  const sleep = localStorage.getItem("overload-sleep") || "8";
-  const entries: CheckInEntry[] = [];
-  const now = new Date();
-
-  for (let i = 0; i < 60; i++) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const key = `checkin-${d.toISOString().split("T")[0]}`;
-    const raw = localStorage.getItem(key);
-    if (!raw) continue;
-    try {
-      const parsed = JSON.parse(raw);
-      const stress = parsed.stress ?? 3;
-      entries.push({
-        date:        d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-        stress,
-        stressLabel: STRESS_LABELS[stress] ?? "Moderate",
-        note:        parsed.note || undefined,
-        score:       stressToScore(stress, role, sleep),
-      });
-    } catch {}
-  }
-  return entries;
-}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -82,35 +21,69 @@ function levelClass(score: number) {
   return "ok";
 }
 
+const STRESS_LABELS: Record<number, string> = {
+  1: "Very calm", 2: "Relaxed", 3: "Moderate", 4: "Stressed", 5: "Overwhelmed",
+};
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function HistoryPage() {
-  const [realHistory, setRealHistory]   = useState<HistoryDay[]>([]);
-  const [entries,     setEntries]       = useState<CheckInEntry[]>([]);
-  const [signature,   setSignature]     = useState<ReturnType<typeof computePersonalSignature>>(null);
-  const [arcStory,    setArcStory]      = useState<string | null>(null);
+  const { api } = useAuth();
+  const [checkins, setCheckins] = useState<CheckIn[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [signature, setSignature] = useState<ReturnType<typeof computePersonalSignature>>(null);
+  const [arcStory, setArcStory] = useState<string | null>(null);
 
   useEffect(() => {
-    setRealHistory(buildRealHistory());
-    setEntries(buildRealEntries());
+    if (!api) return;
+    api.get<CheckIn[]>("/api/checkins")
+      .then(setCheckins)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [api]);
+
+  useEffect(() => {
     setSignature(computePersonalSignature());
     setArcStory(buildLongArcNarrative());
   }, []);
 
-  const realDays       = realHistory.filter((d) => !d.ghost);
-  const checkinCount   = realDays.length;
-  const isEmpty        = checkinCount === 0;
+  // Map API checkins (newest first) to chart shape (oldest first for 30-day view)
+  const historyDays = checkins
+    .slice()
+    .reverse()
+    .slice(-30)
+    .map((c) => ({
+      date: new Date(c.checked_in_date + "T00:00:00").toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      }),
+      score: c.score,
+    }));
 
-  // Stats computed from real check-ins only
-  const avg            = realDays.length
-    ? Math.round(realDays.reduce((s, d) => s + d.score, 0) / realDays.length)
+  const scores = checkins.map((c) => c.score);
+  const avg = scores.length
+    ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
     : 0;
-  const highStrainDays = realDays.filter((d) => d.score > 65).length;
-  const inZoneDays     = realDays.filter((d) => d.score <= 40).length;
-  const peakScore      = realDays.length ? Math.max(...realDays.map((d) => d.score)) : 0;
+  const peak = scores.length ? Math.max(...scores) : 0;
+  const highStrain = scores.filter((s) => s > 65).length;
+  const inZone = scores.filter((s) => s <= 40).length;
 
+  const checkinCount = checkins.length;
+  const isEmpty = checkinCount === 0;
+
+  const realDays = historyDays; // all fetched days are real (no ghost)
   const patterns = !isEmpty && realDays.length >= 7 ? detectPatterns(realDays) : [];
   const PATTERN_ICONS = ["📈", "🗓", "⚡"];
+
+  if (loading) {
+    return (
+      <div className="dash-content">
+        <header className="dash-header">
+          <h1 className="dash-greeting">Your history</h1>
+        </header>
+      </div>
+    );
+  }
 
   return (
     <div className="dash-content">
@@ -175,7 +148,7 @@ export default function HistoryPage() {
 
           <div className="hist-stat">
             <div className="hist-stat-value" style={{ color: "var(--red)" }}>
-              {highStrainDays}
+              {highStrain}
             </div>
             <div className="hist-stat-label">Hard days</div>
             <div className="hist-stat-sublabel">Score above 65</div>
@@ -183,15 +156,15 @@ export default function HistoryPage() {
 
           <div className="hist-stat">
             <div className="hist-stat-value" style={{ color: "var(--green)" }}>
-              {inZoneDays}
+              {inZone}
             </div>
             <div className="hist-stat-label">Good days</div>
             <div className="hist-stat-sublabel">Score below 40</div>
           </div>
 
           <div className="hist-stat">
-            <div className="hist-stat-value" style={{ color: scoreColor(peakScore) }}>
-              {peakScore}
+            <div className="hist-stat-value" style={{ color: scoreColor(peak) }}>
+              {peak}
             </div>
             <div className="hist-stat-label">Highest point</div>
             <div className="hist-stat-sublabel">Most load recorded</div>
@@ -200,49 +173,59 @@ export default function HistoryPage() {
       )}
 
       <HistoryChart
-        data={realHistory}
+        data={historyDays}
         checkinCount={checkinCount}
         showPatterns={false}
       />
 
-      {/* Check-in log — real entries from localStorage */}
-      {entries.length > 0 && (
+      {/* Check-in log */}
+      {checkins.length > 0 && (
         <div className="dash-card hist-log">
           <div className="hist-log-header">
             <div>
               <div className="hist-log-title">Your check-ins</div>
-              <div className="hist-log-count">{entries.length} {entries.length === 1 ? "entry" : "entries"}</div>
+              <div className="hist-log-count">
+                {checkins.length} {checkins.length === 1 ? "entry" : "entries"}
+              </div>
             </div>
           </div>
 
           <div className="hist-log-list">
-            {entries.map((entry, i) => (
-              <div key={i} className="hist-log-row">
-                <div className="hist-log-date">{entry.date}</div>
+            {checkins.map((c, i) => {
+              const dateLabel = new Date(c.checked_in_date + "T00:00:00").toLocaleDateString(
+                "en-US",
+                { month: "short", day: "numeric" }
+              );
+              return (
+                <div key={i} className="hist-log-row">
+                  <div className="hist-log-date">{dateLabel}</div>
 
-                <div
-                  className="hist-log-score"
-                  style={{ color: scoreColor(entry.score) }}
-                >
-                  {entry.score}
+                  <div
+                    className="hist-log-score"
+                    style={{ color: scoreColor(c.score) }}
+                  >
+                    {c.score}
+                  </div>
+
+                  <div className={`hist-log-badge hist-log-badge--${levelClass(c.score)}`}>
+                    {scoreLabel(c.score)}
+                  </div>
+
+                  <div className="hist-log-stress">
+                    <span className="hist-log-stress-num">{c.stress}</span>
+                    <span className="hist-log-stress-label">
+                      {STRESS_LABELS[c.stress] ?? "Moderate"}
+                    </span>
+                  </div>
+
+                  {c.note ? (
+                    <div className="hist-log-note">{c.note}</div>
+                  ) : (
+                    <div className="hist-log-no-note">—</div>
+                  )}
                 </div>
-
-                <div className={`hist-log-badge hist-log-badge--${levelClass(entry.score)}`}>
-                  {scoreLabel(entry.score)}
-                </div>
-
-                <div className="hist-log-stress">
-                  <span className="hist-log-stress-num">{entry.stress}</span>
-                  <span className="hist-log-stress-label">{entry.stressLabel}</span>
-                </div>
-
-                {entry.note ? (
-                  <div className="hist-log-note">{entry.note}</div>
-                ) : (
-                  <div className="hist-log-no-note">—</div>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
