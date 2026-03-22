@@ -10,7 +10,7 @@ import {
   type ForecastDay,
 } from "./data";
 import { useAuth } from "@/contexts/AuthContext";
-import type { ScoreCardResult, CheckIn, UpsertCheckInResult } from "@/lib/types";
+import type { ScoreCardResult, CheckIn, UpsertCheckInResult, InsightBundle } from "@/lib/types";
 import ScoreCard from "@/components/dashboard/ScoreCard";
 import ForecastChart from "@/components/dashboard/ForecastChart";
 import CheckInComponent from "@/components/dashboard/CheckIn";
@@ -66,10 +66,11 @@ function buildForecast(scoreCard: ScoreCardResult | null, checkins: CheckIn[]): 
 export default function DashboardPage() {
   const { api } = useAuth();
 
-  const [scoreCard, setScoreCard]   = useState<ScoreCardResult | null>(null);
-  const [checkins, setCheckins]     = useState<CheckIn[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
-  const [ready, setReady]           = useState(false);
+  const [scoreCard, setScoreCard]       = useState<ScoreCardResult | null>(null);
+  const [checkins, setCheckins]         = useState<CheckIn[]>([]);
+  const [insightBundle, setInsightBundle] = useState<InsightBundle | null>(null);
+  const [loadingData, setLoadingData]   = useState(true);
+  const [ready, setReady]               = useState(false);
 
   // Ambient danger mode
   const liveScore = scoreCard?.score.score ?? 55;
@@ -92,6 +93,10 @@ export default function DashboardPage() {
       })
       .catch(console.error)
       .finally(() => setLoadingData(false));
+
+    api.get<InsightBundle>("/api/insights")
+      .then(setInsightBundle)
+      .catch(console.error);
   }, [api]);
 
   // Trigger notification when past reminder time and not yet checked in today
@@ -211,7 +216,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <PersonalizedInsight />
+      <PersonalizedInsight bundle={insightBundle} />
 
       <RecoveryPlan
         plan={recoveryPlan}
