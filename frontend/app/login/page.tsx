@@ -3,23 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-
-function setCookie(name: string, value: string, days = 7) {
-  const maxAge = days * 24 * 60 * 60;
-  document.cookie = `${name}=${value}; path=/; max-age=${maxAge}; SameSite=Lax`;
-}
-
-function getCookie(name: string) {
-  return document.cookie
-    .split("; ")
-    .find((row) => row.startsWith(`${name}=`))
-    ?.split("=")[1];
-}
+import { useAuth } from "@/contexts/AuthContext";
+import type { AuthResult } from "@/lib/types";
+import { setOnboardedCookie } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login, api } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signup");
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,6 +21,7 @@ export default function LoginPage() {
     if (!email.trim()) return "Enter your email address.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
       return "That doesn't look like a valid email.";
+    if (mode === "signup" && !name.trim()) return "Enter your name.";
     if (!password) return "Enter a password.";
     if (mode === "signup" && password.length < 6)
       return "Password must be at least 6 characters.";
@@ -39,20 +33,29 @@ export default function LoginPage() {
     setError("");
     const err = validate();
     if (err) { setError(err); return; }
-
     setLoading(true);
-    // Simulate a short network delay
-    await new Promise((r) => setTimeout(r, 600));
 
-    setCookie("overload-session", "1");
-
-    if (mode === "signup") {
-      // New user → go through onboarding
-      router.push("/onboarding");
-    } else {
-      // Returning user → skip onboarding, go straight to dashboard
-      setCookie("overload-onboarded", "1");
-      router.push("/dashboard");
+    try {
+      if (mode === "signup") {
+        sessionStorage.setItem(
+          "overload-pending-register",
+          JSON.stringify({ email: email.trim(), password, name: name.trim() })
+        );
+        router.push("/onboarding");
+      } else {
+        const result = await api.post<AuthResult>("/api/auth/login", {
+          email: email.trim(),
+          password,
+        });
+        login(result);
+        setOnboardedCookie();
+        router.push("/dashboard");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Something went wrong.";
+      setError(msg);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -87,7 +90,7 @@ export default function LoginPage() {
             : "Sign in to your Overload dashboard."}
         </div>
 
-        <form className="auth-form" onSubmit={handleSubmit} noValidate>
+        <form className="auth-form" onSubmit={handleSubmit} noValidate aria-label="auth form">
           <div className="auth-field">
             <label className="auth-label" htmlFor="email">Email</label>
             <input
@@ -102,6 +105,21 @@ export default function LoginPage() {
             />
           </div>
 
+          {mode === "signup" && (
+            <div className="auth-field">
+              <label className="auth-label" htmlFor="name">Name</label>
+              <input
+                id="name"
+                className="auth-input"
+                type="text"
+                placeholder="Your name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoComplete="name"
+              />
+            </div>
+          )}
+
           <div className="auth-field">
             <label className="auth-label" htmlFor="password">Password</label>
             <input
@@ -115,7 +133,7 @@ export default function LoginPage() {
             />
           </div>
 
-          {error && <div className="auth-error">{error}</div>}
+          {error && <div className="auth-error" role="alert">{error}</div>}
 
           <button
             className={`auth-btn${loading ? " auth-btn--loading" : ""}`}
@@ -134,7 +152,7 @@ export default function LoginPage() {
           {mode === "signup" ? (
             <>Already have an account?{" "}
               <button className="auth-link" onClick={() => { setMode("signin"); setError(""); }}>
-                Sign in
+                Log in instead
               </button>
             </>
           ) : (
