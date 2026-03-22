@@ -69,9 +69,10 @@ func TestEmail(t *testing.T) {
 		"",
 		"notanemail",
 		"@nodomain.com",
-		"x@y",            // no TLD — currently passes, must fail
+		"x@y",                          // no TLD — must fail
 		"missingat.com",
 		"double@@example.com",
+		"Alice <alice@example.com>",    // name-addr format — must fail
 	}
 	for _, e := range valid {
 		if err := validate.Email(e); err != nil {
