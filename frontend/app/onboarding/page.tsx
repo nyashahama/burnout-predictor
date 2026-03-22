@@ -411,7 +411,7 @@ export default function OnboardingPage() {
             <p className="onb-reveal-context-body">{body}</p>
           </div>
 
-          {error && <div className="auth-error">{error}</div>}
+          {error && <div role="alert" className="auth-error">{error}</div>}
 
           <button className="onb-btn" onClick={handleFinish} disabled={loading}>
             {loading ? "Just a moment…" : "Let's start tracking →"}
