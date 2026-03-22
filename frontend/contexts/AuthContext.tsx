@@ -14,7 +14,6 @@ import {
   storeTokens,
   getRefreshToken,
   getAccessToken,
-  setAccessToken,
   clearTokens,
   setSessionCookie,
   clearSessionCookie,
@@ -70,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       if (!res.ok) return false;
       const data = (await res.json()) as RefreshResult;
-      // Only update the access token in memory — refresh token stays in localStorage.
+      // Rotate both tokens — new refresh token replaces old one in localStorage.
       storeTokens(data.access_token, data.refresh_token);
       return true;
     } catch {
