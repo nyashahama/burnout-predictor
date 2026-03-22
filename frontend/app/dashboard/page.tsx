@@ -2,9 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  recoveryPlan,
-  trendDelta,
-  consecutiveDangerDays,
   scoreLabel,
   buildNotificationText,
   type ForecastDay,
@@ -182,8 +179,8 @@ export default function DashboardPage() {
     <div className="dash-content">
       <BurnoutAlert
         score={liveScore}
-        trend={trendDelta}
-        dangerStreak={consecutiveDangerDays}
+        trend={0}
+        dangerStreak={0}
         dangerDaysAhead={dangerDaysAhead}
         recoveryDate={firstRecoveryDay?.date ?? "this weekend"}
       />
@@ -199,8 +196,8 @@ export default function DashboardPage() {
         <div className="dash-grid">
           <ScoreCard
             data={scoreData}
-            trend={trendDelta}
-            dangerStreak={consecutiveDangerDays}
+            trend={0}
+            dangerStreak={0}
             animate={ready}
             streak={streak}
             checkinCount={checkinCount}
@@ -219,7 +216,7 @@ export default function DashboardPage() {
       <PersonalizedInsight bundle={insightBundle} />
 
       <RecoveryPlan
-        plan={recoveryPlan}
+        plan={[]}
         score={liveScore}
         note={todayNote}
         stress={todayStress ?? undefined}

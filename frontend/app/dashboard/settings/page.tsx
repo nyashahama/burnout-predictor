@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { mockCheckIns, computePersonalSignature } from "../data";
+import { computePersonalSignature } from "../data";
 import { useAuth } from "@/contexts/AuthContext";
 import type { UserResponse, NotificationPrefs, UpdateProfileRequest } from "@/lib/types";
 
@@ -50,14 +50,6 @@ function buildCSV(): string {
     const escaped = (note ?? "").replace(/"/g, '""');
     rows.push(`${date},${stress},"${stressLabel(stress)}",${score},"${escaped}"`);
   });
-
-  // If nothing real exists yet, use mock data
-  if (real.length === 0) {
-    mockCheckIns.forEach((entry) => {
-      const escaped = (entry.note ?? "").replace(/"/g, '""');
-      rows.push(`${entry.date},${entry.stress},"${entry.stressLabel}",${entry.score},"${escaped}"`);
-    });
-  }
 
   return rows.join("\n");
 }
