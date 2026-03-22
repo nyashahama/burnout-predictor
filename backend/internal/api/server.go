@@ -50,7 +50,7 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 	authService := authsvc.New(pg, []byte(cfg.JWTSecret), cfg.EmailClient, cfg.AppURL, log)
 	checkinService := checkinsvc.New(pg, cfg.AIClient, log)
 	insightService := insightsvc.New(pg)
-	billingService := billingsvc.New(pg, log)
+	billingService := billingsvc.New(pg, cfg.Pool, log)
 
 	authH := handler.NewAuthHandler(authService)
 	checkinH := handler.NewCheckinHandler(checkinService)
