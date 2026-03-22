@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { mockCheckIns, computePersonalSignature } from "../data";
 import { useAuth } from "@/contexts/AuthContext";
 import type { UserResponse, NotificationPrefs, UpdateProfileRequest } from "@/lib/types";
@@ -49,15 +49,6 @@ function buildCSV(): string {
   real.forEach(({ date, stress, score, note }) => {
     const escaped = (note ?? "").replace(/"/g, '""');
     rows.push(`${date},${stress},"${stressLabel(stress)}",${score},"${escaped}"`);
-  });
-
-  // Fill in mock check-ins for dates not already in real data
-  const realDates = new Set(real.map((r) => r.date));
-  mockCheckIns.forEach((entry) => {
-    // Convert "Mar 13" style to something usable — skip if duplicate
-    if (realDates.size > 0) return; // only fall back when no real data at all
-    const escaped = (entry.note ?? "").replace(/"/g, '""');
-    rows.push(`${entry.date},${entry.stress},"${entry.stressLabel}",${entry.score},"${escaped}"`);
   });
 
   // If nothing real exists yet, use mock data
@@ -191,6 +182,7 @@ export default function SettingsPage() {
   const [weeklySummary, setWeeklySummary]   = useState(true);
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>("default");
   const [gcalConnected, setGcalConnected]   = useState(false);
+  const reminderTimeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saved, setSaved]                   = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
   const [showGcalModal, setShowGcalModal]   = useState(false);
@@ -295,6 +287,7 @@ export default function SettingsPage() {
   // ── Save (profile section) ────────────────────────────────────────────────
 
   async function handleSave() {
+    if (saving) return;
     await saveProfile({
       name: name.trim() || "there",
       role,
@@ -308,6 +301,7 @@ export default function SettingsPage() {
   // ── Toggle reminder with permission request ───────────────────────────────
 
   async function handleReminderToggle(checked: boolean) {
+    if (saving) return;
     if (checked) {
       const perm = await requestNotifPermission();
       setNotifPermission(perm);
@@ -550,8 +544,12 @@ export default function SettingsPage() {
                 type="time"
                 value={reminderTime}
                 onChange={(e) => {
-                  setReminderTime(e.target.value);
-                  saveNotifPrefs({ reminder_time: e.target.value });
+                  const val = e.target.value;
+                  setReminderTime(val);
+                  if (reminderTimeDebounce.current) clearTimeout(reminderTimeDebounce.current);
+                  reminderTimeDebounce.current = setTimeout(() => {
+                    if (!saving) saveNotifPrefs({ reminder_time: val });
+                  }, 500);
                 }}
               />
             </div>
@@ -568,10 +566,7 @@ export default function SettingsPage() {
               <input
                 type="checkbox"
                 checked={weeklySummary}
-                onChange={(e) => {
-                  setWeeklySummary(e.target.checked);
-                  saveNotifPrefs({ monday_debrief_email: e.target.checked });
-                }}
+                onChange={(e) => { if (!saving) saveNotifPrefs({ monday_debrief_email: e.target.checked }); }}
               />
               <span className="settings-toggle-track" />
               <span className="settings-toggle-thumb" />
