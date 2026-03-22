@@ -70,12 +70,16 @@ function buildNarrative(data: ForecastDay[]): string {
 export default function ForecastChart({ data }: { data: ForecastDay[] }) {
   const [hovered, setHovered] = useState<number | null>(null);
 
+  if (!data || data.length === 0) {
+    return <div className="forecast-empty">No data yet</div>;
+  }
+
   const narrative = buildNarrative(data);
 
   return (
     <div className="dash-card forecast">
       <div className="forecast-header">
-        <div className="forecast-title">7-day forecast</div>
+        <div className="forecast-title">Last 7 days</div>
         <div className="forecast-narrative">{narrative}</div>
       </div>
 
