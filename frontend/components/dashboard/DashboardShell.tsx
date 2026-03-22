@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { mockUser } from "@/app/dashboard/data";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { href: "/dashboard",          label: "Dashboard", icon: "◎" },
@@ -11,10 +12,6 @@ const navItems = [
   { href: "/dashboard/weekly",   label: "Weekly",    icon: "◷" },
   { href: "/dashboard/settings", label: "Settings",  icon: "⊙" },
 ];
-
-function clearCookie(name: string) {
-  document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax`;
-}
 
 // ── Notification Manager ──────────────────────────────────────────────────────
 
@@ -177,13 +174,14 @@ export default function DashboardShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { user, logout } = useAuth();
   const [name,   setName]   = useState(mockUser.name);
   const [streak, setStreak] = useState(mockUser.streak);
   const [hasCheckedIn, setHasCheckedIn] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("overload-name");
-    if (stored) setName(stored);
+    const stored = user?.name ?? localStorage.getItem("overload-name") ?? "there";
+    setName(stored);
 
     // Compute real streak from check-ins
     let s = 0;
@@ -200,11 +198,10 @@ export default function DashboardShell({
     // Check if user checked in today
     const todayKey = `checkin-${now.toISOString().split("T")[0]}`;
     setHasCheckedIn(!!localStorage.getItem(todayKey));
-  }, []);
+  }, [user]);
 
-  function signOut() {
-    clearCookie("overload-session");
-    clearCookie("overload-onboarded");
+  async function handleSignOut() {
+    await logout();
     router.push("/");
   }
 
@@ -241,7 +238,7 @@ export default function DashboardShell({
               {streak > 0 ? `🔥 ${streak}-day streak` : "No streak yet"}
             </div>
           </div>
-          <button className="dash-signout" onClick={signOut} title="Sign out">
+          <button className="dash-signout" onClick={handleSignOut} title="Sign out">
             ⎋
           </button>
         </div>
@@ -266,7 +263,7 @@ export default function DashboardShell({
             <span className="dash-bottom-label">{item.label}</span>
           </Link>
         ))}
-        <button className="dash-bottom-item" onClick={signOut}>
+        <button className="dash-bottom-item" onClick={handleSignOut}>
           <span className="dash-bottom-avatar">{initials}</span>
           <span className="dash-bottom-label">Sign out</span>
         </button>
