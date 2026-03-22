@@ -50,7 +50,7 @@ func TestFollowUpHandler_GetToday_StoreError_ReturnsNull(t *testing.T) {
 		GetTodayFollowUpFn: func(_ context.Context, _ db.GetTodayFollowUpParams) (db.FollowUp, error) {
 			return db.FollowUp{}, errors.New("no rows")
 		},
-	})
+	}, nil)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req = withUser(req, testUser)
@@ -84,7 +84,7 @@ func TestFollowUpHandler_GetToday_Success_Unsurfaced_CallsMarkSurfaced(t *testin
 			surfacedCalled = true
 			return nil
 		},
-	})
+	}, nil)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req = withUser(req, testUser)
@@ -113,7 +113,7 @@ func TestFollowUpHandler_GetToday_Success_AlreadySurfaced_NoMarkCall(t *testing.
 			surfacedCalled = true
 			return nil
 		},
-	})
+	}, nil)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req = withUser(req, testUser)
@@ -141,7 +141,7 @@ func dismissRequest(t *testing.T, h *handler.FollowUpHandler, id string) *httpte
 }
 
 func TestFollowUpHandler_Dismiss_MalformedUUID(t *testing.T) {
-	h := handler.NewFollowUpHandler(&mockFollowUpStore{})
+	h := handler.NewFollowUpHandler(&mockFollowUpStore{}, nil)
 	rec := dismissRequest(t, h, "not-a-uuid")
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("got %d, want 400", rec.Code)
@@ -154,7 +154,7 @@ func TestFollowUpHandler_Dismiss_StoreError(t *testing.T) {
 		DismissFollowUpFn: func(_ context.Context, _ db.DismissFollowUpParams) error {
 			return errors.New("db error")
 		},
-	})
+	}, nil)
 	rec := dismissRequest(t, h, uuid.New().String())
 	if rec.Code != http.StatusInternalServerError {
 		t.Errorf("got %d, want 500", rec.Code)
@@ -162,7 +162,7 @@ func TestFollowUpHandler_Dismiss_StoreError(t *testing.T) {
 }
 
 func TestFollowUpHandler_Dismiss_Success(t *testing.T) {
-	h := handler.NewFollowUpHandler(&mockFollowUpStore{})
+	h := handler.NewFollowUpHandler(&mockFollowUpStore{}, nil)
 	rec := dismissRequest(t, h, uuid.New().String())
 	if rec.Code != http.StatusOK {
 		t.Errorf("got %d, want 200", rec.Code)

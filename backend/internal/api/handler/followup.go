@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -24,10 +25,14 @@ type followUpStore interface {
 // Note: follow-up retrieval and dismissal are thin DB operations — no service layer needed.
 type FollowUpHandler struct {
 	store followUpStore
+	log   *slog.Logger
 }
 
-func NewFollowUpHandler(store followUpStore) *FollowUpHandler {
-	return &FollowUpHandler{store: store}
+func NewFollowUpHandler(store followUpStore, log *slog.Logger) *FollowUpHandler {
+	if log == nil {
+		log = slog.Default()
+	}
+	return &FollowUpHandler{store: store, log: log}
 }
 
 func localDate(timezone string) time.Time {
@@ -55,10 +60,12 @@ func (h *FollowUpHandler) GetToday(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !fu.SurfacedAt.Valid {
-		_ = h.store.MarkFollowUpSurfaced(r.Context(), db.MarkFollowUpSurfacedParams{
+		if err := h.store.MarkFollowUpSurfaced(r.Context(), db.MarkFollowUpSurfacedParams{
 			ID:     fu.ID,
 			UserID: user.ID,
-		})
+		}); err != nil {
+			h.log.WarnContext(r.Context(), "follow-up: mark surfaced failed", "follow_up_id", fu.ID, "err", err)
+		}
 	}
 
 	respond.JSON(w, http.StatusOK, map[string]interface{}{"follow_up": fu})
