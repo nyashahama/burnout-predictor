@@ -76,7 +76,7 @@ export interface CheckIn {
 
 export interface UpsertCheckInRequest {
   stress: number;
-  note?: string;
+  note: string;   // always send, use "" when empty
   energy_level?: number;
   focus_quality?: number;
   hours_worked?: number;
@@ -147,7 +147,7 @@ export interface InsightBundle {
   monthly_arc: MonthlyArcResult | null;
   what_works: string;
   milestone: MilestoneData | null;
-  check_in_count: number;
+  check_in_count: number; // Go int64 — safe as number for realistic check-in counts (well below 2^53)
   accuracy_label: string;
   dismissed_components: string[];
 }
