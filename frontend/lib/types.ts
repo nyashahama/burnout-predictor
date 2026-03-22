@@ -71,7 +71,7 @@ export interface CheckIn {
   energy_level: number | null;      // pgtype.Int2
   focus_quality: number | null;     // pgtype.Int2
   hours_worked: number | null;      // pgtype.Numeric
-  physical_symptoms: string[];
+  physical_symptoms: string[] | null;
 }
 
 export interface UpsertCheckInRequest {
@@ -92,8 +92,8 @@ export interface UpsertCheckInResult {
 }
 
 export interface SessionContext {
-  message: string;
-  kind: "drop" | "rise" | "note_reference" | "neutral";
+  Message: string;
+  Kind: "drop" | "rise" | "note_reference" | "neutral";
 }
 
 export type Trend = "improving" | "stable" | "worsening";
@@ -168,6 +168,7 @@ export interface UpdateProfileRequest {
   role?: string;
   sleep_baseline?: number;
   timezone?: string;
+  estimated_score?: number;
 }
 
 export interface ApiError {
