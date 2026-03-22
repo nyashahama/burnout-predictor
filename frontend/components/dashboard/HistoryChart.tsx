@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import {
-  HistoryDay,
   scoreColor,
   scoreLabel,
   detectPatterns,
 } from "@/app/dashboard/data";
+
+type HistoryDay = { date: string; score: number; ghost?: boolean };
 
 export default function HistoryChart({
   data,

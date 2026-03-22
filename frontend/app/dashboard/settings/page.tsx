@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { mockCheckIns, computePersonalSignature } from "../data";
+import { computePersonalSignature } from "../data";
+import { useAuth } from "@/contexts/AuthContext";
+import type { UserResponse, NotificationPrefs, UpdateProfileRequest } from "@/lib/types";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -49,23 +50,6 @@ function buildCSV(): string {
     const escaped = (note ?? "").replace(/"/g, '""');
     rows.push(`${date},${stress},"${stressLabel(stress)}",${score},"${escaped}"`);
   });
-
-  // Fill in mock check-ins for dates not already in real data
-  const realDates = new Set(real.map((r) => r.date));
-  mockCheckIns.forEach((entry) => {
-    // Convert "Mar 13" style to something usable — skip if duplicate
-    if (realDates.size > 0) return; // only fall back when no real data at all
-    const escaped = (entry.note ?? "").replace(/"/g, '""');
-    rows.push(`${entry.date},${entry.stress},"${entry.stressLabel}",${entry.score},"${escaped}"`);
-  });
-
-  // If nothing real exists yet, use mock data
-  if (real.length === 0) {
-    mockCheckIns.forEach((entry) => {
-      const escaped = (entry.note ?? "").replace(/"/g, '""');
-      rows.push(`${entry.date},${entry.stress},"${entry.stressLabel}",${entry.score},"${escaped}"`);
-    });
-  }
 
   return rows.join("\n");
 }
@@ -175,7 +159,13 @@ function GCalModal({ onConnect, onClose }: { onConnect: () => void; onClose: () 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
-  const router = useRouter();
+  const { api, user } = useAuth();
+  const [profile, setProfile] = useState<UserResponse | null>(user);
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  // Local form state (derived from profile/notifPrefs, editable)
   const [name, setName]                     = useState("");
   const [role, setRole]                     = useState("engineer");
   const [sleep, setSleep]                   = useState("8");
@@ -184,6 +174,7 @@ export default function SettingsPage() {
   const [weeklySummary, setWeeklySummary]   = useState(true);
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>("default");
   const [gcalConnected, setGcalConnected]   = useState(false);
+  const reminderTimeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saved, setSaved]                   = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
   const [showGcalModal, setShowGcalModal]   = useState(false);
@@ -197,29 +188,45 @@ export default function SettingsPage() {
     isStale: boolean;
   } | null>(null);
 
-  // Bootstrap from localStorage
+  // Fetch profile and notification prefs from API on mount
   useEffect(() => {
-    const storedName    = localStorage.getItem("overload-name") || "there";
-    const storedRole    = localStorage.getItem("overload-role")  || "engineer";
-    const storedSleep   = localStorage.getItem("overload-sleep") || "8";
-    const notifEnabled  = localStorage.getItem("overload-notif-enabled") === "1";
-    const notifTime     = localStorage.getItem("overload-notif-time") || "17:30";
-    const weeklyEnabled = localStorage.getItem("overload-weekly-summary") !== "0";
-    const gcal          = localStorage.getItem("overload-gcal-connected") === "1";
+    if (!api) return;
+    Promise.all([
+      api.get<UserResponse>("/api/user"),
+      api.get<NotificationPrefs>("/api/notifications/prefs"),
+    ])
+      .then(([p, n]) => {
+        setProfile(p);
+        setNotifPrefs(n);
+      })
+      .catch(console.error);
+  }, [api]);
 
-    setName(storedName);
-    setRole(storedRole);
-    setSleep(storedSleep);
-    setReminderEnabled(notifEnabled);
-    setReminderTime(notifTime);
-    setWeeklySummary(weeklyEnabled);
-    setGcalConnected(gcal);
+  // Sync form fields when profile or notifPrefs load
+  useEffect(() => {
+    if (profile) {
+      setName(profile.name || "there");
+      setRole(profile.role || "engineer");
+      setSleep(String(profile.sleep_baseline ?? 8));
+      setGcalConnected(profile.calendar_connected ?? false);
+    }
+  }, [profile]);
 
+  useEffect(() => {
+    if (notifPrefs) {
+      setReminderEnabled(notifPrefs.checkin_reminder);
+      setReminderTime(notifPrefs.reminder_time || "17:30");
+      setWeeklySummary(notifPrefs.monday_debrief_email);
+    }
+  }, [notifPrefs]);
+
+  // Browser notification permission + learned profile (still uses localStorage for check-in count)
+  useEffect(() => {
     if ("Notification" in window) {
       setNotifPermission(Notification.permission);
     }
 
-    // Compute learned profile
+    // Compute learned profile from localStorage check-ins
     let checkinCount = 0;
     for (let i = 0; i < localStorage.length; i++) {
       if (localStorage.key(i)?.startsWith("checkin-")) checkinCount++;
@@ -239,29 +246,45 @@ export default function SettingsPage() {
     });
   }, []);
 
-  // ── Save ──────────────────────────────────────────────────────────────────
+  // ── Save profile ──────────────────────────────────────────────────────────
+
+  async function saveProfile(updates: UpdateProfileRequest) {
+    setSaving(true);
+    setSaveError("");
+    try {
+      const updated = await api.patch<UserResponse>("/api/user", updates);
+      setProfile(updated);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // ── Save notification prefs ───────────────────────────────────────────────
+
+  async function saveNotifPrefs(updates: Partial<NotificationPrefs>) {
+    setSaving(true);
+    setSaveError("");
+    try {
+      const updated = await api.patch<NotificationPrefs>("/api/notifications/prefs", updates);
+      setNotifPrefs(updated);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // ── Save (profile section) ────────────────────────────────────────────────
 
   async function handleSave() {
-    localStorage.setItem("overload-name", name.trim() || "there");
-    localStorage.setItem("overload-role", role);
-    localStorage.setItem("overload-sleep", sleep);
-    localStorage.setItem("overload-profile-updated", new Date().toISOString().split("T")[0]);
-    localStorage.setItem("overload-weekly-summary", weeklySummary ? "1" : "0");
-
-    if (reminderEnabled) {
-      const perm = await requestNotifPermission();
-      setNotifPermission(perm);
-      if (perm === "granted") {
-        localStorage.setItem("overload-notif-enabled", "1");
-        localStorage.setItem("overload-notif-time", reminderTime);
-      } else {
-        // Permission denied — save preference but can't schedule
-        localStorage.setItem("overload-notif-enabled", "1");
-        localStorage.setItem("overload-notif-time", reminderTime);
-      }
-    } else {
-      localStorage.setItem("overload-notif-enabled", "0");
-    }
+    if (saving) return;
+    await saveProfile({
+      name: name.trim() || "there",
+      role,
+      sleep_baseline: Number(sleep),
+    });
 
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -270,11 +293,13 @@ export default function SettingsPage() {
   // ── Toggle reminder with permission request ───────────────────────────────
 
   async function handleReminderToggle(checked: boolean) {
+    if (saving) return;
     if (checked) {
       const perm = await requestNotifPermission();
       setNotifPermission(perm);
     }
     setReminderEnabled(checked);
+    await saveNotifPrefs({ checkin_reminder: checked });
   }
 
   // ── Export CSV ────────────────────────────────────────────────────────────
@@ -315,13 +340,11 @@ export default function SettingsPage() {
   // ── GCal connect ──────────────────────────────────────────────────────────
 
   function handleGcalConnect() {
-    localStorage.setItem("overload-gcal-connected", "1");
     setGcalConnected(true);
     setShowGcalModal(false);
   }
 
   function handleGcalDisconnect() {
-    localStorage.removeItem("overload-gcal-connected");
     setGcalConnected(false);
   }
 
@@ -356,6 +379,12 @@ export default function SettingsPage() {
       {cleared && (
         <div className="settings-flash settings-flash--ok">
           ✓ All check-in data cleared. Starting fresh.
+        </div>
+      )}
+
+      {saveError && (
+        <div className="settings-flash settings-flash--error">
+          {saveError}
         </div>
       )}
 
@@ -506,7 +535,14 @@ export default function SettingsPage() {
                 className="settings-input settings-input--time"
                 type="time"
                 value={reminderTime}
-                onChange={(e) => setReminderTime(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setReminderTime(val);
+                  if (reminderTimeDebounce.current) clearTimeout(reminderTimeDebounce.current);
+                  reminderTimeDebounce.current = setTimeout(() => {
+                    if (!saving) saveNotifPrefs({ reminder_time: val });
+                  }, 500);
+                }}
               />
             </div>
           )}
@@ -522,7 +558,7 @@ export default function SettingsPage() {
               <input
                 type="checkbox"
                 checked={weeklySummary}
-                onChange={(e) => setWeeklySummary(e.target.checked)}
+                onChange={(e) => { if (!saving) saveNotifPrefs({ monday_debrief_email: e.target.checked }); }}
               />
               <span className="settings-toggle-track" />
               <span className="settings-toggle-thumb" />
@@ -622,8 +658,9 @@ export default function SettingsPage() {
           <button
             className={`settings-save${saved ? " settings-save--saved" : ""}`}
             onClick={handleSave}
+            disabled={saving}
           >
-            {saved ? "Saved ✓" : "Save changes"}
+            {saving ? "Saving…" : saved ? "Saved ✓" : "Save changes"}
           </button>
         </div>
       </div>
