@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import type { AuthResult } from "@/lib/types";
-import { setOnboardedCookie } from "@/lib/auth";
+import { setOnboardedCookie, setSessionCookie } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -41,6 +41,7 @@ export default function LoginPage() {
           "overload-pending-register",
           JSON.stringify({ email: email.trim(), password, name: name.trim() })
         );
+        setSessionCookie();
         router.push("/onboarding");
       } else {
         const result = await api.post<AuthResult>("/api/auth/login", {

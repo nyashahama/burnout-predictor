@@ -209,7 +209,7 @@ export default function OnboardingPage() {
       const result = await api.post<AuthResult>("/api/auth/register", {
         email: pending.email ?? "",
         password: pending.password ?? "",
-        name: pending.name ?? "there",
+        name: name.trim() || pending.name || "there",
         role,
         sleep_baseline: parseInt(sleep, 10),
         timezone: tz,
