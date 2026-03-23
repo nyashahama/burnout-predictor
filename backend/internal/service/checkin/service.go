@@ -209,7 +209,7 @@ func (s *Service) Upsert(ctx context.Context, user db.User, req UpsertRequest) (
 			TodayScore:    out.Score,
 		}
 
-		aiCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		aiCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		narrative, aiErr := s.ai.GenerateScoreCard(aiCtx, scIn, history30)
 		cancel()
 		if aiErr == nil {
@@ -329,7 +329,7 @@ func (s *Service) GetScoreCard(ctx context.Context, user db.User) (ScoreCardResu
 			TodayScore:    out.Score,
 		}
 
-		aiCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		aiCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		narrative, aiErr := s.ai.GenerateScoreCard(aiCtx, scIn, history30)
 		cancel()
 		if aiErr == nil {

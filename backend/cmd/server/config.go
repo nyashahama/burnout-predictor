@@ -12,10 +12,19 @@ type Config struct {
 	Port         string
 	ResendAPIKey string
 	EmailFrom    string
-	OpenAIAPIKey string
+	AIAPIKey string
 	PaddleSecret string
 	AppURL       string
 	CORSOrigin   string
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // Load reads configuration from environment variables. Fatal if required vars are missing.
@@ -26,7 +35,7 @@ func Load() Config {
 		Port:         os.Getenv("PORT"),
 		ResendAPIKey: os.Getenv("RESEND_API_KEY"),
 		EmailFrom:    os.Getenv("EMAIL_FROM"),
-		OpenAIAPIKey: os.Getenv("OPENAI_API_KEY"),
+		AIAPIKey: firstNonEmpty(os.Getenv("DEEPSEEK_API_KEY"), os.Getenv("OPENAI_API_KEY")),
 		PaddleSecret: os.Getenv("PADDLE_WEBHOOK_SECRET"),
 		AppURL:       os.Getenv("APP_URL"),
 		CORSOrigin:   os.Getenv("CORS_ORIGIN"),

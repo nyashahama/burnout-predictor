@@ -52,9 +52,9 @@ func main() {
 	}
 
 	var aiClient *ai.Client
-	if cfg.OpenAIAPIKey != "" {
-		aiClient = ai.New(cfg.OpenAIAPIKey)
-		slog.Default().Info("ai enabled", "provider", "openai")
+	if cfg.AIAPIKey != "" {
+		aiClient = ai.New(cfg.AIAPIKey)
+		slog.Default().Info("ai enabled", "provider", "deepseek")
 	} else {
 		slog.Default().Info("ai disabled")
 	}
