@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	apiURL = "https://api.openai.com/v1/chat/completions"
-	model  = "gpt-4o-mini"
+	apiURL = "https://api.deepseek.com/v1/chat/completions"
+	model  = "deepseek-chat"
 )
 
 // Client calls the OpenAI API.
@@ -28,7 +28,7 @@ type Client struct {
 func New(apiKey string) *Client {
 	return &Client{
 		apiKey: apiKey,
-		http:   &http.Client{Timeout: 20 * time.Second},
+		http:   &http.Client{Timeout: 35 * time.Second},
 	}
 }
 
