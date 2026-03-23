@@ -7,6 +7,7 @@ import {
   type ForecastDay,
 } from "./data";
 import { useDashboardData } from "@/contexts/DashboardDataContext";
+import DashboardSkeleton from "@/components/dashboard/DashboardSkeleton";
 import type { ScoreCardResult, CheckIn } from "@/lib/types";
 import ScoreCard from "@/components/dashboard/ScoreCard";
 import ForecastChart from "@/components/dashboard/ForecastChart";
@@ -62,6 +63,8 @@ function buildForecast(scoreCard: ScoreCardResult | null, checkins: CheckIn[]): 
 
 export default function DashboardPage() {
   const { scoreCard, checkins, insightBundle, loadingData, ready, handleCheckInComplete } = useDashboardData();
+
+  if (loadingData) return <DashboardSkeleton showCalculatingLabel />;
 
   // Ambient danger mode
   const liveScore = scoreCard?.score.score ?? 55;
@@ -137,7 +140,7 @@ export default function DashboardPage() {
   const todayStress = todayCI?.stress ?? null;
 
   return (
-    <div className="dash-content">
+    <div className="dash-content dash-fade-in">
       <BurnoutAlert
         score={liveScore}
         trend={0}

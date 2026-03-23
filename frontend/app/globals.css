@@ -2913,6 +2913,22 @@ body {
   flex-shrink: 0;
 }
 
+@keyframes dash-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.dash-fade-in {
+  animation: dash-fade-in 0.3s ease;
+}
+
+.skel-score-label {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-align: center;
+  margin-top: 4px;
+}
+
 /* ─── DASHBOARD RESPONSIVE ───────────────────────────────── */
 
 /* ── Small desktop / tablet: collapse grid, reduce padding ── */
