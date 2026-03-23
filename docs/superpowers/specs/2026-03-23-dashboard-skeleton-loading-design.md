@@ -1,74 +1,125 @@
 # Dashboard Skeleton Loading State
 
 **Date:** 2026-03-23
-**Status:** Approved
+**Status:** Pending review
 
 ## Problem
 
-The dashboard fetches data from the backend on load, including an AI-generated score card via DeepSeek that can take up to 30 seconds. During this time the page is blank, which looks broken and confuses users.
+The dashboard has two loading phases:
+
+1. **Route-level** — Next.js App Router shows `app/dashboard/loading.tsx` during navigation. Already works.
+2. **Client-side data fetch** — once the page mounts, `DashboardDataContext` fetches from the backend (score card, check-ins, insights). The AI score card via DeepSeek can take up to 30 seconds. During this phase `loadingData` is `true` but the page renders with empty/default values, which looks broken.
+
+Only phase 2 is broken. Phase 1 already has a skeleton.
 
 ## Solution
 
-A skeleton loading screen that mirrors the real dashboard layout. Skeleton blocks use a left-to-right shimmer animation (industry standard: LinkedIn, Vercel, Linear). Once data arrives the skeleton fades out and real content fades in.
+Extract the existing `loading.tsx` layout into a shared `DashboardSkeleton` component. Both `loading.tsx` and `DashboardPage` use it. Add a "Calculating your score…" label shown only during the client-side fetch so users understand the AI delay.
 
-## Component
+## What Already Exists (do not re-create)
 
-**`components/dashboard/DashboardSkeleton.tsx`**
+- **`frontend/app/dashboard/loading.tsx`** — full skeleton layout using `.skel`.
+- **`.skel` class + `@keyframes skel-shimmer`** — in `globals.css` lines 2892–2913. Pixel-based, 1.6s linear. No changes needed.
 
-A single component that renders the skeleton layout. No props needed. Matches the dashboard structure:
+## Files to Create / Modify
 
-1. **Greeting row** — one wide short block (mimics the "Good morning, X" line)
-2. **Dashboard grid** — three columns matching `dash-grid`:
-   - *Score card block* — tall card with a circular score placeholder, three signal rows, and a small `"Calculating your score…"` label in `--muted` so users understand the AI delay
-   - *Forecast chart block* — a row of 7 varying-height bars mimicking the bar chart
-   - *Check-in block* — a form-shaped card with label and button placeholders
-3. **History chart block** — a wide short block at the bottom
+### 1. New: `frontend/components/dashboard/DashboardSkeleton.tsx`
 
-## Animation
+Copy the JSX from `loading.tsx` exactly, with two structural changes:
 
-CSS `@keyframes skel-shimmer` added to `globals.css` under `/* ─── SKELETON */`:
+**a) Wrap `dash-grid` in `dash-hero`** — the real `page.tsx` renders `dash-grid` inside a `dash-hero` div. The skeleton must match this so mobile CSS rules (e.g. `dash-hero .dash-grid { order: -1 }`) apply consistently during loading:
 
-```css
-@keyframes skel-shimmer {
-  0%   { background-position: 200% center; }
-  100% { background-position: -200% center; }
+```tsx
+<div className="dash-hero">
+  <div className="dash-grid">
+    {/* score card and forecast skeletons */}
+  </div>
+</div>
+{/* check-in and history skeletons below */}
+```
+
+**b) Accept one optional prop:**
+
+```tsx
+interface Props { showCalculatingLabel?: boolean; }
+```
+
+Inside the score card block, after the signal rows, conditionally render:
+
+```tsx
+{showCalculatingLabel && (
+  <p className="skel-score-label">Calculating your score…</p>
+)}
+```
+
+The outer `<div className="dash-content">` should carry accessibility attributes:
+
+```tsx
+<div className="dash-content" role="status" aria-label="Loading dashboard" aria-busy="true">
+```
+
+`role="status"` is required for `aria-label` to be announced by screen readers on a generic `div`.
+
+### 2. Update: `frontend/app/dashboard/loading.tsx`
+
+Replace its content with:
+
+```tsx
+import DashboardSkeleton from "@/components/dashboard/DashboardSkeleton";
+export default function DashboardLoading() {
+  return <DashboardSkeleton />;
 }
 ```
 
-Skeleton blocks use:
-```css
-background: linear-gradient(90deg, var(--paper-2) 25%, var(--paper-3) 50%, var(--paper-2) 75%);
-background-size: 200% 100%;
-animation: skel-shimmer 1.8s ease-in-out infinite;
+No `showCalculatingLabel` prop — route-level transitions are fast, the label is not appropriate here.
+
+### 3. Update: `frontend/app/dashboard/page.tsx`
+
+Import `DashboardSkeleton`. Read `loadingData` from `useDashboardData()`.
+
+**Loading state** (`loadingData === true`):
+```tsx
+if (loadingData) return <DashboardSkeleton showCalculatingLabel />;
 ```
 
-Border radius matches real cards (`8px`). Colours use existing design tokens — no new variables.
+**Loaded / error state** (`loadingData === false`): render the page. When `ready` is also false (fetch failed), `scoreCard` is null and `checkins` is `[]`. The existing fallback values (score defaults to 55, etc.) handle this gracefully — no dedicated error UI needed.
 
-## Integration
+Wrap the content in `dash-fade-in` so it animates in after the skeleton:
 
-`DashboardPage` reads `loadingData` from `useDashboardData`. While true it renders `<DashboardSkeleton />`. Once `loadingData` is false it renders the real content with a short `opacity` transition (0.3s ease).
+```tsx
+return (
+  <div className="dash-fade-in">
+    {/* existing page content */}
+  </div>
+);
+```
 
-## CSS Naming
+The `dash-fade-in` class is a CSS animation, not a transition. It fires once when the element mounts (i.e. when the skeleton is replaced), which is exactly the right moment. No ref or state toggle needed.
 
-Class prefix: `skel-` following the existing BEM-ish convention.
+### 4. Update: `frontend/app/globals.css`
 
-Classes:
-- `skel-wrap` — outer container, matches `dash-content` spacing
-- `skel-block` — base block with shimmer (reused everywhere)
-- `skel-greeting` — greeting row
-- `skel-grid` — three-column grid wrapper
-- `skel-score` — tall score card column
-- `skel-score-circle` — circular score placeholder
-- `skel-score-signals` — three signal row placeholders
-- `skel-score-label` — "Calculating your score…" text
-- `skel-forecast` — forecast column with bar placeholders
-- `skel-bars` — row of 7 bars
-- `skel-bar` — individual bar (height varies via inline style or modifier classes)
-- `skel-checkin` — check-in column
-- `skel-history` — history chart row
+Add under the existing `/* ─── SKELETON / LOADING */` section:
+
+```css
+@keyframes dash-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.dash-fade-in {
+  animation: dash-fade-in 0.3s ease;
+}
+
+.skel-score-label {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-align: center;
+  margin-top: 4px;
+}
+```
 
 ## Out of Scope
 
-- Skeleton states for the History or Settings pages (not requested)
-- Per-component skeleton states (all-or-nothing swap is sufficient)
+- Skeleton states for History or Settings pages
+- Dedicated error UI for failed fetches
 - Dark/light mode variants (design tokens handle this automatically)
