@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useEffect } from "react";
 import {
   scoreLabel,
   buildNotificationText,
   type ForecastDay,
 } from "./data";
-import { useAuth } from "@/contexts/AuthContext";
-import type { ScoreCardResult, CheckIn, UpsertCheckInResult, InsightBundle } from "@/lib/types";
+import { useDashboardData } from "@/contexts/DashboardDataContext";
+import type { ScoreCardResult, CheckIn } from "@/lib/types";
 import ScoreCard from "@/components/dashboard/ScoreCard";
 import ForecastChart from "@/components/dashboard/ForecastChart";
 import CheckInComponent from "@/components/dashboard/CheckIn";
@@ -61,13 +61,7 @@ function buildForecast(scoreCard: ScoreCardResult | null, checkins: CheckIn[]): 
 }
 
 export default function DashboardPage() {
-  const { api } = useAuth();
-
-  const [scoreCard, setScoreCard]       = useState<ScoreCardResult | null>(null);
-  const [checkins, setCheckins]         = useState<CheckIn[]>([]);
-  const [insightBundle, setInsightBundle] = useState<InsightBundle | null>(null);
-  const [loadingData, setLoadingData]   = useState(true);
-  const [ready, setReady]               = useState(false);
+  const { scoreCard, checkins, insightBundle, loadingData, ready, handleCheckInComplete } = useDashboardData();
 
   // Ambient danger mode
   const liveScore = scoreCard?.score.score ?? 55;
@@ -76,25 +70,6 @@ export default function DashboardPage() {
     document.body.dataset.scoreLevel = lvl;
     return () => { delete document.body.dataset.scoreLevel; };
   }, [liveScore]);
-
-  useEffect(() => {
-    if (!api) return;
-    Promise.all([
-      api.get<ScoreCardResult>("/api/score"),
-      api.get<CheckIn[]>("/api/checkins"),
-    ])
-      .then(([sc, ci]) => {
-        setScoreCard(sc);
-        setCheckins(ci);
-        setReady(true);
-      })
-      .catch(console.error)
-      .finally(() => setLoadingData(false));
-
-    api.get<InsightBundle>("/api/insights")
-      .then(setInsightBundle)
-      .catch(console.error);
-  }, [api]);
 
   // Trigger notification when past reminder time and not yet checked in today
   useEffect(() => {
@@ -128,20 +103,6 @@ export default function DashboardPage() {
       }
     } catch {}
   }, [loadingData, scoreCard?.has_checkin, scoreCard?.streak]);
-
-  const handleCheckInComplete = useCallback((result: UpsertCheckInResult) => {
-    setScoreCard(prev => prev ? {
-      ...prev,
-      score: result.score,
-      explanation: result.explanation,
-      suggestion: result.suggestion,
-      has_checkin: true,
-    } : null);
-    setCheckins(prev => [
-      result.check_in,
-      ...prev.filter(c => c.checked_in_date !== result.check_in.checked_in_date),
-    ]);
-  }, []);
 
   const hasCheckedIn = scoreCard?.has_checkin ?? false;
   const level        = liveScore > 65 ? "danger" : liveScore > 40 ? "warning" : "ok";

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { DashboardDataProvider } from "@/contexts/DashboardDataContext";
 
 const navItems = [
   { href: "/dashboard",          label: "Dashboard", icon: "◎" },
@@ -247,7 +248,9 @@ export default function DashboardShell({
       <main className="dash-main">
         <WeeklyPrompt />
         <NotificationManager hasCheckedIn={hasCheckedIn} />
-        {children}
+        <DashboardDataProvider>
+          {children}
+        </DashboardDataProvider>
       </main>
 
       {/* ── Bottom nav (mobile only) ── */}
