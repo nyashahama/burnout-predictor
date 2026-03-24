@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
 
@@ -18,18 +18,15 @@ export default function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <div className="auth-page">
-        <div className="auth-card">
-          <Link href="/" className="auth-logo">Over<em>load</em></Link>
-          <div className="auth-heading">Invalid link</div>
-          <div className="auth-error" role="alert">
-            This reset link is missing a token. Please request a new one.
-          </div>
-          <Link href="/login" className="auth-btn" style={{ textAlign: "center", textDecoration: "none", display: "block" }}>
-            Back to sign in
-          </Link>
+      <>
+        <div className="auth-heading">Invalid link</div>
+        <div className="auth-error" role="alert">
+          This reset link is missing a token. Please request a new one.
         </div>
-      </div>
+        <Link href="/login" className="auth-btn" style={{ textAlign: "center", textDecoration: "none", display: "block" }}>
+          Back to sign in
+        </Link>
+      </>
     );
   }
 
@@ -68,74 +65,83 @@ export default function ResetPasswordPage() {
   }
 
   return (
+    <>
+      <div className="auth-heading">
+        {done ? "Password updated" : "Set a new password"}
+      </div>
+      <div className="auth-sub">
+        {done
+          ? "You can now sign in with your new password."
+          : "Choose a strong password — at least 8 characters."}
+      </div>
+
+      {done ? (
+        <>
+          <div className="auth-success" role="status">
+            Your password has been reset successfully.
+          </div>
+          <Link href="/login" className="auth-btn" style={{ textAlign: "center", textDecoration: "none", display: "block" }}>
+            Sign in →
+          </Link>
+        </>
+      ) : (
+        <form className="auth-form" onSubmit={handleSubmit} noValidate aria-label="reset password form">
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="password">New password</label>
+            <input
+              id="password"
+              className="auth-input"
+              type="password"
+              placeholder="At least 8 characters"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
+              autoFocus
+            />
+          </div>
+
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="confirm">Confirm password</label>
+            <input
+              id="confirm"
+              className="auth-input"
+              type="password"
+              placeholder="Repeat your new password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              autoComplete="new-password"
+            />
+          </div>
+
+          {error && <div className="auth-error" role="alert">{error}</div>}
+
+          <button
+            className={`auth-btn${loading ? " auth-btn--loading" : ""}`}
+            type="submit"
+            disabled={loading}
+          >
+            {loading ? "Just a moment…" : "Reset password →"}
+          </button>
+        </form>
+      )}
+
+      {!done && (
+        <div className="auth-footer">
+          <Link href="/login" className="auth-link">← Back to sign in</Link>
+        </div>
+      )}
+    </>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
     <div className="auth-page">
       <div className="auth-card">
         <Link href="/" className="auth-logo">Over<em>load</em></Link>
-
-        <div className="auth-heading">
-          {done ? "Password updated" : "Set a new password"}
-        </div>
-        <div className="auth-sub">
-          {done
-            ? "You can now sign in with your new password."
-            : "Choose a strong password — at least 8 characters."}
-        </div>
-
-        {done ? (
-          <>
-            <div className="auth-success" role="status">
-              Your password has been reset successfully.
-            </div>
-            <Link href="/login" className="auth-btn" style={{ textAlign: "center", textDecoration: "none", display: "block" }}>
-              Sign in →
-            </Link>
-          </>
-        ) : (
-          <form className="auth-form" onSubmit={handleSubmit} noValidate aria-label="reset password form">
-            <div className="auth-field">
-              <label className="auth-label" htmlFor="password">New password</label>
-              <input
-                id="password"
-                className="auth-input"
-                type="password"
-                placeholder="At least 8 characters"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="new-password"
-                autoFocus
-              />
-            </div>
-
-            <div className="auth-field">
-              <label className="auth-label" htmlFor="confirm">Confirm password</label>
-              <input
-                id="confirm"
-                className="auth-input"
-                type="password"
-                placeholder="Repeat your new password"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                autoComplete="new-password"
-              />
-            </div>
-
-            {error && <div className="auth-error" role="alert">{error}</div>}
-
-            <button
-              className={`auth-btn${loading ? " auth-btn--loading" : ""}`}
-              type="submit"
-              disabled={loading}
-            >
-              {loading ? "Just a moment…" : "Reset password →"}
-            </button>
-          </form>
-        )}
-
-        {!done && (
-          <div className="auth-footer">
-            <Link href="/login" className="auth-link">← Back to sign in</Link>
-          </div>
-        )}
+        <Suspense fallback={<div className="auth-sub">Loading…</div>}>
+          <ResetPasswordContent />
+        </Suspense>
       </div>
     </div>
   );
