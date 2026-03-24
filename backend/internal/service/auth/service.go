@@ -11,6 +11,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
@@ -194,7 +195,13 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (RegisterRe
 
 func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResult, error) {
 	user, err := s.store.GetUserByEmail(ctx, req.Email)
-	if err != nil || !user.PasswordHash.Valid {
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return LoginResult{}, ErrInvalidCredentials
+		}
+		return LoginResult{}, fmt.Errorf("get user: %w", err)
+	}
+	if !user.PasswordHash.Valid {
 		return LoginResult{}, ErrInvalidCredentials
 	}
 
