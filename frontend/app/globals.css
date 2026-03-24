@@ -3817,6 +3817,16 @@ body {
   line-height: 1.4;
 }
 
+.auth-success {
+  font-size: 13px;
+  color: var(--green);
+  padding: 10px 14px;
+  background: var(--paper-2);
+  border: 1px solid var(--paper-3);
+  border-radius: 8px;
+  line-height: 1.4;
+}
+
 .auth-btn {
   width: 100%;
   padding: 13px;
