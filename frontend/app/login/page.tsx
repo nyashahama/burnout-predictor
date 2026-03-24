@@ -23,8 +23,8 @@ export default function LoginPage() {
       return "That doesn't look like a valid email.";
     if (mode === "signup" && !name.trim()) return "Enter your name.";
     if (!password) return "Enter a password.";
-    if (mode === "signup" && password.length < 6)
-      return "Password must be at least 6 characters.";
+    if (mode === "signup" && password.length < 8)
+      return "Password must be at least 8 characters.";
     return null;
   }
 
@@ -127,7 +127,7 @@ export default function LoginPage() {
               id="password"
               className="auth-input"
               type="password"
-              placeholder={mode === "signup" ? "At least 6 characters" : "Your password"}
+              placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete={mode === "signup" ? "new-password" : "current-password"}
