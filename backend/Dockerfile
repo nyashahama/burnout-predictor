@@ -13,7 +13,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/server
 # Production stage
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates postgresql-client
+RUN apk --no-cache add ca-certificates postgresql-client tzdata
 
 WORKDIR /root/
 
