@@ -44,8 +44,20 @@ export class ApiClient {
     });
 
     if (res.status === 401) {
-      this.onUnauthenticated();
-      throw new ApiClientError(401, "Session expired");
+      if (token) {
+        // Authenticated request expired — clear session and redirect.
+        this.onUnauthenticated();
+        throw new ApiClientError(401, "Session expired");
+      }
+      // Unauthenticated 401 (e.g. wrong login credentials) — surface the server message.
+      let message = "Invalid credentials";
+      try {
+        const err = (await res.json()) as ApiError;
+        if (err.error) message = err.error;
+      } catch {
+        // ignore parse failure
+      }
+      throw new ApiClientError(401, message);
     }
 
     if (!res.ok) {
