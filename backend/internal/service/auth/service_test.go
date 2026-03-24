@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -217,7 +218,7 @@ func TestLogin_InvalidPassword(t *testing.T) {
 func TestLogin_UserNotFound(t *testing.T) {
 	store := &mockAuthStore{
 		getUserByEmail: func(_ context.Context, _ string) (db.User, error) {
-			return db.User{}, errors.New("not found")
+			return db.User{}, pgx.ErrNoRows
 		},
 	}
 	svc := newService(store)
