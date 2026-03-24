@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
@@ -32,7 +33,17 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
+	if err != nil {
+		slog.Default().Error("parse db config", "err", err)
+		os.Exit(1)
+	}
+	// Use the simple query protocol so pgx never creates server-side prepared
+	// statements. This prevents SQLSTATE 42P05 ("prepared statement already
+	// exists") errors that occur when pool connections are reused across
+	// goroutines with the default CacheStatement exec mode.
+	poolCfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		slog.Default().Error("connect db", "err", err)
 		os.Exit(1)
