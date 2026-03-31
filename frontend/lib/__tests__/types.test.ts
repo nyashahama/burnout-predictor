@@ -20,6 +20,8 @@ describe("API types", () => {
 
   it("ScoreCardResult has score output and has_checkin", () => {
     expectTypeOf<ScoreCardResult>().toHaveProperty("score");
+    expectTypeOf<ScoreCardResult>().toHaveProperty("daily_forecast");
+    expectTypeOf<ScoreCardResult>().toHaveProperty("recommended_action");
     expectTypeOf<ScoreCardResult>().toHaveProperty("has_checkin");
     expectTypeOf<ScoreCardResult>().toHaveProperty("streak");
   });
@@ -43,6 +45,8 @@ describe("API types", () => {
     expectTypeOf<InsightBundle>().toHaveProperty("monthly_arc");
     expectTypeOf<InsightBundle>().toHaveProperty("milestone");
     expectTypeOf<InsightBundle>().toHaveProperty("patterns");
+    expectTypeOf<InsightBundle>().toHaveProperty("pattern_insights");
+    expectTypeOf<InsightBundle>().toHaveProperty("recovery_feedback");
     expectTypeOf<InsightBundle>().toHaveProperty("dismissed_components");
   });
 });
