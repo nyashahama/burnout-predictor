@@ -16,6 +16,41 @@ export interface ScoreOutput {
   signals: Signal[];
 }
 
+export type InsightConfidence = "low" | "medium" | "high";
+export type ForecastDirection = "down" | "stable" | "up";
+
+export interface DailyForecast {
+  score: number;
+  delta: number;
+  direction: ForecastDirection;
+  confidence: InsightConfidence;
+  summary: string;
+}
+
+export interface RecommendedAction {
+  title: string;
+  detail: string;
+  driver: string;
+  confidence: InsightConfidence;
+}
+
+export interface PatternInsightCard {
+  title: string;
+  explanation: string;
+  evidence: string;
+  driver: string;
+  confidence: InsightConfidence;
+}
+
+export interface RecoveryFeedback {
+  title: string;
+  explanation: string;
+  evidence: string;
+  driver: string;
+  confidence: InsightConfidence;
+  average_improvement: number;
+}
+
 export interface PlanSection {
   timing: string;
   actions: string[];
@@ -48,6 +83,8 @@ export interface ScoreCardResult {
   score: ScoreOutput;
   explanation: string;
   suggestion: string;
+  daily_forecast: DailyForecast;
+  recommended_action: RecommendedAction;
   trajectory: string;
   accuracy_label: string;
   streak: number;
@@ -88,6 +125,8 @@ export interface UpsertCheckInResult {
   score: ScoreOutput;
   explanation: string;
   suggestion: string;
+  daily_forecast: DailyForecast;
+  recommended_action: RecommendedAction;
   recovery_plan?: PlanSection[];
 }
 
@@ -140,12 +179,14 @@ export interface MilestoneData {
 export interface InsightBundle {
   session_context: SessionContext | null;
   patterns: string[];
+  pattern_insights: PatternInsightCard[];
   earned_pattern: EarnedPatternInsight | null;
   signature: SignatureData | null;
   signature_narrative: string;
   arc_narrative: string;
   monthly_arc: MonthlyArcResult | null;
   what_works: string;
+  recovery_feedback: RecoveryFeedback[];
   milestone: MilestoneData | null;
   check_in_count: number; // Go int64 — safe as number for realistic check-in counts (well below 2^53)
   accuracy_label: string;

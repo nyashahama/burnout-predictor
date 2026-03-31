@@ -191,7 +191,11 @@ func TestGetScoreCard_WithCheckIn(t *testing.T) {
 	user := defaultUser()
 	store := &mockCheckinStore{
 		getTodayCheckIn: func(_ context.Context, _ db.GetTodayCheckInParams) (db.CheckIn, error) {
-			return db.CheckIn{Stress: 3, Score: 50}, nil
+			return db.CheckIn{
+				Stress:        3,
+				Score:         50,
+				CheckedInDate: pgtype.Date{Time: time.Now().UTC(), Valid: true},
+			}, nil
 		},
 	}
 	svc := newCheckinService(store)
@@ -202,5 +206,11 @@ func TestGetScoreCard_WithCheckIn(t *testing.T) {
 	}
 	if !res.HasCheckIn {
 		t.Error("HasCheckIn = false, want true when check-in exists")
+	}
+	if res.DailyForecast.Summary == "" {
+		t.Error("DailyForecast summary = empty, want populated")
+	}
+	if res.RecommendedAction.Title == "" {
+		t.Error("RecommendedAction title = empty, want populated")
 	}
 }

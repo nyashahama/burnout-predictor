@@ -53,21 +53,25 @@ type UpsertRequest struct {
 }
 
 type UpsertResult struct {
-	CheckIn      db.CheckIn          `json:"check_in"`
-	Score        score.Output        `json:"score"`
-	Explanation  string              `json:"explanation"`
-	Suggestion   string              `json:"suggestion"`
-	RecoveryPlan []score.PlanSection `json:"recovery_plan,omitempty"`
+	CheckIn            db.CheckIn                `json:"check_in"`
+	Score              score.Output              `json:"score"`
+	Explanation        string                    `json:"explanation"`
+	Suggestion         string                    `json:"suggestion"`
+	DailyForecast      score.DailyForecast       `json:"daily_forecast"`
+	RecommendedAction  score.RecommendedAction   `json:"recommended_action"`
+	RecoveryPlan       []score.PlanSection       `json:"recovery_plan,omitempty"`
 }
 
 type ScoreCardResult struct {
-	Score       score.Output `json:"score"`
-	Explanation string       `json:"explanation"`
-	Suggestion  string       `json:"suggestion"`
-	Trajectory  string       `json:"trajectory"`
-	Accuracy    string       `json:"accuracy_label"`
-	Streak      int32        `json:"streak"`
-	HasCheckIn  bool         `json:"has_checkin"`
+	Score             score.Output            `json:"score"`
+	Explanation       string                  `json:"explanation"`
+	Suggestion        string                  `json:"suggestion"`
+	DailyForecast     score.DailyForecast     `json:"daily_forecast"`
+	RecommendedAction score.RecommendedAction `json:"recommended_action"`
+	Trajectory        string                  `json:"trajectory"`
+	Accuracy          string                  `json:"accuracy_label"`
+	Streak            int32                   `json:"streak"`
+	HasCheckIn        bool                    `json:"has_checkin"`
 }
 
 // ── Exported helper ───────────────────────────────────────────────────────────
@@ -99,6 +103,37 @@ func BuildScoreInput(user db.User, rows []db.ListRecentCheckInsRow, todayStress 
 		EstimatedScore: estScore,
 		MeetingCount:   -1,
 	}
+}
+
+func analysisEntriesFromRecentRows(rows []db.ListRecentCheckInsRow) []score.AnalysisEntry {
+	entries := make([]score.AnalysisEntry, 0, len(rows))
+	for _, row := range rows {
+		entry := score.AnalysisEntry{
+			Date:             row.CheckedInDate.Time,
+			Stress:           int(row.Stress),
+			Score:            int(row.Score),
+			PhysicalSymptoms: row.PhysicalSymptoms,
+		}
+		if row.Note.Valid {
+			entry.Note = row.Note.String
+		}
+		if row.EnergyLevel.Valid {
+			v := int(row.EnergyLevel.Int16)
+			entry.EnergyLevel = &v
+		}
+		if row.FocusQuality.Valid {
+			v := int(row.FocusQuality.Int16)
+			entry.FocusQuality = &v
+		}
+		if row.HoursWorked.Valid {
+			f, err := row.HoursWorked.Float64Value()
+			if err == nil && f.Valid {
+				entry.HoursWorked = &f.Float64
+			}
+		}
+		entries = append(entries, entry)
+	}
+	return entries
 }
 
 // ── Public methods ────────────────────────────────────────────────────────────
@@ -224,6 +259,21 @@ func (s *Service) Upsert(ctx context.Context, user db.User, req UpsertRequest) (
 		}
 	}
 
+	analysisEntries := analysisEntriesFromRecentRows(recent)
+	analysisEntries = append([]score.AnalysisEntry{{
+		Date:             today,
+		Stress:           req.Stress,
+		Score:            out.Score,
+		Note:             req.Note,
+		EnergyLevel:      req.EnergyLevel,
+		FocusQuality:     req.FocusQuality,
+		HoursWorked:      req.HoursWorked,
+		PhysicalSymptoms: req.PhysicalSymptoms,
+	}}, analysisEntries...)
+
+	dailyForecast := score.BuildDailyForecast(out.Score, int(danger), analysisEntries)
+	recommendedAction := score.BuildRecommendedAction(out.Score, int(danger), suggestion, analysisEntries, true)
+
 	// Final fallback: if AI was enabled but failed and stress >= 4, still provide a plan.
 	if recoveryPlan == nil && req.Stress >= 4 {
 		recoveryPlan = score.BuildDynamicRecoveryPlan(score.RecoveryPlanInput{
@@ -235,11 +285,13 @@ func (s *Service) Upsert(ctx context.Context, user db.User, req UpsertRequest) (
 	}
 
 	return UpsertResult{
-		CheckIn:      checkin,
-		Score:        out,
-		Explanation:  explanation,
-		Suggestion:   suggestion,
-		RecoveryPlan: recoveryPlan,
+		CheckIn:           checkin,
+		Score:             out,
+		Explanation:       explanation,
+		Suggestion:        suggestion,
+		DailyForecast:     dailyForecast,
+		RecommendedAction: recommendedAction,
+		RecoveryPlan:      recoveryPlan,
 	}, nil
 }
 
@@ -292,6 +344,7 @@ func (s *Service) GetScoreCard(ctx context.Context, user db.User) (ScoreCardResu
 		RecentStresses:        in.RecentStresses,
 	})
 	suggestion := score.BuildSuggestion(out.Score, hasTodayCI, int(danger))
+	analysisEntries := analysisEntriesFromRecentRows(recent)
 
 	if s.ai != nil && hasTodayCI {
 		history30, _ := s.store.ListRecentCheckIns(ctx, db.ListRecentCheckInsParams{
@@ -342,14 +395,49 @@ func (s *Service) GetScoreCard(ctx context.Context, user db.User) (ScoreCardResu
 		}
 	}
 
+	if hasTodayCI {
+		var todayEnergy, todayFocus *int
+		if todayCI.EnergyLevel.Valid {
+			v := int(todayCI.EnergyLevel.Int16)
+			todayEnergy = &v
+		}
+		if todayCI.FocusQuality.Valid {
+			v := int(todayCI.FocusQuality.Int16)
+			todayFocus = &v
+		}
+		var todayHours *float64
+		if todayCI.HoursWorked.Valid {
+			f, err := todayCI.HoursWorked.Float64Value()
+			if err == nil && f.Valid {
+				todayHours = &f.Float64
+			}
+		}
+		todayEntry := score.AnalysisEntry{
+			Date:             today,
+			Stress:           int(todayCI.Stress),
+			Score:            out.Score,
+			Note:             todayCI.Note.String,
+			EnergyLevel:      todayEnergy,
+			FocusQuality:     todayFocus,
+			HoursWorked:      todayHours,
+			PhysicalSymptoms: todayCI.PhysicalSymptoms,
+		}
+		analysisEntries = append([]score.AnalysisEntry{todayEntry}, analysisEntries...)
+	}
+
+	dailyForecast := score.BuildDailyForecast(out.Score, int(danger), analysisEntries)
+	recommendedAction := score.BuildRecommendedAction(out.Score, int(danger), suggestion, analysisEntries, hasTodayCI)
+
 	return ScoreCardResult{
-		Score:       out,
-		Explanation: explanation,
-		Suggestion:  suggestion,
-		Trajectory:  trajectory,
-		Accuracy:    score.AccuracyLabel(int(count)),
-		Streak:      streak,
-		HasCheckIn:  hasTodayCI,
+		Score:             out,
+		Explanation:       explanation,
+		Suggestion:        suggestion,
+		DailyForecast:     dailyForecast,
+		RecommendedAction: recommendedAction,
+		Trajectory:        trajectory,
+		Accuracy:          score.AccuracyLabel(int(count)),
+		Streak:            streak,
+		HasCheckIn:        hasTodayCI,
 	}, nil
 }
 
