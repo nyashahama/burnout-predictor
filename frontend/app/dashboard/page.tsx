@@ -16,17 +16,25 @@ function getLevel(score: number) {
 }
 
 export default function DashboardPage() {
-  const { scoreCard, checkins, insightBundle, loadingData, loadError, reload, handleCheckInComplete } = useDashboardData();
+  const { scoreCard, checkins, insightBundle, loadingData, loadingMessage, loadError, reload, handleCheckInComplete } = useDashboardData();
 
   if (loadingData) {
     return (
-      <div className="grid gap-6">
-        <Skeleton className="h-40 w-full" />
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Skeleton className="h-64 w-full" />
-          <Skeleton className="h-64 w-full" />
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Preparing your dashboard</CardTitle>
+          <CardDescription>
+            {loadingMessage} Render cold starts and DeepSeek-backed responses can take a bit longer on the free tier.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Skeleton className="h-24 w-full" />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Skeleton className="h-48 w-full" />
+            <Skeleton className="h-48 w-full" />
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -37,7 +45,10 @@ export default function DashboardPage() {
           <CardTitle>Dashboard unavailable</CardTitle>
           <CardDescription>{loadError}</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            This usually means the free Render instance or a slower AI-backed score call did not finish in time.
+          </p>
           <Button onClick={() => void reload()}>
             <RefreshCcw className="h-4 w-4" />
             Try again
