@@ -49,12 +49,14 @@ type DismissRequest struct {
 type InsightBundle struct {
 	SessionContext      *score.SessionContext              `json:"session_context"`
 	Patterns            []string                          `json:"patterns"`
+	PatternInsights     []score.PatternInsight            `json:"pattern_insights"`
 	EarnedPattern       *score.EarnedPatternInsightResult `json:"earned_pattern"`
 	Signature           *score.SignatureData               `json:"signature"`
 	SignatureNarrative  string                            `json:"signature_narrative"`
 	ArcNarrative        string                            `json:"arc_narrative"`
 	MonthlyArc          *score.MonthlyArcResult           `json:"monthly_arc"`
 	WhatWorks           string                            `json:"what_works"`
+	RecoveryFeedback    []score.RecoveryFeedback          `json:"recovery_feedback"`
 	Milestone           *score.MilestoneData              `json:"milestone"`
 	CheckInCount        int64                             `json:"check_in_count"`
 	AccuracyLabel       string                            `json:"accuracy_label"`
@@ -109,9 +111,11 @@ func (s *Service) Get(ctx context.Context, user db.User) (InsightBundle, error) 
 	}
 
 	noteEntries := s.buildNoteEntries(all)
+	analysisEntries := s.buildAnalysisEntries(all)
 
 	sessionCtx := s.buildSessionContext(ctx, user, today, todayErr, todayCI, yesterdayErr, yesterday)
 	patterns := score.DetectPatterns(historyEntries)
+	patternInsights := score.BuildPatternInsights(analysisEntries)
 	earnedPattern := s.buildEarnedPatternInsight(ctx, user, all, today)
 
 	sig := score.ComputePersonalSignature(signatureEntries)
@@ -123,6 +127,7 @@ func (s *Service) Get(ctx context.Context, user db.User) (InsightBundle, error) 
 	arcNarrative := score.BuildLongArcNarrative(arcEntries, today) // returns string
 	monthlyArc := s.buildMonthlyArc(ctx, user, today)
 	whatWorks := score.FindWhatWorksForYou(noteEntries) // returns string
+	recoveryFeedback := score.BuildRecoveryFeedback(analysisEntries)
 	milestone := s.buildMilestone(ctx, user, int(totalCount), signatureEntries)
 
 	knownComponents := make([]string, 0, len(knownDismissableComponents))
@@ -140,12 +145,14 @@ func (s *Service) Get(ctx context.Context, user db.User) (InsightBundle, error) 
 	return InsightBundle{
 		SessionContext:      sessionCtx,
 		Patterns:            patterns.Patterns,
+		PatternInsights:     patternInsights,
 		EarnedPattern:       earnedPattern,
 		Signature:           sig,
 		SignatureNarrative:  sigNarrative,
 		ArcNarrative:        arcNarrative,
 		MonthlyArc:          monthlyArc,
 		WhatWorks:           whatWorks,
+		RecoveryFeedback:    recoveryFeedback,
 		Milestone:           milestone,
 		CheckInCount:        totalCount,
 		AccuracyLabel:       score.AccuracyLabel(int(totalCount)),
@@ -333,6 +340,37 @@ func (s *Service) buildNoteEntries(all []db.CheckIn) []score.NoteEntry {
 			e.NextScore = &next
 		}
 		entries[i] = e
+	}
+	return entries
+}
+
+func (s *Service) buildAnalysisEntries(all []db.CheckIn) []score.AnalysisEntry {
+	entries := make([]score.AnalysisEntry, 0, len(all))
+	for _, c := range all {
+		entry := score.AnalysisEntry{
+			Date:             c.CheckedInDate.Time,
+			Stress:           int(c.Stress),
+			Score:            int(c.Score),
+			PhysicalSymptoms: c.PhysicalSymptoms,
+		}
+		if c.Note.Valid {
+			entry.Note = c.Note.String
+		}
+		if c.EnergyLevel.Valid {
+			v := int(c.EnergyLevel.Int16)
+			entry.EnergyLevel = &v
+		}
+		if c.FocusQuality.Valid {
+			v := int(c.FocusQuality.Int16)
+			entry.FocusQuality = &v
+		}
+		if c.HoursWorked.Valid {
+			f, err := c.HoursWorked.Float64Value()
+			if err == nil && f.Valid {
+				entry.HoursWorked = &f.Float64
+			}
+		}
+		entries = append(entries, entry)
 	}
 	return entries
 }
