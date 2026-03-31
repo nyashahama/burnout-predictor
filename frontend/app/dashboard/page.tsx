@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, RefreshCcw, TrendingDown, TrendingUp } from "lucide-react";
+import { Activity, RefreshCcw, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
 import CheckIn from "@/components/dashboard/CheckIn";
 import { useDashboardData } from "@/contexts/DashboardDataContext";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,12 @@ function getLevel(score: number) {
   if (score > 65) return { label: "High strain", tone: "destructive" as const };
   if (score > 40) return { label: "Watch this", tone: "secondary" as const };
   return { label: "In your zone", tone: "default" as const };
+}
+
+function forecastCopy(delta: number) {
+  if (delta >= 3) return `+${delta} vs today`;
+  if (delta <= -3) return `${delta} vs today`;
+  return "roughly flat";
 }
 
 export default function DashboardPage() {
@@ -64,13 +70,17 @@ export default function DashboardPage() {
   const recent = checkins.slice(0, 7).reverse();
   const dangerDays = checkins.filter((entry) => entry.score > 65).length;
   const todayCheckIn = checkins.find((entry) => entry.checked_in_date === getTodayString());
+  const forecast = scoreCard?.daily_forecast;
+  const action = scoreCard?.recommended_action;
+  const patternInsights = insightBundle?.pattern_insights ?? [];
+  const recoveryFeedback = insightBundle?.recovery_feedback ?? [];
 
   return (
     <div className="space-y-6">
       <div className="space-y-2">
         <h1 className="text-4xl tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground">
-          Your current score, recent trend, and today&apos;s recovery context in one place.
+          Your current score, tomorrow risk, and the best move to make today.
         </p>
       </div>
 
@@ -119,6 +129,65 @@ export default function DashboardPage() {
         <CheckIn checkins={checkins} streakFromApi={streak} onComplete={handleCheckInComplete} />
       </div>
 
+      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>Tomorrow forecast</CardTitle>
+            <CardDescription>
+              {forecast?.summary ?? "Log today to unlock a clearer tomorrow forecast."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <div className="text-sm text-muted-foreground">Projected score</div>
+                <div className="text-4xl font-semibold">{forecast?.score ?? "—"}</div>
+              </div>
+              <Badge variant={forecast?.direction === "up" ? "destructive" : "secondary"}>
+                {forecast ? forecastCopy(forecast.delta) : "pending"}
+              </Badge>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Confidence: <span className="font-medium capitalize text-foreground">{forecast?.confidence ?? "low"}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Best move today
+            </CardTitle>
+            <CardDescription>One action chosen from the strongest driver behind your score.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="text-xl font-semibold">{action?.title ?? "Complete today’s check-in"}</div>
+            <p className="text-sm leading-7 text-muted-foreground">
+              {action?.detail ?? scoreCard?.suggestion ?? "Log a check-in to get a concrete move for today."}
+            </p>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Driver:</span>
+              <Badge variant="outline">{action?.driver ?? "pending"}</Badge>
+              <span className="capitalize">{action?.confidence ?? "low"} confidence</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Calibration</CardTitle>
+            <CardDescription>How much real signal the system has collected from you.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="text-3xl font-semibold">{scoreCard?.accuracy_label || "Still learning"}</div>
+            <p className="text-sm leading-7 text-muted-foreground">
+              More real check-ins increase the reliability of forecasts, pattern detection, and recovery feedback.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -150,11 +219,22 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Insights</CardTitle>
-            <CardDescription>What the backend has learned so far.</CardDescription>
+            <CardTitle>Why the score is moving</CardTitle>
+            <CardDescription>Cause-based patterns with evidence behind them.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {insightBundle?.patterns?.length ? (
+            {patternInsights.length ? (
+              patternInsights.map((pattern) => (
+                <div key={`${pattern.driver}-${pattern.title}`} className="rounded-lg border border-border px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="font-medium">{pattern.title}</div>
+                    <Badge variant="outline" className="capitalize">{pattern.confidence}</Badge>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{pattern.explanation}</p>
+                  <p className="mt-2 text-xs uppercase tracking-[0.15em] text-muted-foreground">{pattern.evidence}</p>
+                </div>
+              ))
+            ) : insightBundle?.patterns?.length ? (
               insightBundle.patterns.map((pattern, index) => (
                 <div key={index} className="rounded-lg border border-border px-4 py-3 text-sm leading-6">
                   {pattern}
@@ -162,17 +242,38 @@ export default function DashboardPage() {
               ))
             ) : (
               <p className="text-sm text-muted-foreground">
-                Check in consistently for a few days and the dashboard will start surfacing pattern-based insights.
+                Check in consistently for a few days and the dashboard will start surfacing evidence-backed drivers behind your score.
               </p>
-            )}
-            {scoreCard?.suggestion && (
-              <div className="rounded-lg border border-primary/15 bg-primary/5 px-4 py-3 text-sm leading-6">
-                <span className="font-medium text-primary">Today&apos;s move:</span> {scoreCard.suggestion}
-              </div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>What actually helped</CardTitle>
+          <CardDescription>Recovery evidence based on what happened the following day.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {recoveryFeedback.length ? (
+            recoveryFeedback.map((item) => (
+              <div key={`${item.driver}-${item.title}`} className="rounded-lg border border-border px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-medium">{item.title}</div>
+                  <Badge variant="outline" className="capitalize">{item.confidence}</Badge>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.explanation}</p>
+                <p className="mt-2 text-xs uppercase tracking-[0.15em] text-muted-foreground">{item.evidence}</p>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-lg border border-primary/15 bg-primary/5 px-4 py-3 text-sm leading-6">
+              <span className="font-medium text-primary">Still learning:</span>{" "}
+              {insightBundle?.what_works || "Once a few recovery cycles are logged, the dashboard will start showing what actually improves your next-day score."}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
