@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { verifySignedValue } from "@/lib/session";
 
-export function middleware(request: NextRequest) {
-  const session = request.cookies.get("overload-session");
-  const onboarded = request.cookies.get("overload-onboarded");
+export async function middleware(request: NextRequest) {
+  const secret = process.env.SESSION_COOKIE_SECRET ?? "local-dev-session-secret";
+  const session = await verifySignedValue(
+    request.cookies.get("overload-session")?.value,
+    "session",
+    secret,
+  );
+  const onboarded = await verifySignedValue(
+    request.cookies.get("overload-onboarded")?.value,
+    "onboarded",
+    secret,
+  );
   const { pathname } = request.nextUrl;
 
   // Protect dashboard: needs session + onboarding complete

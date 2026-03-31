@@ -8,6 +8,8 @@ import {
   clearFollowUpForToday,
 } from "@/app/dashboard/data";
 import { useAuth } from "@/contexts/AuthContext";
+import { getTodayString } from "@/lib/date";
+import { safeParseJson, safeStorageGet } from "@/lib/storage";
 import type { CheckIn, UpsertCheckInResult } from "@/lib/types";
 
 const stressLevels = [
@@ -31,7 +33,7 @@ function getConsecutiveHighStress(checkins: CheckIn[]): number {
   for (let i = 1; i <= 3; i++) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split("T")[0];
+    const dateStr = getTodayString(d);
     const ci = checkins.find(c => c.checked_in_date === dateStr);
     if (!ci) break;
     if (ci.score > 65) count++;
@@ -65,26 +67,24 @@ function findEchoPattern(note: string, stress: number): string | null {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
     const key = `checkin-${d.toISOString().split("T")[0]}`;
-    const raw = localStorage.getItem(key);
+    const raw = safeStorageGet(localStorage, key);
     if (!raw) continue;
-    try {
-      const parsed = JSON.parse(raw);
-      if (!parsed.note) continue;
-      const pastStress: number = parsed.stress ?? 0;
-      const pastKws = extractKeywords(parsed.note);
-      const overlap = pastKws.filter((w) => currentKws.has(w)).length;
+    const parsed = safeParseJson<{ note?: string; stress?: number }>(raw, {});
+    if (!parsed.note) continue;
+    const pastStress: number = parsed.stress ?? 0;
+    const pastKws = extractKeywords(parsed.note);
+    const overlap = pastKws.filter((w) => currentKws.has(w)).length;
 
-      const isMatch =
-        (currentKws.size >= 2 && overlap >= 2) ||
-        (stress >= 4 && pastStress >= 4 && parsed.note.length > 10 && overlap >= 1);
-      if (!isMatch) continue;
+    const isMatch =
+      (currentKws.size >= 2 && overlap >= 2) ||
+      (stress >= 4 && pastStress >= 4 && parsed.note.length > 10 && overlap >= 1);
+    if (!isMatch) continue;
 
-      if (!bestMatch || overlap > bestMatch.overlap) {
-        const dateLabel = d.toLocaleDateString("en-US", { month: "long", day: "numeric" });
-        const snippet   = parsed.note.length > 50 ? parsed.note.slice(0, 50) + "…" : parsed.note;
-        bestMatch = { dateLabel, snippet, overlap };
-      }
-    } catch {}
+    if (!bestMatch || overlap > bestMatch.overlap) {
+      const dateLabel = d.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+      const snippet   = parsed.note.length > 50 ? parsed.note.slice(0, 50) + "…" : parsed.note;
+      bestMatch = { dateLabel, snippet, overlap };
+    }
   }
 
   if (!bestMatch) return null;
@@ -103,18 +103,15 @@ function getComparableNote(stress: number): { dateLabel: string; note: string } 
     const d = new Date(now);
     d.setDate(d.getDate() - i);
     const key = `checkin-${d.toISOString().split("T")[0]}`;
-    const raw = localStorage.getItem(key);
+    const raw = safeStorageGet(localStorage, key);
     if (!raw) continue;
-    try {
-      const parsed = JSON.parse(raw);
-      if (!parsed.note || typeof parsed.stress !== "number") continue;
-      // Match: same or adjacent stress level AND has a note
-      if (Math.abs(parsed.stress - stress) <= 1 && parsed.note.trim().length > 5) {
-        const dateLabel = d.toLocaleDateString("en-US", { month: "long", day: "numeric" });
-        const note = parsed.note.length > 55 ? parsed.note.slice(0, 55) + "…" : parsed.note;
-        return { dateLabel, note };
-      }
-    } catch {}
+    const parsed = safeParseJson<{ note?: string; stress?: number }>(raw, {});
+    if (!parsed.note || typeof parsed.stress !== "number") continue;
+    if (Math.abs(parsed.stress - stress) <= 1 && parsed.note.trim().length > 5) {
+      const dateLabel = d.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+      const note = parsed.note.length > 55 ? parsed.note.slice(0, 55) + "…" : parsed.note;
+      return { dateLabel, note };
+    }
   }
   return null;
 }
@@ -127,36 +124,34 @@ function getYesterdayContext(): { question: string; context: string | null } {
   const now = new Date();
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
-  const key = `checkin-${yesterday.toISOString().split("T")[0]}`;
-  const raw = localStorage.getItem(key);
+  const key = `checkin-${getTodayString(yesterday)}`;
+  const raw = safeStorageGet(localStorage, key);
   if (!raw) return { question: "How are you carrying it today?", context: null };
 
-  try {
-    const parsed = JSON.parse(raw);
-    const note: string = parsed.note || "";
-    const stress: number = parsed.stress ?? 0;
-    const n = note.toLowerCase();
+  const parsed = safeParseJson<{ note?: string; stress?: number }>(raw, {});
+  const note: string = parsed.note || "";
+  const stress: number = parsed.stress ?? 0;
+  const n = note.toLowerCase();
 
-    if (/deadline|deliver|launch|submit|due/.test(n)) {
-      const snippet = note.length > 40 ? note.slice(0, 40) + "…" : note;
-      return {
-        question: "How did it go?",
-        context: `Yesterday: "${snippet}"`,
-      };
-    }
-    if (/meeting|call|sync|standup|review|presentation|demo/.test(n)) {
-      return { question: "How are you coming out of it?", context: null };
-    }
-    if (/sleep|tired|exhausted|rest|insomnia/.test(n)) {
-      return { question: "Did you manage to rest?", context: null };
-    }
-    if (stress >= 5) {
-      return { question: "Still in it, or is today different?", context: null };
-    }
-    if (stress >= 4) {
-      return { question: "How does today feel compared to yesterday?", context: null };
-    }
-  } catch {}
+  if (/deadline|deliver|launch|submit|due/.test(n)) {
+    const snippet = note.length > 40 ? note.slice(0, 40) + "…" : note;
+    return {
+      question: "How did it go?",
+      context: `Yesterday: "${snippet}"`,
+    };
+  }
+  if (/meeting|call|sync|standup|review|presentation|demo/.test(n)) {
+    return { question: "How are you coming out of it?", context: null };
+  }
+  if (/sleep|tired|exhausted|rest|insomnia/.test(n)) {
+    return { question: "Did you manage to rest?", context: null };
+  }
+  if (stress >= 5) {
+    return { question: "Still in it, or is today different?", context: null };
+  }
+  if (stress >= 4) {
+    return { question: "How does today feel compared to yesterday?", context: null };
+  }
 
   return { question: "How are you carrying it today?", context: null };
 }
@@ -200,33 +195,30 @@ function findPreviousOutcome(
     const d = new Date(now);
     d.setDate(d.getDate() - i);
     const key = `checkin-${d.toISOString().split("T")[0]}`;
-    const raw = localStorage.getItem(key);
+    const raw = safeStorageGet(localStorage, key);
     if (!raw) continue;
-    try {
-      const parsed = JSON.parse(raw);
-      if (typeof parsed.stress !== "number") continue;
-      if (Math.abs(parsed.stress - stress) > 1) continue;
+    const parsed = safeParseJson<{ stress?: number }>(raw, {});
+    if (typeof parsed.stress !== "number") continue;
+    if (Math.abs(parsed.stress - stress) > 1) continue;
 
-      // Check the following day
-      const nextDay = new Date(d);
-      nextDay.setDate(nextDay.getDate() + 1);
-      const nextRaw = localStorage.getItem(`checkin-${nextDay.toISOString().split("T")[0]}`);
-      if (!nextRaw) continue;
+    const nextDay = new Date(d);
+    nextDay.setDate(nextDay.getDate() + 1);
+    const nextRaw = safeStorageGet(localStorage, `checkin-${getTodayString(nextDay)}`);
+    if (!nextRaw) continue;
 
-      const nextParsed = JSON.parse(nextRaw);
-      const thisScore  = stressToScore(parsed.stress, role, sleepBaseline);
-      const nextScore  = stressToScore(nextParsed.stress ?? 3, role, sleepBaseline);
-      const delta      = thisScore - nextScore;
+    const nextParsed = safeParseJson<{ stress?: number }>(nextRaw, {});
+    const thisScore  = stressToScore(parsed.stress, role, sleepBaseline);
+    const nextScore  = stressToScore(nextParsed.stress ?? 3, role, sleepBaseline);
+    const delta      = thisScore - nextScore;
 
-      const dateLabel = d.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+    const dateLabel = d.toLocaleDateString("en-US", { month: "long", day: "numeric" });
 
-      if (delta >= 12) {
-        return `Last time you were here (${dateLabel}), your score dropped ${delta} points the next day. You know what to do.`;
-      }
-      if (delta <= -12) {
-        return `Last time you were at this level (${dateLabel}), it climbed the next day. Tonight matters.`;
-      }
-    } catch {}
+    if (delta >= 12) {
+      return `Last time you were here (${dateLabel}), your score dropped ${delta} points the next day. You know what to do.`;
+    }
+    if (delta <= -12) {
+      return `Last time you were at this level (${dateLabel}), it climbed the next day. Tonight matters.`;
+    }
   }
   return null;
 }
@@ -327,7 +319,7 @@ export default function CheckIn({
 }: Props) {
   const { api } = useAuth();
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = getTodayString();
   const todayCheckin = checkins.find(c => c.checked_in_date === today);
 
   const [stress, setStress]                   = useState<number | null>(null);
@@ -345,6 +337,7 @@ export default function CheckIn({
   const [role, setRole]                       = useState("engineer");
   const [sleepBaseline, setSleepBaseline]     = useState("8");
   const [followUp, setFollowUp]               = useState<{ event: string; question: string; snippet: string } | null>(null);
+  const [submitError, setSubmitError]         = useState("");
 
   // Mark as submitted on mount if today's check-in already exists in the API data
   useEffect(() => {
@@ -352,8 +345,8 @@ export default function CheckIn({
   }, [todayCheckin?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const savedRole  = localStorage.getItem("overload-role")  || "engineer";
-    const savedSleep = localStorage.getItem("overload-sleep") || "8";
+    const savedRole  = safeStorageGet(localStorage, "overload-role")  || "engineer";
+    const savedSleep = safeStorageGet(localStorage, "overload-sleep") || "8";
     setRole(savedRole);
     setSleepBaseline(savedSleep);
 
@@ -371,7 +364,8 @@ export default function CheckIn({
     const priorHigh    = getConsecutiveHighStress(checkins);
     const streak       = streakFromApi;
     const isFirst      = checkins.length === 0;
-    const todayDateStr = new Date().toISOString().split("T")[0];
+    const todayDateStr = getTodayString();
+    setSubmitError("");
 
     // Parse note for future events and clear any surfaced follow-up (kept for local UX)
     if (note.trim()) parseFollowUpSignals(note, todayDateStr);
@@ -398,7 +392,7 @@ export default function CheckIn({
       onComplete?.(result);
       setSubmitted(true);
     } catch (e) {
-      console.error("Check-in failed:", e);
+      setSubmitError(e instanceof Error ? e.message : "Could not save your check-in.");
     } finally {
       setUpdating(false);
       setSubmitting(false);
@@ -434,7 +428,7 @@ export default function CheckIn({
   }
 
   return (
-    <div className="dash-card checkin">
+    <div className="dash-card checkin" aria-labelledby="checkin-title">
       {followUp ? (
         <div className="checkin-followup">
           <div className="checkin-followup-question">{followUp.question}</div>
@@ -445,7 +439,7 @@ export default function CheckIn({
           {yesterdayCtx.context && (
             <p className="checkin-yesterday-ref">{yesterdayCtx.context}</p>
           )}
-          <div className="checkin-question">{yesterdayCtx.question}</div>
+          <div id="checkin-title" className="checkin-question">{yesterdayCtx.question}</div>
         </>
       )}
 
@@ -457,6 +451,8 @@ export default function CheckIn({
               stress === s.value ? " checkin-stress-btn--active" : ""
             }`}
             onClick={() => handleStressSelect(s.value)}
+            aria-pressed={stress === s.value}
+            aria-label={s.label}
           >
             <span className="checkin-stress-num">{s.value}</span>
             <span className="checkin-stress-label">{s.label}</span>
@@ -484,6 +480,8 @@ export default function CheckIn({
         />
         <p className="checkin-note-hint">The more specific, the smarter the app gets.</p>
       </div>
+
+      {submitError && <div className="auth-error" role="alert">{submitError}</div>}
 
       <button
         className={`checkin-submit${updating ? " checkin-submit--updating" : ""}`}

@@ -1,3 +1,5 @@
+import { parseDateString } from "@/lib/date";
+
 export type SignalLevel = "ok" | "warning" | "danger";
 
 export type ForecastDay = {
@@ -161,18 +163,6 @@ export function getLiveSignals(
 
 // ─── Pattern Detection ────────────────────────────────────────────────────────
 
-const MONTH_MAP: Record<string, number> = {
-  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
-  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
-};
-
-function parseDateStr(dateStr: string): Date | null {
-  const [mon, day] = dateStr.trim().split(" ");
-  const m = MONTH_MAP[mon];
-  if (m === undefined || !day) return null;
-  return new Date(2026, m, parseInt(day, 10));
-}
-
 /**
  * Analyses a history array and returns up to 3 human-readable
  * pattern observations (day-of-week spikes, trend, strain frequency).
@@ -185,7 +175,7 @@ export function detectPatterns(data: HistoryDay[]): string[] {
   // Group scores by day of week
   const byDow: Record<number, number[]> = {};
   data.forEach((d) => {
-    const date = parseDateStr(d.date);
+    const date = parseDateString(d.date);
     if (!date) return;
     const dow = date.getDay();
     if (!byDow[dow]) byDow[dow] = [];

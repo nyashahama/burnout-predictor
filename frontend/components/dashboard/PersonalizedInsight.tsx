@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import type { InsightBundle } from "@/lib/types";
 
@@ -9,12 +10,14 @@ interface Props {
 
 export default function PersonalizedInsight({ bundle }: Props) {
   const { api } = useAuth();
+  const [dismissError, setDismissError] = useState("");
 
   async function dismiss(componentKey: string) {
     try {
       await api.post("/api/insights/dismiss", { component_key: componentKey });
-    } catch (e) {
-      console.error("Dismiss failed:", e);
+      setDismissError("");
+    } catch {
+      setDismissError("Could not dismiss this insight right now.");
     }
   }
 
@@ -36,6 +39,7 @@ export default function PersonalizedInsight({ bundle }: Props) {
   return (
     <div className="dash-card personalized-insight">
       <div className="pi-label">What your data says</div>
+      {dismissError && <div className="auth-error" role="alert">{dismissError}</div>}
 
       {session_context && !dismissed.has("session_context") && (
         <div className="pi-section pi-session-context">
