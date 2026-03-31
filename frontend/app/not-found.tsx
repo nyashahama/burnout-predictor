@@ -1,17 +1,21 @@
 import Link from "next/link";
+import { AuthShell } from "@/components/AuthShell";
+import { buttonVariants } from "@/components/ui/button";
+import { CardDescription, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 export default function NotFound() {
   return (
-    <main className="auth-page">
-      <div className="auth-card">
-        <div className="auth-heading">Page not found</div>
-        <div className="auth-sub">
+    <AuthShell>
+      <div className="space-y-4">
+        <CardTitle className="text-3xl">Page not found</CardTitle>
+        <CardDescription className="text-base">
           The route you requested does not exist or has moved.
-        </div>
-        <Link href="/" className="auth-btn">
+        </CardDescription>
+        <Link href="/" className={cn(buttonVariants(), "w-full")}>
           Back to home
         </Link>
       </div>
-    </main>
+    </AuthShell>
   );
 }

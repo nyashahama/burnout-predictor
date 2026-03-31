@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Instrument_Serif, DM_Sans } from "next/font/google";
-import "./globals.css";
+import "./theme.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 
 const instrumentSerif = Instrument_Serif({
@@ -35,22 +35,7 @@ export default function RootLayout({
       lang="en"
       className={`${instrumentSerif.variable} ${dmSans.variable}`}
     >
-      <head>
-        {/* Preconnect for Google Fonts */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        {/* Instrument Serif + DM Sans (exactly as in your HTML) */}
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap"
-          rel="stylesheet"
-        />
-        {/* If you need other fonts from your previous app, keep them too */}
-      </head>
-      <body>
+      <body className="min-h-screen bg-background text-foreground">
         <AuthProvider>
           {children}
         </AuthProvider>
