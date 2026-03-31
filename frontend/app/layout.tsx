@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   description:
     "Overload watches your sleep, work, and calendar — and tells you 14 days in advance when you’re heading toward a wall.",
   icons: {
-    icon: "./icon.png",
+    icon: "/icon.svg",
   },
 };
 
