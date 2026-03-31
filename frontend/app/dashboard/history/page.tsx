@@ -1,29 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { RefreshCcw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { formatDateForDisplay } from "@/lib/date";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { parseCheckIns } from "@/lib/validators";
+import { formatDateForDisplay } from "@/lib/date";
 import type { CheckIn } from "@/lib/types";
-import {
-  scoreColor,
-  scoreLabel,
-} from "../data";
-import HistoryChart from "@/components/dashboard/HistoryChart";
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-function levelClass(score: number) {
-  if (score > 65) return "danger";
-  if (score > 40) return "warning";
-  return "ok";
-}
-
-const STRESS_LABELS: Record<number, string> = {
-  1: "Very calm", 2: "Relaxed", 3: "Moderate", 4: "Stressed", 5: "Overwhelmed",
-};
-
-// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function HistoryPage() {
   const { api } = useAuth();
@@ -31,18 +15,11 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function loadHistory() {
-    if (!api) return;
+  const loadHistory = useCallback(async () => {
     setLoading(true);
     setError("");
-
     try {
-      const result = await Promise.race([
-        api.get("/api/checkins", parseCheckIns),
-        new Promise<CheckIn[]>((_, reject) => {
-          setTimeout(() => reject(new Error("History took too long to load.")), 5000);
-        }),
-      ]);
+      const result = await api.get("/api/checkins", parseCheckIns);
       setCheckins(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load history.");
@@ -50,171 +27,90 @@ export default function HistoryPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [api]);
 
   useEffect(() => {
     void loadHistory();
-  }, [api]);
+  }, [loadHistory]);
 
-  // Map API checkins (newest first) to chart shape (oldest first for 30-day view)
-  const historyDays = checkins
-    .slice()
-    .reverse()
-    .slice(-30)
-    .map((c) => ({
-      date: formatDateForDisplay(c.checked_in_date),
-      score: c.score,
-    }));
-
-  const last30 = checkins.slice(0, 30); // checkins are newest-first from API
-  const scores = last30.map((c) => c.score);
-  const avg = scores.length
-    ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-    : 0;
+  const scores = checkins.map((entry) => entry.score);
+  const average = scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : 0;
   const peak = scores.length ? Math.max(...scores) : 0;
-  const highStrain = scores.filter((s) => s > 65).length;
-  const inZone = scores.filter((s) => s <= 40).length;
-
-  const checkinCount = checkins.length;
-  const isEmpty = checkinCount === 0;
-
-  if (loading) {
-    return (
-      <div className="dash-content">
-        <header className="dash-header">
-          <h1 className="dash-greeting">Your history</h1>
-        </header>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="dash-content">
-        <header className="dash-header">
-          <h1 className="dash-greeting">Your history</h1>
-          <p className="dash-subheading">{error}</p>
-        </header>
-        <div className="dash-card">
-          <button className="settings-outline-btn" onClick={() => void loadHistory()}>
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="dash-content">
-      <header className="dash-header">
-        <h1 className="dash-greeting">Your history</h1>
-        <p className="dash-subheading">
-          {isEmpty
-            ? "Check in each day and the data will start to know you"
-            : `${checkinCount} check-in${checkinCount !== 1 ? "s" : ""} — this is what the data has learned`}
-        </p>
-      </header>
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <h1 className="text-4xl tracking-tight">History</h1>
+        <p className="text-muted-foreground">Every logged check-in, with the most recent entries first.</p>
+      </div>
 
-      {/* Stats row */}
-      {isEmpty ? (
-        <div className="hist-empty-stats">
-          <div className="hist-empty-stats-icon">📭</div>
-          <div className="hist-empty-stats-title">No data yet</div>
-          <div className="hist-empty-stats-sub">
-            Complete your first daily check-in on the dashboard to start
-            building your history. Patterns surface after 7 days.
-          </div>
-        </div>
-      ) : (
-        <div className="hist-stats">
-          <div className="hist-stat">
-            <div className="hist-stat-value" style={{ color: scoreColor(avg) }}>
-              {avg}
-            </div>
-            <div className="hist-stat-label">Your average</div>
-            <div className="hist-stat-sublabel">{scoreLabel(avg)}</div>
-          </div>
-
-          <div className="hist-stat">
-            <div className="hist-stat-value" style={{ color: "var(--red)" }}>
-              {highStrain}
-            </div>
-            <div className="hist-stat-label">Hard days</div>
-            <div className="hist-stat-sublabel">Score above 65</div>
-          </div>
-
-          <div className="hist-stat">
-            <div className="hist-stat-value" style={{ color: "var(--green)" }}>
-              {inZone}
-            </div>
-            <div className="hist-stat-label">Good days</div>
-            <div className="hist-stat-sublabel">Score below 40</div>
-          </div>
-
-          <div className="hist-stat">
-            <div className="hist-stat-value" style={{ color: scoreColor(peak) }}>
-              {peak}
-            </div>
-            <div className="hist-stat-label">Highest point</div>
-            <div className="hist-stat-sublabel">Most load recorded</div>
-          </div>
-        </div>
+      {error && (
+        <Card>
+          <CardContent className="flex items-center justify-between gap-4 p-6">
+            <p className="text-sm text-destructive">{error}</p>
+            <Button variant="outline" onClick={() => void loadHistory()}>
+              <RefreshCcw className="h-4 w-4" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
-      <HistoryChart
-        data={historyDays}
-        checkinCount={checkinCount}
-        showPatterns={false}
-      />
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardDescription>Entries</CardDescription>
+            <CardTitle className="text-3xl">{checkins.length}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardDescription>Average score</CardDescription>
+            <CardTitle className="text-3xl">{average}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardDescription>Highest score</CardDescription>
+            <CardTitle className="text-3xl">{peak}</CardTitle>
+          </CardHeader>
+        </Card>
+      </div>
 
-      {/* Check-in log */}
-      {checkins.length > 0 && (
-        <div className="dash-card hist-log">
-          <div className="hist-log-header">
-            <div>
-              <div className="hist-log-title">Your check-ins</div>
-              <div className="hist-log-count">
-                {checkins.length} {checkins.length === 1 ? "entry" : "entries"}
-              </div>
-            </div>
-          </div>
-
-          <div className="hist-log-list">
-            {checkins.map((c, i) => {
-              const dateLabel = formatDateForDisplay(c.checked_in_date);
-              return (
-                <div key={i} className="hist-log-row">
-                  <div className="hist-log-date">{dateLabel}</div>
-
-                  <div
-                    className="hist-log-score"
-                    style={{ color: scoreColor(c.score) }}
-                  >
-                    {c.score}
+      <Card>
+        <CardHeader>
+          <CardTitle>Check-in log</CardTitle>
+          <CardDescription>{loading ? "Loading entries…" : "Your recorded history."}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : checkins.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No data yet. Your first check-in will populate this page.</p>
+          ) : (
+            checkins.map((entry) => (
+              <div key={entry.id} className="rounded-lg border border-border p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="font-medium">{formatDateForDisplay(entry.checked_in_date)}</div>
+                    <div className="text-sm text-muted-foreground">{entry.note || "No note recorded."}</div>
                   </div>
-
-                  <div className={`hist-log-badge hist-log-badge--${levelClass(c.score)}`}>
-                    {scoreLabel(c.score)}
+                  <div className="grid grid-cols-2 gap-4 text-sm sm:flex sm:items-center">
+                    <div>
+                      <div className="text-muted-foreground">Stress</div>
+                      <div className="font-medium">{entry.stress}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Score</div>
+                      <div className="font-medium">{entry.score}</div>
+                    </div>
                   </div>
-
-                  <div className="hist-log-stress">
-                    <span className="hist-log-stress-num">{c.stress}</span>
-                    <span className="hist-log-stress-label">
-                      {STRESS_LABELS[c.stress] ?? "Moderate"}
-                    </span>
-                  </div>
-
-                  {c.note ? (
-                    <div className="hist-log-note">{c.note}</div>
-                  ) : (
-                    <div className="hist-log-no-note">—</div>
-                  )}
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
