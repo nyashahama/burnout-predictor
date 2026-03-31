@@ -520,7 +520,7 @@ func detectKeywordTrigger(entries []AnalysisEntry) *patternCandidate {
 
 	return &patternCandidate{
 		PatternInsight: PatternInsight{
-			Title:       fmt.Sprintf("%s days are showing up in the red", strings.Title(label)),
+			Title:       fmt.Sprintf("%s days are showing up in the red", humanizeLabel(label)),
 			Explanation: fmt.Sprintf("%d of your last %d danger-zone days mentioned %s context.", count, highStrainDays, strings.ReplaceAll(label, "-", " ")),
 			Evidence:    fmt.Sprintf("%d/%d recent high-strain notes pointed to the same driver.", count, highStrainDays),
 			Driver:      driver,
@@ -631,6 +631,14 @@ func hasKeyword(note string, keywords ...string) bool {
 		}
 	}
 	return false
+}
+
+func humanizeLabel(label string) string {
+	label = strings.ReplaceAll(label, "-", " ")
+	if label == "" {
+		return ""
+	}
+	return strings.ToUpper(label[:1]) + label[1:]
 }
 
 func hasSymptom(symptoms []string, values ...string) bool {
