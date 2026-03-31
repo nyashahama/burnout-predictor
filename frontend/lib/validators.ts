@@ -77,7 +77,7 @@ export const parseAuthResult = (value: unknown): AuthResult => {
 };
 
 export const parseScoreCardResult = (value: unknown): ScoreCardResult => {
-  if (!isRecord(value) || !isRecord(value.score)) {
+  if (!isRecord(value) || !isRecord(value.score) || !isRecord(value.daily_forecast) || !isRecord(value.recommended_action)) {
     throw new Error("Invalid API response: score card payload is malformed.");
   }
   return value as unknown as ScoreCardResult;
@@ -106,7 +106,12 @@ export const parseNotificationPrefs = (value: unknown): NotificationPrefs => {
 
 export const parseInsightBundle = (value: unknown): InsightBundle => {
   if (!isRecord(value)) throw new Error("Invalid API response: insight bundle must be an object.");
-  if (!Array.isArray(value.patterns) || !Array.isArray(value.dismissed_components)) {
+  if (
+    !Array.isArray(value.patterns) ||
+    !Array.isArray(value.pattern_insights) ||
+    !Array.isArray(value.recovery_feedback) ||
+    !Array.isArray(value.dismissed_components)
+  ) {
     throw new Error("Invalid API response: insight bundle arrays are malformed.");
   }
   return value as unknown as InsightBundle;
