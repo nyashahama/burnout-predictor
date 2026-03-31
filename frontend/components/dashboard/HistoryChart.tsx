@@ -32,9 +32,9 @@ export default function HistoryChart({
   const PATTERN_ICONS = ["📈", "🗓", "⚡"];
 
   return (
-    <div className="dash-card history">
+    <section className="dash-card history" aria-labelledby="history-title">
       <div className="history-header">
-        <div className="history-title">30-day history</div>
+        <div id="history-title" className="history-title">30-day history</div>
         <div className="history-sub">
           {isEmpty
             ? "Your history will build as you check in each day"
@@ -78,6 +78,11 @@ export default function HistoryChart({
                 className="history-col"
                 onMouseEnter={() => !isGhost && setTooltip({ index: i, day: d })}
                 onMouseLeave={() => setTooltip(null)}
+                tabIndex={isGhost ? -1 : 0}
+                role={isGhost ? undefined : "img"}
+                aria-label={isGhost ? undefined : `${d.date}, score ${d.score}, ${scoreLabel(d.score)}`}
+                onFocus={() => !isGhost && setTooltip({ index: i, day: d })}
+                onBlur={() => setTooltip(null)}
               >
                 {isHovered && (
                   <div className="history-tooltip">
@@ -151,6 +156,6 @@ export default function HistoryChart({
           )}
         </div>
       )}
-    </div>
+    </section>
   );
 }

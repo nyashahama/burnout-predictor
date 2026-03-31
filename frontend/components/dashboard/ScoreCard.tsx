@@ -161,12 +161,14 @@ export default function ScoreCard({
   }[data.level];
 
   return (
-    <div className="dash-card scorecard">
+    <section className="dash-card scorecard" aria-labelledby="scorecard-title">
       {/* Header */}
       <div className="scorecard-header">
-        <div className="scorecard-label">How you&apos;re carrying it</div>
-        <div className={`scorecard-badge scorecard-badge--${data.level}`}>
-          {data.level === "danger" ? "⚠ " : data.level === "warning" ? "◑ " : "✓ "}
+        <div id="scorecard-title" className="scorecard-label">How you&apos;re carrying it</div>
+        <div className={`scorecard-badge scorecard-badge--${data.level}`} aria-label={badgeLabel}>
+          <span aria-hidden="true">
+            {data.level === "danger" ? "⚠ " : data.level === "warning" ? "◑ " : "✓ "}
+          </span>
           {badgeLabel}
         </div>
       </div>
@@ -189,7 +191,7 @@ export default function ScoreCard({
           </div>
           {(streak ?? 0) > 0 && (
             <div className="scorecard-streak-count">
-              🔥 {streak}-day streak
+              <span aria-hidden="true">🔥 </span>{streak}-day streak
             </div>
           )}
           {dangerStreak >= 2 && (
@@ -251,6 +253,6 @@ export default function ScoreCard({
         </div>
         <p className="suggestion-text">{data.suggestion}</p>
       </div>
-    </div>
+    </section>
   );
 }

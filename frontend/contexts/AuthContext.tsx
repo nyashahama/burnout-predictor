@@ -18,13 +18,14 @@ import {
   setSessionCookie,
   clearSessionCookie,
 } from "@/lib/auth";
+import { parseAuthResult, parseRefreshResult, parseUserResponse } from "@/lib/validators";
 import type { AuthResult, RefreshResult, UserResponse } from "@/lib/types";
 
 interface AuthContextValue {
   user: UserResponse | null;
   api: ApiClient;
   isLoading: boolean;
-  login: (result: AuthResult) => void;
+  login: (result: AuthResult) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<boolean>;
 }
@@ -39,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleUnauthenticated = useCallback(() => {
     clearTokens();
-    clearSessionCookie();
+    void clearSessionCookie();
     setUser(null);
     if (typeof window !== "undefined") {
       window.location.href = "/login";
@@ -52,9 +53,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [handleUnauthenticated]
   );
 
-  const login = useCallback((result: AuthResult) => {
+  const login = useCallback(async (result: AuthResult) => {
     storeTokens(result.access_token, result.refresh_token);
-    setSessionCookie();
+    await setSessionCookie();
     setUser(result.user);
   }, []);
 
@@ -68,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ refresh_token: rt }),
       });
       if (!res.ok) return false;
-      const data = (await res.json()) as RefreshResult;
+      const data = parseRefreshResult((await res.json()) as RefreshResult);
       // Rotate both tokens — new refresh token replaces old one in localStorage.
       storeTokens(data.access_token, data.refresh_token);
       return true;
@@ -84,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Ignore — clear client-side state regardless.
     }
     clearTokens();
-    clearSessionCookie();
+    await clearSessionCookie();
     setUser(null);
   }, [api]);
 
@@ -104,18 +105,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (ok) {
         try {
-          const profile = await api.get<UserResponse>("/api/user");
+          const profile = await api.get("/api/user", parseUserResponse);
           if (!cancelled) {
             setUser(profile);
-            setSessionCookie();
+            await setSessionCookie();
           }
         } catch {
           clearTokens();
-          clearSessionCookie();
+          await clearSessionCookie();
         }
       } else {
         clearTokens();
-        clearSessionCookie();
+        await clearSessionCookie();
       }
 
       if (!cancelled) setIsLoading(false);

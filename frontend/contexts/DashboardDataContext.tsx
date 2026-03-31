@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { parseCheckIns, parseInsightBundle, parseScoreCardResult } from "@/lib/validators";
 import type { ScoreCardResult, CheckIn, InsightBundle, UpsertCheckInResult } from "@/lib/types";
 
 interface DashboardDataContextValue {
@@ -15,8 +16,10 @@ interface DashboardDataContextValue {
   checkins: CheckIn[];
   insightBundle: InsightBundle | null;
   loadingData: boolean;
+  loadError: string;
   ready: boolean;
   handleCheckInComplete: (result: UpsertCheckInResult) => void;
+  reload: () => Promise<void>;
 }
 
 const DashboardDataContext = createContext<DashboardDataContextValue | null>(null);
@@ -28,26 +31,53 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
   const [checkins, setCheckins]           = useState<CheckIn[]>([]);
   const [insightBundle, setInsightBundle] = useState<InsightBundle | null>(null);
   const [loadingData, setLoadingData]     = useState(true);
+  const [loadError, setLoadError]         = useState("");
   const [ready, setReady]                 = useState(false);
 
-  useEffect(() => {
-    if (authLoading || !api) return;
-    Promise.all([
-      api.get<ScoreCardResult>("/api/score"),
-      api.get<CheckIn[]>("/api/checkins"),
-    ])
-      .then(([sc, ci]) => {
-        setScoreCard(sc);
-        setCheckins(ci);
-        setReady(true);
-      })
-      .catch(console.error)
-      .finally(() => setLoadingData(false));
+  const withTimeout = useCallback(async <T,>(promise: Promise<T>, message: string): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        setTimeout(() => reject(new Error(message)), 5000);
+      }),
+    ]);
+  }, []);
 
-    api.get<InsightBundle>("/api/insights")
-      .then(setInsightBundle)
-      .catch(console.error);
-  }, [api, authLoading]);
+  const reload = useCallback(async () => {
+    if (authLoading || !api) return;
+    setLoadingData(true);
+    setLoadError("");
+
+    try {
+      const [sc, ci] = await withTimeout(
+        Promise.all([
+          api.get("/api/score", parseScoreCardResult),
+          api.get("/api/checkins", parseCheckIns),
+        ]),
+        "Dashboard data took too long to load.",
+      );
+
+      setScoreCard(sc);
+      setCheckins(ci);
+      setReady(true);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Failed to load dashboard data.");
+      setReady(false);
+    } finally {
+      setLoadingData(false);
+    }
+
+    try {
+      const bundle = await api.get("/api/insights", parseInsightBundle);
+      setInsightBundle(bundle);
+    } catch {
+      setInsightBundle(null);
+    }
+  }, [api, authLoading, withTimeout]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
 
   const handleCheckInComplete = useCallback((result: UpsertCheckInResult) => {
     setScoreCard(prev => prev ? {
@@ -65,7 +95,16 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
 
   return (
     <DashboardDataContext.Provider
-      value={{ scoreCard, checkins, insightBundle, loadingData, ready, handleCheckInComplete }}
+      value={{
+        scoreCard,
+        checkins,
+        insightBundle,
+        loadingData,
+        loadError,
+        ready,
+        handleCheckInComplete,
+        reload,
+      }}
     >
       {children}
     </DashboardDataContext.Provider>

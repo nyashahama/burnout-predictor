@@ -77,9 +77,9 @@ export default function ForecastChart({ data }: { data: ForecastDay[] }) {
   const narrative = buildNarrative(data);
 
   return (
-    <div className="dash-card forecast">
+    <section className="dash-card forecast" aria-labelledby="forecast-title">
       <div className="forecast-header">
-        <div className="forecast-title">Last 7 days</div>
+        <div id="forecast-title" className="forecast-title">Last 7 days</div>
         <div className="forecast-narrative">{narrative}</div>
       </div>
 
@@ -105,6 +105,11 @@ export default function ForecastChart({ data }: { data: ForecastDay[] }) {
                 className={`forecast-col${isToday ? " forecast-col--today" : ""}`}
                 onMouseEnter={() => setHovered(i)}
                 onMouseLeave={() => setHovered(null)}
+                tabIndex={0}
+                role="img"
+                aria-label={`${isToday ? "Today" : d.day}, ${d.date}, score ${d.score}, ${scoreLabel(d.score)}`}
+                onFocus={() => setHovered(i)}
+                onBlur={() => setHovered(null)}
               >
                 {isHovered && (
                   <div
@@ -173,6 +178,6 @@ export default function ForecastChart({ data }: { data: ForecastDay[] }) {
           <span>High strain</span>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import type { AuthResult } from "@/lib/types";
 import { setOnboardedCookie, setSessionCookie } from "@/lib/auth";
+import { parseAuthResult } from "@/lib/validators";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
@@ -50,15 +51,15 @@ export default function LoginPage() {
           "overload-pending-register",
           JSON.stringify({ email: email.trim(), password, name: name.trim() })
         );
-        setSessionCookie();
+        await setSessionCookie();
         router.push("/onboarding");
       } else if (mode === "signin") {
         const result = await api.post<AuthResult>("/api/auth/login", {
           email: email.trim(),
           password,
-        });
-        login(result);
-        setOnboardedCookie();
+        }, parseAuthResult);
+        await login(result);
+        await setOnboardedCookie();
         router.push("/dashboard");
       } else {
         // forgot password — always show the same message to prevent enumeration

@@ -6,6 +6,7 @@ import {
   buildNotificationText,
   type ForecastDay,
 } from "./data";
+import { formatDateForDisplay, getTodayString } from "@/lib/date";
 import { useDashboardData } from "@/contexts/DashboardDataContext";
 import DashboardSkeleton from "@/components/dashboard/DashboardSkeleton";
 import type { ScoreCardResult, CheckIn } from "@/lib/types";
@@ -43,7 +44,7 @@ function buildForecast(scoreCard: ScoreCardResult | null, checkins: CheckIn[]): 
   for (let i = -6; i <= 0; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
-    const dateStr = d.toISOString().split("T")[0];
+    const dateStr = getTodayString(d);
     const isToday = i === 0;
     const ci = checkins.find(c => c.checked_in_date === dateStr);
     const score = isToday
@@ -52,7 +53,7 @@ function buildForecast(scoreCard: ScoreCardResult | null, checkins: CheckIn[]): 
     if (score !== null) {
       result.push({
         day: d.toLocaleDateString("en-US", { weekday: "short" }),
-        date: isToday ? "Today" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        date: isToday ? "Today" : formatDateForDisplay(d),
         score,
         level: scoreLevel(score),
       });
@@ -62,9 +63,31 @@ function buildForecast(scoreCard: ScoreCardResult | null, checkins: CheckIn[]): 
 }
 
 export default function DashboardPage() {
-  const { scoreCard, checkins, insightBundle, loadingData, ready, handleCheckInComplete } = useDashboardData();
+  const {
+    scoreCard,
+    checkins,
+    insightBundle,
+    loadingData,
+    loadError,
+    ready,
+    handleCheckInComplete,
+    reload,
+  } = useDashboardData();
 
   if (loadingData) return <DashboardSkeleton showCalculatingLabel />;
+  if (loadError) {
+    return (
+      <div className="dash-content">
+        <div className="dash-card">
+          <h1 className="dash-greeting">Dashboard unavailable</h1>
+          <p className="dash-subheading">{loadError}</p>
+          <button className="settings-outline-btn" onClick={() => void reload()}>
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Ambient danger mode
   const liveScore = scoreCard?.score.score ?? 55;
@@ -91,7 +114,7 @@ export default function DashboardPage() {
         const isAfterTime =
           nowTime.getHours() > hh ||
           (nowTime.getHours() === hh && nowTime.getMinutes() >= mm);
-        const notifKey = `notif-sent-${nowTime.toISOString().split("T")[0]}`;
+        const notifKey = `notif-sent-${getTodayString(nowTime)}`;
 
         if (isAfterTime && !localStorage.getItem(notifKey)) {
           const savedName = localStorage.getItem("overload-name") || "";
@@ -129,15 +152,17 @@ export default function DashboardPage() {
     .slice()
     .sort((a, b) => a.checked_in_date.localeCompare(b.checked_in_date))
     .map(ci => ({
-      date: new Date(ci.checked_in_date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      date: formatDateForDisplay(ci.checked_in_date),
       score: ci.score,
     }));
 
   // Today's note and stress from the most recent check-in (today's date)
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getTodayString();
   const todayCI  = checkins.find(c => c.checked_in_date === todayStr);
   const todayNote   = todayCI?.note ?? undefined;
   const todayStress = todayCI?.stress ?? null;
+  const latestCheckIn = checkins[0];
+  const recoveryStress = todayStress ?? latestCheckIn?.stress ?? (liveScore > 65 ? 4 : undefined);
 
   return (
     <div className="dash-content dash-fade-in">
@@ -183,9 +208,9 @@ export default function DashboardPage() {
         plan={[]}
         score={liveScore}
         note={todayNote}
-        stress={todayStress ?? undefined}
+        stress={recoveryStress ?? undefined}
         consecutiveDays={0}
-        role={scoreCard ? "engineer" : "engineer"}
+        role={latestCheckIn?.role_snapshot ?? "engineer"}
       />
 
       <HistoryChart data={realHistory.length ? realHistory : []} checkinCount={checkinCount} />

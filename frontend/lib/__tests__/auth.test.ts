@@ -44,20 +44,20 @@ describe("auth storage helpers", () => {
     expect(getAccessToken()).toBeNull();
   });
 
-  it("setSessionCookie sets overload-session cookie", () => {
-    setSessionCookie();
+  it("setSessionCookie sets overload-session cookie", async () => {
+    await setSessionCookie();
     expect(document.cookie).toContain("overload-session=1");
   });
 
-  it("setOnboardedCookie sets overload-onboarded cookie", () => {
-    setOnboardedCookie();
+  it("setOnboardedCookie sets overload-onboarded cookie", async () => {
+    await setOnboardedCookie();
     expect(document.cookie).toContain("overload-onboarded=1");
   });
 
-  it("clearSessionCookie removes both cookies", () => {
-    setSessionCookie();
-    setOnboardedCookie();
-    clearSessionCookie();
+  it("clearSessionCookie removes both cookies", async () => {
+    await setSessionCookie();
+    await setOnboardedCookie();
+    await clearSessionCookie();
     expect(document.cookie).not.toContain("overload-session=1");
     expect(document.cookie).not.toContain("overload-onboarded=1");
   });

@@ -7,21 +7,12 @@ interface WaitlistBody {
   source?: string;
 }
 
-// Simple in-memory rate limit (1 submission per IP per minute)
-const submissions = new Map<string, number>();
 const RATE_LIMIT_MS = 60_000;
-
-function isRateLimited(ip: string): boolean {
-  const last = submissions.get(ip);
-  if (!last) return false;
-  return Date.now() - last < RATE_LIMIT_MS;
-}
+const RATE_LIMIT_COOKIE = "overload-waitlist-limit";
 
 export async function POST(req: NextRequest) {
-  const ip =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-
-  if (isRateLimited(ip)) {
+  const limitedUntil = Number.parseInt(req.cookies.get(RATE_LIMIT_COOKIE)?.value ?? "0", 10);
+  if (!Number.isNaN(limitedUntil) && limitedUntil > Date.now()) {
     return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   }
 
@@ -30,14 +21,12 @@ export async function POST(req: NextRequest) {
   const audienceId = process.env.RESEND_AUDIENCE_ID;
 
   if (!apiKey) {
-    console.error("[waitlist] RESEND_API_KEY is not set in .env.local");
     return NextResponse.json(
       { error: "Server misconfiguration: RESEND_API_KEY missing." },
       { status: 500 },
     );
   }
   if (!audienceId) {
-    console.error("[waitlist] RESEND_AUDIENCE_ID is not set in .env.local");
     return NextResponse.json(
       { error: "Server misconfiguration: RESEND_AUDIENCE_ID missing." },
       { status: 500 },
@@ -65,11 +54,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  submissions.set(ip, Date.now());
-
   // ── 1. Add to Resend audience ───────────────────────────────────
   let resendStatus: number;
-  let resendBody: unknown;
 
   try {
     const resendRes = await fetch(
@@ -85,17 +71,22 @@ export async function POST(req: NextRequest) {
     );
 
     resendStatus = resendRes.status;
-    resendBody = await resendRes.json().catch(() => null);
-
-    console.log("[waitlist] Resend response:", resendStatus, resendBody);
+    const resendBody = await resendRes.json().catch(() => null);
 
     if (resendStatus === 409) {
       // Already on list — silent success
-      return NextResponse.json({ ok: true, duplicate: true });
+      const response = NextResponse.json({ ok: true, duplicate: true });
+      response.cookies.set(RATE_LIMIT_COOKIE, String(Date.now() + RATE_LIMIT_MS), {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: Math.ceil(RATE_LIMIT_MS / 1000),
+      });
+      return response;
     }
 
     if (!resendRes.ok) {
-      console.error("[waitlist] Resend error:", resendStatus, resendBody);
       return NextResponse.json(
         {
           error: `Resend rejected the request (${resendStatus}). Check your RESEND_AUDIENCE_ID and API key permissions.`,
@@ -103,8 +94,7 @@ export async function POST(req: NextRequest) {
         { status: 500 },
       );
     }
-  } catch (err) {
-    console.error("[waitlist] Network error calling Resend:", err);
+  } catch {
     return NextResponse.json(
       { error: "Could not reach Resend API. Check your internet/firewall." },
       { status: 500 },
@@ -137,17 +127,20 @@ export async function POST(req: NextRequest) {
       });
 
       if (!notifyRes.ok) {
-        const notifyBody = await notifyRes.json().catch(() => null);
-        console.warn(
-          "[waitlist] Owner notify failed:",
-          notifyRes.status,
-          notifyBody,
-        );
+        await notifyRes.json().catch(() => null);
       }
-    } catch (err) {
-      console.warn("[waitlist] Owner notify network error:", err);
+    } catch {
+      // Owner notification failure should not block waitlist signup.
     }
   }
 
-  return NextResponse.json({ ok: true });
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set(RATE_LIMIT_COOKIE, String(Date.now() + RATE_LIMIT_MS), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: Math.ceil(RATE_LIMIT_MS / 1000),
+  });
+  return response;
 }

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { formatDateForDisplay } from "@/lib/date";
+import { parseCheckIns } from "@/lib/validators";
 import type { CheckIn } from "@/lib/types";
 import {
   scoreColor,
@@ -27,13 +29,31 @@ export default function HistoryPage() {
   const { api } = useAuth();
   const [checkins, setCheckins] = useState<CheckIn[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  async function loadHistory() {
+    if (!api) return;
+    setLoading(true);
+    setError("");
+
+    try {
+      const result = await Promise.race([
+        api.get("/api/checkins", parseCheckIns),
+        new Promise<CheckIn[]>((_, reject) => {
+          setTimeout(() => reject(new Error("History took too long to load.")), 5000);
+        }),
+      ]);
+      setCheckins(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load history.");
+      setCheckins([]);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    if (!api) return;
-    api.get<CheckIn[]>("/api/checkins")
-      .then(setCheckins)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    void loadHistory();
   }, [api]);
 
   // Map API checkins (newest first) to chart shape (oldest first for 30-day view)
@@ -42,10 +62,7 @@ export default function HistoryPage() {
     .reverse()
     .slice(-30)
     .map((c) => ({
-      date: new Date(c.checked_in_date + "T00:00:00").toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      }),
+      date: formatDateForDisplay(c.checked_in_date),
       score: c.score,
     }));
 
@@ -67,6 +84,22 @@ export default function HistoryPage() {
         <header className="dash-header">
           <h1 className="dash-greeting">Your history</h1>
         </header>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="dash-content">
+        <header className="dash-header">
+          <h1 className="dash-greeting">Your history</h1>
+          <p className="dash-subheading">{error}</p>
+        </header>
+        <div className="dash-card">
+          <button className="settings-outline-btn" onClick={() => void loadHistory()}>
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
@@ -148,10 +181,7 @@ export default function HistoryPage() {
 
           <div className="hist-log-list">
             {checkins.map((c, i) => {
-              const dateLabel = new Date(c.checked_in_date + "T00:00:00").toLocaleDateString(
-                "en-US",
-                { month: "short", day: "numeric" }
-              );
+              const dateLabel = formatDateForDisplay(c.checked_in_date);
               return (
                 <div key={i} className="hist-log-row">
                   <div className="hist-log-date">{dateLabel}</div>

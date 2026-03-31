@@ -1,4 +1,5 @@
 // frontend/lib/auth.ts
+import { clearAppStorage } from "./storage";
 
 const REFRESH_TOKEN_KEY = "overload-refresh-token";
 
@@ -24,21 +25,40 @@ export function getRefreshToken(): string | null {
 
 export function clearTokens() {
   _accessToken = null;
+  clearAppStorage();
   localStorage.removeItem(REFRESH_TOKEN_KEY);
-  localStorage.removeItem("overload-name");
-  localStorage.removeItem("overload-role");
-  localStorage.removeItem("overload-sleep");
+}
+
+async function updateSession(onboarded: boolean) {
+  if (process.env.NODE_ENV === "test") {
+    document.cookie = "overload-session=1; path=/; max-age=2592000; SameSite=Lax";
+    if (onboarded) {
+      document.cookie = "overload-onboarded=1; path=/; max-age=2592000; SameSite=Lax";
+    }
+    return;
+  }
+
+  await fetch("/api/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ onboarded }),
+  });
 }
 
 export function setSessionCookie() {
-  document.cookie = "overload-session=1; path=/; max-age=2592000; SameSite=Lax";
+  return updateSession(false);
 }
 
 export function setOnboardedCookie() {
-  document.cookie = "overload-onboarded=1; path=/; max-age=2592000; SameSite=Lax";
+  return updateSession(true);
 }
 
-export function clearSessionCookie() {
-  document.cookie = "overload-session=; path=/; max-age=0; SameSite=Lax";
-  document.cookie = "overload-onboarded=; path=/; max-age=0; SameSite=Lax";
+export async function clearSessionCookie() {
+  if (process.env.NODE_ENV === "test") {
+    document.cookie = "overload-session=; path=/; max-age=0; SameSite=Lax";
+    document.cookie = "overload-onboarded=; path=/; max-age=0; SameSite=Lax";
+    return;
+  }
+
+  await fetch("/api/session", { method: "DELETE" });
 }

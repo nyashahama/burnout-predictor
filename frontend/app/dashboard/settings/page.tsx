@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef } from "react";
 import { computePersonalSignature } from "../data";
 import { useAuth } from "@/contexts/AuthContext";
+import { getTodayString } from "@/lib/date";
+import { safeParseJson } from "@/lib/storage";
+import { parseNotificationPrefs, parseUserResponse } from "@/lib/validators";
 import type { UserResponse, NotificationPrefs, UpdateProfileRequest } from "@/lib/types";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -21,13 +24,13 @@ function getRealCheckIns(): Array<{ date: string; stress: number; score: number;
     try {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
-      const parsed = JSON.parse(raw);
+      const parsed = safeParseJson<Record<string, unknown>>(raw, {});
       const dateStr = key.replace("checkin-", ""); // YYYY-MM-DD
       entries.push({
         date: dateStr,
-        stress: parsed.stress ?? 0,
-        score: parsed.score ?? 0,
-        note: parsed.note,
+        stress: typeof parsed.stress === "number" ? parsed.stress : 0,
+        score: typeof parsed.score === "number" ? parsed.score : 0,
+        note: typeof parsed.note === "string" ? parsed.note : undefined,
       });
     } catch {}
   }
@@ -93,69 +96,6 @@ function ConfirmModal({
   );
 }
 
-function GCalModal({ onConnect, onClose }: { onConnect: () => void; onClose: () => void }) {
-  const [phase, setPhase] = useState<"idle" | "connecting" | "done">("idle");
-
-  function handleConnect() {
-    setPhase("connecting");
-    // Simulate OAuth delay
-    setTimeout(() => {
-      setPhase("done");
-      setTimeout(() => {
-        onConnect();
-      }, 800);
-    }, 1800);
-  }
-
-  return (
-    <div className="modal-backdrop" onClick={phase === "idle" ? onClose : undefined}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        {phase === "idle" && (
-          <>
-            <div className="modal-icon">📅</div>
-            <div className="modal-title">Connect Google Calendar</div>
-            <p className="modal-body">
-              Overload will read your calendar density — meetings, blocked focus time, and
-              scheduling patterns — to improve your score accuracy. No event content is stored.
-            </p>
-            <div className="modal-permissions">
-              <div className="modal-perm-item">
-                <span className="modal-perm-icon">✓</span> Read meeting counts and times
-              </div>
-              <div className="modal-perm-item">
-                <span className="modal-perm-icon">✓</span> Detect focus blocks vs fragmented days
-              </div>
-              <div className="modal-perm-item modal-perm-never">
-                <span className="modal-perm-icon">✗</span> Event titles, descriptions, or attendees
-              </div>
-            </div>
-            <div className="modal-actions">
-              <button className="modal-cancel" onClick={onClose}>Cancel</button>
-              <button className="modal-confirm" onClick={handleConnect}>
-                Connect with Google
-              </button>
-            </div>
-          </>
-        )}
-
-        {phase === "connecting" && (
-          <div className="modal-connecting">
-            <div className="modal-spinner" />
-            <div className="modal-connecting-text">Connecting to Google Calendar…</div>
-          </div>
-        )}
-
-        {phase === "done" && (
-          <div className="modal-connecting">
-            <div className="modal-done-icon">✓</div>
-            <div className="modal-connecting-text">Calendar connected!</div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
@@ -177,7 +117,6 @@ export default function SettingsPage() {
   const reminderTimeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saved, setSaved]                   = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
-  const [showGcalModal, setShowGcalModal]   = useState(false);
   const [cleared, setCleared]               = useState(false);
   const [exported, setExported]             = useState(false);
   const [learnedProfile, setLearnedProfile] = useState<{
@@ -192,14 +131,16 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!api) return;
     Promise.all([
-      api.get<UserResponse>("/api/user"),
-      api.get<NotificationPrefs>("/api/notifications/prefs"),
+      api.get("/api/user", parseUserResponse),
+      api.get("/api/notifications/prefs", parseNotificationPrefs),
     ])
       .then(([p, n]) => {
         setProfile(p);
         setNotifPrefs(n);
       })
-      .catch(console.error);
+      .catch(() => {
+        setSaveError("Could not load your current settings.");
+      });
   }, [api]);
 
   // Sync form fields when profile or notifPrefs load
@@ -253,6 +194,7 @@ export default function SettingsPage() {
     setSaveError("");
     try {
       const updated = await api.patch<UserResponse>("/api/user", updates);
+      setSaved(true);
       setProfile(updated);
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Failed to save");
@@ -268,6 +210,7 @@ export default function SettingsPage() {
     setSaveError("");
     try {
       const updated = await api.patch<NotificationPrefs>("/api/notifications/prefs", updates);
+      setSaved(true);
       setNotifPrefs(updated);
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Failed to save");
@@ -285,8 +228,6 @@ export default function SettingsPage() {
       role,
       sleep_baseline: Number(sleep),
     });
-
-    setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   }
 
@@ -306,7 +247,7 @@ export default function SettingsPage() {
 
   function handleExport() {
     const csv = buildCSV();
-    const today = new Date().toISOString().split("T")[0];
+    const today = getTodayString();
     downloadCSV(csv, `overload-history-${today}.csv`);
     setExported(true);
     setTimeout(() => setExported(false), 2500);
@@ -339,15 +280,6 @@ export default function SettingsPage() {
 
   // ── GCal connect ──────────────────────────────────────────────────────────
 
-  function handleGcalConnect() {
-    setGcalConnected(true);
-    setShowGcalModal(false);
-  }
-
-  function handleGcalDisconnect() {
-    setGcalConnected(false);
-  }
-
   const initials = name.trim() ? name.trim()[0].toUpperCase() : "?";
 
   const notifBlocked = notifPermission === "denied";
@@ -361,13 +293,6 @@ export default function SettingsPage() {
           confirmLabel="Yes, clear everything"
           onConfirm={handleClearConfirm}
           onCancel={() => setShowClearModal(false)}
-        />
-      )}
-
-      {showGcalModal && (
-        <GCalModal
-          onConnect={handleGcalConnect}
-          onClose={() => setShowGcalModal(false)}
         />
       )}
 
@@ -558,7 +483,12 @@ export default function SettingsPage() {
               <input
                 type="checkbox"
                 checked={weeklySummary}
-                onChange={(e) => { if (!saving) saveNotifPrefs({ monday_debrief_email: e.target.checked }); }}
+                onChange={(e) => {
+                  setWeeklySummary(e.target.checked);
+                  if (!saving) {
+                    void saveNotifPrefs({ monday_debrief_email: e.target.checked });
+                  }
+                }}
               />
               <span className="settings-toggle-track" />
               <span className="settings-toggle-thumb" />
@@ -573,7 +503,6 @@ export default function SettingsPage() {
             The more context the app has, the more accurate your score. Your data stays on your device — nothing is stored from third-party services.
           </p>
 
-          {/* Google Calendar — live integration */}
           <div className="settings-integration settings-integration--gcal">
             <div className="settings-integration-icon">📅</div>
             <div className="settings-integration-info">
@@ -581,27 +510,12 @@ export default function SettingsPage() {
               <div className="settings-integration-sub">
                 {gcalConnected
                   ? "Reading meeting density · calendar signal active in your score"
-                  : "Auto-detect meeting load and blocked focus time"}
+                  : "Calendar sync is not available yet. The placeholder connect flow has been removed."}
               </div>
             </div>
-            {gcalConnected ? (
-              <div className="settings-integration-connected-wrap">
-                <div className="settings-integration-connected">Connected ✓</div>
-                <button
-                  className="settings-integration-disconnect"
-                  onClick={handleGcalDisconnect}
-                >
-                  Disconnect
-                </button>
-              </div>
-            ) : (
-              <button
-                className="settings-outline-btn"
-                onClick={() => setShowGcalModal(true)}
-              >
-                Connect
-              </button>
-            )}
+            <div className="settings-integration-badge">
+              {gcalConnected ? "Connected" : "Coming soon"}
+            </div>
           </div>
 
           {/* Others — coming soon */}
@@ -659,6 +573,7 @@ export default function SettingsPage() {
             className={`settings-save${saved ? " settings-save--saved" : ""}`}
             onClick={handleSave}
             disabled={saving}
+            aria-busy={saving}
           >
             {saving ? "Saving…" : saved ? "Saved ✓" : "Save changes"}
           </button>

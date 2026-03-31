@@ -1,6 +1,8 @@
 // frontend/lib/api.ts
 import type { ApiError } from "./types";
 
+type Validator<T> = (value: unknown) => T;
+
 export class ApiClientError extends Error {
   constructor(
     public status: number,
@@ -27,7 +29,8 @@ export class ApiClient {
   private async request<T>(
     method: string,
     path: string,
-    body?: unknown
+    body?: unknown,
+    validate?: Validator<T>,
   ): Promise<T> {
     const token = this.getToken();
     const headers: Record<string, string> = {
@@ -73,23 +76,24 @@ export class ApiClient {
 
     if (res.status === 204) return undefined as T;
 
-    return res.json() as Promise<T>;
+    const payload = (await res.json()) as unknown;
+    return validate ? validate(payload) : (payload as T);
   }
 
-  get<T>(path: string): Promise<T> {
-    return this.request<T>("GET", path);
+  get<T>(path: string, validate?: Validator<T>): Promise<T> {
+    return this.request<T>("GET", path, undefined, validate);
   }
 
-  post<T>(path: string, body?: unknown): Promise<T> {
-    return this.request<T>("POST", path, body);
+  post<T>(path: string, body?: unknown, validate?: Validator<T>): Promise<T> {
+    return this.request<T>("POST", path, body, validate);
   }
 
-  patch<T>(path: string, body: unknown): Promise<T> {
-    return this.request<T>("PATCH", path, body);
+  patch<T>(path: string, body: unknown, validate?: Validator<T>): Promise<T> {
+    return this.request<T>("PATCH", path, body, validate);
   }
 
-  delete<T>(path: string): Promise<T> {
-    return this.request<T>("DELETE", path);
+  delete<T>(path: string, validate?: Validator<T>): Promise<T> {
+    return this.request<T>("DELETE", path, undefined, validate);
   }
 }
 

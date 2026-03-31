@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { DashboardDataProvider } from "@/contexts/DashboardDataContext";
+import { getTodayString } from "@/lib/date";
+import { safeParseJson } from "@/lib/storage";
 
 const navItems = [
   { href: "/dashboard",          label: "Dashboard", icon: "◎" },
@@ -22,13 +24,11 @@ function getConsecutiveDanger(): number {
   for (let i = 1; i <= 10; i++) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
-    const raw = localStorage.getItem(`checkin-${d.toISOString().split("T")[0]}`);
+    const raw = localStorage.getItem(`checkin-${getTodayString(d)}`);
     if (!raw) break;
-    try {
-      const parsed = JSON.parse(raw);
-      if (parsed.stress >= 4) n++;
-      else break;
-    } catch { break; }
+    const parsed = safeParseJson<{ stress?: number }>(raw, {});
+    if ((parsed.stress ?? 0) >= 4) n++;
+    else break;
   }
   return n;
 }
@@ -134,7 +134,7 @@ function WeeklyPrompt() {
     const isMorning = now.getHours() >= 7 && now.getHours() < 12;
     if (!isMonday || !isMorning) return;
 
-    const dismissKey = `weekly-dismissed-${now.toISOString().split("T")[0]}`;
+    const dismissKey = `weekly-dismissed-${getTodayString(now)}`;
     if (localStorage.getItem(dismissKey)) return;
 
     setShow(true);
@@ -142,7 +142,7 @@ function WeeklyPrompt() {
 
   function dismiss() {
     const now = new Date();
-    localStorage.setItem(`weekly-dismissed-${now.toISOString().split("T")[0]}`, "1");
+    localStorage.setItem(`weekly-dismissed-${getTodayString(now)}`, "1");
     setShow(false);
   }
 
@@ -189,14 +189,14 @@ export default function DashboardShell({
     for (let i = 0; i < 365; i++) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
-      const key = `checkin-${d.toISOString().split("T")[0]}`;
+      const key = `checkin-${getTodayString(d)}`;
       if (localStorage.getItem(key)) s++;
       else break;
     }
     setStreak(s);
 
     // Check if user checked in today
-    const todayKey = `checkin-${now.toISOString().split("T")[0]}`;
+    const todayKey = `checkin-${getTodayString(now)}`;
     setHasCheckedIn(!!localStorage.getItem(todayKey));
   }, [user]);
 
@@ -216,15 +216,16 @@ export default function DashboardShell({
           <span className="dash-logo-mark">O<em>l</em></span>
         </div>
 
-        <nav className="dash-nav">
+        <nav className="dash-nav" aria-label="Dashboard navigation">
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={`dash-nav-item${pathname === item.href ? " dash-nav-active" : ""}`}
               title={item.label}
+              aria-current={pathname === item.href ? "page" : undefined}
             >
-              <span className="dash-nav-icon">{item.icon}</span>
+              <span className="dash-nav-icon" aria-hidden="true">{item.icon}</span>
               <span className="dash-nav-label">{item.label}</span>
             </Link>
           ))}
@@ -260,8 +261,9 @@ export default function DashboardShell({
             key={item.href}
             href={item.href}
             className={`dash-bottom-item${pathname === item.href ? " dash-bottom-active" : ""}`}
+            aria-current={pathname === item.href ? "page" : undefined}
           >
-            <span className="dash-bottom-icon">{item.icon}</span>
+            <span className="dash-bottom-icon" aria-hidden="true">{item.icon}</span>
             <span className="dash-bottom-label">{item.label}</span>
           </Link>
         ))}

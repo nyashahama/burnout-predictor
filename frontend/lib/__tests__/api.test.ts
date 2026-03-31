@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { server } from "../../vitest.setup";
 import { ApiClient } from "../api";
+import { parseUserResponse } from "../validators";
 
 const BASE = "http://localhost:8080";
 
@@ -95,5 +96,17 @@ describe("ApiClient", () => {
     );
     await client.get("/api/health");
     expect(authHeader).toBeNull();
+  });
+
+  it("rejects malformed JSON when a validator is provided", async () => {
+    server.use(
+      http.get(`${BASE}/api/user`, () =>
+        HttpResponse.json({ id: 1, name: "Alex" })
+      )
+    );
+
+    await expect(client.get("/api/user", parseUserResponse)).rejects.toThrow(
+      /invalid api response/i,
+    );
   });
 });

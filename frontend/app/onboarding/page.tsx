@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import type { AuthResult } from "@/lib/types";
 import { setOnboardedCookie } from "@/lib/auth";
+import { safeParseJson } from "@/lib/storage";
+import { parseAuthResult } from "@/lib/validators";
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 
@@ -200,9 +202,10 @@ export default function OnboardingPage() {
     setLoading(true);
     setError("");
     try {
-      const pending = JSON.parse(
-        sessionStorage.getItem("overload-pending-register") ?? "{}"
-      ) as { email?: string; password?: string; name?: string };
+      const pending = safeParseJson<{ email?: string; password?: string; name?: string }>(
+        sessionStorage.getItem("overload-pending-register"),
+        {},
+      );
 
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
@@ -213,17 +216,17 @@ export default function OnboardingPage() {
         role,
         sleep_baseline: parseInt(sleep, 10),
         timezone: tz,
-      });
+      }, parseAuthResult);
 
       sessionStorage.removeItem("overload-pending-register");
-      login(result);
+      await login(result);
 
       localStorage.setItem("overload-name", result.user.name);
       localStorage.setItem("overload-role", result.user.role);
       localStorage.setItem("overload-sleep", String(result.user.sleep_baseline));
       localStorage.setItem("overload-last-felt", lastFelt);
 
-      setOnboardedCookie();
+      await setOnboardedCookie();
       router.push("/dashboard");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Registration failed. Please try again.";
