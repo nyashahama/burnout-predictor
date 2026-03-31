@@ -1,219 +1,167 @@
 "use client";
 
-import { useEffect } from "react";
-import {
-  scoreLabel,
-  buildNotificationText,
-  type ForecastDay,
-} from "./data";
-import { formatDateForDisplay, getTodayString } from "@/lib/date";
+import { Activity, RefreshCcw, TrendingDown, TrendingUp } from "lucide-react";
+import CheckIn from "@/components/dashboard/CheckIn";
 import { useDashboardData } from "@/contexts/DashboardDataContext";
-import DashboardSkeleton from "@/components/dashboard/DashboardSkeleton";
-import type { ScoreCardResult, CheckIn } from "@/lib/types";
-import ScoreCard from "@/components/dashboard/ScoreCard";
-import ForecastChart from "@/components/dashboard/ForecastChart";
-import CheckInComponent from "@/components/dashboard/CheckIn";
-import HistoryChart from "@/components/dashboard/HistoryChart";
-import UserGreeting from "@/components/dashboard/UserGreeting";
-import BurnoutAlert from "@/components/dashboard/BurnoutAlert";
-import RecoveryPlan from "@/components/dashboard/RecoveryPlan";
-import MondayDebrief from "@/components/dashboard/MondayDebrief";
-import ComebackCard from "@/components/dashboard/ComebackCard";
-import MilestoneInsight from "@/components/dashboard/MilestoneInsight";
-import EarlyArc from "@/components/dashboard/EarlyArc";
-import GapReturn from "@/components/dashboard/GapReturn";
-import RecoveryMilestone from "@/components/dashboard/RecoveryMilestone";
-import PersonalizedInsight from "@/components/dashboard/PersonalizedInsight";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatDateForDisplay, getTodayString } from "@/lib/date";
 
-// Forecast stats derived from live forecast (updated after check-in)
-function getForecastStats(data: ForecastDay[]) {
-  const dangerDaysAhead = Math.max(0, data.filter((d) => d.score > 65).length - 1);
-  const firstRecoveryDay = data.find((d, i) => i > 0 && d.score <= 40);
-  return { dangerDaysAhead, firstRecoveryDay };
-}
-
-function scoreLevel(s: number): "ok" | "warning" | "danger" {
-  if (s > 65) return "danger";
-  if (s > 40) return "warning";
-  return "ok";
-}
-
-function buildForecast(scoreCard: ScoreCardResult | null, checkins: CheckIn[]): ForecastDay[] {
-  const result: ForecastDay[] = [];
-  const today = new Date();
-  for (let i = -6; i <= 0; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    const dateStr = getTodayString(d);
-    const isToday = i === 0;
-    const ci = checkins.find(c => c.checked_in_date === dateStr);
-    const score = isToday
-      ? (scoreCard?.score.score ?? ci?.score ?? null)
-      : (ci?.score ?? null);
-    if (score !== null) {
-      result.push({
-        day: d.toLocaleDateString("en-US", { weekday: "short" }),
-        date: isToday ? "Today" : formatDateForDisplay(d),
-        score,
-        level: scoreLevel(score),
-      });
-    }
-  }
-  return result;
+function getLevel(score: number) {
+  if (score > 65) return { label: "High strain", tone: "destructive" as const };
+  if (score > 40) return { label: "Watch this", tone: "secondary" as const };
+  return { label: "In your zone", tone: "default" as const };
 }
 
 export default function DashboardPage() {
-  const {
-    scoreCard,
-    checkins,
-    insightBundle,
-    loadingData,
-    loadError,
-    ready,
-    handleCheckInComplete,
-    reload,
-  } = useDashboardData();
+  const { scoreCard, checkins, insightBundle, loadingData, loadError, reload, handleCheckInComplete } = useDashboardData();
 
-  if (loadingData) return <DashboardSkeleton showCalculatingLabel />;
-  if (loadError) {
+  if (loadingData) {
     return (
-      <div className="dash-content">
-        <div className="dash-card">
-          <h1 className="dash-greeting">Dashboard unavailable</h1>
-          <p className="dash-subheading">{loadError}</p>
-          <button className="settings-outline-btn" onClick={() => void reload()}>
-            Try again
-          </button>
+      <div className="grid gap-6">
+        <Skeleton className="h-40 w-full" />
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-64 w-full" />
         </div>
       </div>
     );
   }
 
-  // Ambient danger mode
-  const liveScore = scoreCard?.score.score ?? 55;
-  useEffect(() => {
-    const lvl = liveScore > 65 ? "danger" : liveScore > 40 ? "warning" : "ok";
-    document.body.dataset.scoreLevel = lvl;
-    return () => { delete document.body.dataset.scoreLevel; };
-  }, [liveScore]);
+  if (loadError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Dashboard unavailable</CardTitle>
+          <CardDescription>{loadError}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={() => void reload()}>
+            <RefreshCcw className="h-4 w-4" />
+            Try again
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
-  // Trigger notification when past reminder time and not yet checked in today
-  useEffect(() => {
-    if (loadingData) return;
-    const streak = scoreCard?.streak ?? 0;
-    try {
-      if (
-        "Notification" in window &&
-        Notification.permission === "granted" &&
-        localStorage.getItem("overload-notif-enabled") === "1" &&
-        !scoreCard?.has_checkin
-      ) {
-        const timeStr = localStorage.getItem("overload-notif-time") || "17:30";
-        const [hh, mm] = timeStr.split(":").map(Number);
-        const nowTime = new Date();
-        const isAfterTime =
-          nowTime.getHours() > hh ||
-          (nowTime.getHours() === hh && nowTime.getMinutes() >= mm);
-        const notifKey = `notif-sent-${getTodayString(nowTime)}`;
-
-        if (isAfterTime && !localStorage.getItem(notifKey)) {
-          const savedName = localStorage.getItem("overload-name") || "";
-          const { title, body } = buildNotificationText({
-            streak,
-            consecutiveDangerDays: 0,
-            name: savedName || undefined,
-          });
-          new Notification(title, { body, icon: "/favicon.ico" });
-          localStorage.setItem(notifKey, "1");
-        }
-      }
-    } catch {}
-  }, [loadingData, scoreCard?.has_checkin, scoreCard?.streak]);
-
-  const hasCheckedIn = scoreCard?.has_checkin ?? false;
-  const level        = liveScore > 65 ? "danger" : liveScore > 40 ? "warning" : "ok";
-  const liveForecast = buildForecast(scoreCard, checkins);
-  const checkinCount = checkins.length;
-  const streak       = scoreCard?.streak ?? 0;
-
-  const scoreData = {
-    score: liveScore,
-    statusLabel: scoreLabel(liveScore),
-    level: level as "ok" | "warning" | "danger",
-    signals: scoreCard?.score.signals ?? [],
-    suggestion: scoreCard?.suggestion ?? "",
-    isPending: !hasCheckedIn,
-  };
-
-  const { dangerDaysAhead, firstRecoveryDay } = getForecastStats(liveForecast);
-
-  // Build history from real check-ins for HistoryChart
-  const realHistory = checkins
-    .slice()
-    .sort((a, b) => a.checked_in_date.localeCompare(b.checked_in_date))
-    .map(ci => ({
-      date: formatDateForDisplay(ci.checked_in_date),
-      score: ci.score,
-    }));
-
-  // Today's note and stress from the most recent check-in (today's date)
-  const todayStr = getTodayString();
-  const todayCI  = checkins.find(c => c.checked_in_date === todayStr);
-  const todayNote   = todayCI?.note ?? undefined;
-  const todayStress = todayCI?.stress ?? null;
-  const latestCheckIn = checkins[0];
-  const recoveryStress = todayStress ?? latestCheckIn?.stress ?? (liveScore > 65 ? 4 : undefined);
+  const liveScore = scoreCard?.score.score ?? 0;
+  const streak = scoreCard?.streak ?? 0;
+  const level = getLevel(liveScore);
+  const recent = checkins.slice(0, 7).reverse();
+  const dangerDays = checkins.filter((entry) => entry.score > 65).length;
+  const todayCheckIn = checkins.find((entry) => entry.checked_in_date === getTodayString());
 
   return (
-    <div className="dash-content dash-fade-in">
-      <BurnoutAlert
-        score={liveScore}
-        trend={0}
-        dangerStreak={0}
-        dangerDaysAhead={dangerDaysAhead}
-        recoveryDate={firstRecoveryDay?.date ?? "this weekend"}
-      />
-
-      <div className="dash-hero">
-        <UserGreeting liveScore={liveScore} />
-        <GapReturn hasCheckedIn={hasCheckedIn} />
-        <EarlyArc checkinCount={checkinCount} />
-        <ComebackCard currentScore={liveScore} />
-        <RecoveryMilestone />
-        <MilestoneInsight checkinCount={checkinCount} />
-        <MondayDebrief />
-        <div className="dash-grid">
-          <ScoreCard
-            data={scoreData}
-            trend={0}
-            dangerStreak={0}
-            animate={ready}
-            streak={streak}
-            checkinCount={checkinCount}
-            explanation={scoreCard?.explanation}
-            trajectory={scoreCard?.trajectory ?? undefined}
-          />
-          <ForecastChart data={liveForecast} />
-          <CheckInComponent
-            checkins={checkins}
-            streakFromApi={scoreCard?.streak ?? 0}
-            onComplete={handleCheckInComplete}
-          />
-        </div>
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <h1 className="text-4xl tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground">
+          Your current score, recent trend, and today&apos;s recovery context in one place.
+        </p>
       </div>
 
-      <PersonalizedInsight bundle={insightBundle} />
+      <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between space-y-0">
+            <div>
+              <CardTitle className="text-2xl">Current strain</CardTitle>
+              <CardDescription>Updated from your latest check-in and profile context.</CardDescription>
+            </div>
+            <Badge variant={level.tone === "destructive" ? "destructive" : "secondary"}>{level.label}</Badge>
+          </CardHeader>
+          <CardContent className="grid gap-6 md:grid-cols-[220px_1fr] md:items-center">
+            <div className="rounded-2xl border border-primary/10 bg-primary/5 p-6 text-center">
+              <div className="text-6xl font-semibold text-primary">{liveScore}</div>
+              <div className="mt-2 text-sm uppercase tracking-[0.2em] text-muted-foreground">out of 100</div>
+            </div>
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="rounded-lg border border-border p-4">
+                  <div className="text-sm text-muted-foreground">Streak</div>
+                  <div className="mt-2 text-2xl font-semibold">{streak}</div>
+                </div>
+                <div className="rounded-lg border border-border p-4">
+                  <div className="text-sm text-muted-foreground">Danger days</div>
+                  <div className="mt-2 text-2xl font-semibold">{dangerDays}</div>
+                </div>
+                <div className="rounded-lg border border-border p-4">
+                  <div className="text-sm text-muted-foreground">Today</div>
+                  <div className="mt-2 text-2xl font-semibold">{todayCheckIn ? todayCheckIn.stress : "—"}</div>
+                </div>
+              </div>
+              <p className="text-sm leading-7 text-muted-foreground">
+                {scoreCard?.explanation ?? "Check in today to sharpen the score and recovery recommendations."}
+              </p>
+              {scoreCard?.trajectory && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  {scoreCard.trajectory.includes("down") ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
+                  {scoreCard.trajectory}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-      <RecoveryPlan
-        plan={[]}
-        score={liveScore}
-        note={todayNote}
-        stress={recoveryStress ?? undefined}
-        consecutiveDays={0}
-        role={latestCheckIn?.role_snapshot ?? "engineer"}
-      />
+        <CheckIn checkins={checkins} streakFromApi={streak} onComplete={handleCheckInComplete} />
+      </div>
 
-      <HistoryChart data={realHistory.length ? realHistory : []} checkinCount={checkinCount} />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
+              Last 7 check-ins
+            </CardTitle>
+            <CardDescription>Latest entries, oldest to newest.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {recent.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No check-ins yet. Your first one will appear here.</p>
+            ) : (
+              recent.map((entry) => (
+                <div key={entry.id} className="flex items-center justify-between rounded-lg border border-border px-4 py-3">
+                  <div>
+                    <div className="font-medium">{formatDateForDisplay(entry.checked_in_date)}</div>
+                    <div className="text-sm text-muted-foreground">{entry.note || "No note captured"}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-semibold">{entry.score}</div>
+                    <div className="text-xs uppercase tracking-[0.15em] text-muted-foreground">stress {entry.stress}</div>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Insights</CardTitle>
+            <CardDescription>What the backend has learned so far.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {insightBundle?.patterns?.length ? (
+              insightBundle.patterns.map((pattern, index) => (
+                <div key={index} className="rounded-lg border border-border px-4 py-3 text-sm leading-6">
+                  {pattern}
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Check in consistently for a few days and the dashboard will start surfacing pattern-based insights.
+              </p>
+            )}
+            {scoreCard?.suggestion && (
+              <div className="rounded-lg border border-primary/15 bg-primary/5 px-4 py-3 text-sm leading-6">
+                <span className="font-medium text-primary">Today&apos;s move:</span> {scoreCard.suggestion}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
