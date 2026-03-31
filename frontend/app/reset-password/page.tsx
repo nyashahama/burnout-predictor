@@ -1,15 +1,20 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { AuthShell } from "@/components/AuthShell";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { CardDescription, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
-
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
@@ -18,31 +23,21 @@ function ResetPasswordContent() {
 
   if (!token) {
     return (
-      <>
-        <div className="auth-heading">Invalid link</div>
-        <div className="auth-error" role="alert">
+      <div className="space-y-4">
+        <CardTitle className="text-3xl">Invalid link</CardTitle>
+        <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
           This reset link is missing a token. Please request a new one.
         </div>
-        <Link href="/login" className="auth-btn" style={{ textAlign: "center", textDecoration: "none", display: "block" }}>
-          Back to sign in
-        </Link>
-      </>
+        <Link href="/login" className={cn(buttonVariants(), "w-full")}>Back to sign in</Link>
+      </div>
     );
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
-      return;
-    }
-    if (password !== confirm) {
-      setError("Passwords do not match.");
-      return;
-    }
-
+    if (password.length < 8) return setError("Password must be at least 8 characters.");
+    if (password !== confirm) return setError("Passwords do not match.");
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
@@ -50,11 +45,9 @@ function ResetPasswordContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, password }),
       });
-
-      if (res.ok) {
-        setDone(true);
-      } else {
-        const data = await res.json().catch(() => ({})) as { error?: string };
+      if (res.ok) setDone(true);
+      else {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
         setError(data.error ?? "Something went wrong. Please try again.");
       }
     } catch {
@@ -65,84 +58,46 @@ function ResetPasswordContent() {
   }
 
   return (
-    <>
-      <div className="auth-heading">
-        {done ? "Password updated" : "Set a new password"}
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <CardTitle className="text-3xl">{done ? "Password updated" : "Set a new password"}</CardTitle>
+        <CardDescription className="text-base">
+          {done ? "You can now sign in with your new password." : "Choose a strong password — at least 8 characters."}
+        </CardDescription>
       </div>
-      <div className="auth-sub">
-        {done
-          ? "You can now sign in with your new password."
-          : "Choose a strong password — at least 8 characters."}
-      </div>
-
       {done ? (
-        <>
-          <div className="auth-success" role="status">
+        <div className="space-y-4">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">
             Your password has been reset successfully.
           </div>
-          <Link href="/login" className="auth-btn" style={{ textAlign: "center", textDecoration: "none", display: "block" }}>
-            Sign in →
-          </Link>
-        </>
+          <Link href="/login" className={cn(buttonVariants(), "w-full")}>Sign in →</Link>
+        </div>
       ) : (
-        <form className="auth-form" onSubmit={handleSubmit} noValidate aria-label="reset password form">
-          <div className="auth-field">
-            <label className="auth-label" htmlFor="password">New password</label>
-            <input
-              id="password"
-              className="auth-input"
-              type="password"
-              placeholder="At least 8 characters"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="new-password"
-              autoFocus
-            />
+        <form className="space-y-4" onSubmit={handleSubmit} noValidate aria-label="reset password form">
+          <div className="space-y-2">
+            <Label htmlFor="password">New password</Label>
+            <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" />
           </div>
-
-          <div className="auth-field">
-            <label className="auth-label" htmlFor="confirm">Confirm password</label>
-            <input
-              id="confirm"
-              className="auth-input"
-              type="password"
-              placeholder="Repeat your new password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              autoComplete="new-password"
-            />
+          <div className="space-y-2">
+            <Label htmlFor="confirm">Confirm password</Label>
+            <Input id="confirm" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Repeat your new password" />
           </div>
-
-          {error && <div className="auth-error" role="alert">{error}</div>}
-
-          <button
-            className={`auth-btn${loading ? " auth-btn--loading" : ""}`}
-            type="submit"
-            disabled={loading}
-          >
+          {error && <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">{error}</div>}
+          <Button className="w-full" type="submit" disabled={loading}>
             {loading ? "Just a moment…" : "Reset password →"}
-          </button>
+          </Button>
         </form>
       )}
-
-      {!done && (
-        <div className="auth-footer">
-          <Link href="/login" className="auth-link">← Back to sign in</Link>
-        </div>
-      )}
-    </>
+    </div>
   );
 }
 
 export default function ResetPasswordPage() {
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <Link href="/" className="auth-logo">Over<em>load</em></Link>
-        <Suspense fallback={<div className="auth-sub">Loading…</div>}>
-          <ResetPasswordContent />
-        </Suspense>
-      </div>
-    </div>
+    <AuthShell>
+      <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
+        <ResetPasswordContent />
+      </Suspense>
+    </AuthShell>
   );
 }
