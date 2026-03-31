@@ -121,6 +121,8 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
       score: result.score,
       explanation: result.explanation,
       suggestion: result.suggestion,
+      daily_forecast: result.daily_forecast,
+      recommended_action: result.recommended_action,
       has_checkin: true,
     } : null);
     setCheckins(prev => [
