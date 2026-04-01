@@ -48,12 +48,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Build the ApiClient once, injecting a live token getter closure.
-  const api = useMemo(
-    () => createApiClient(() => getAccessToken(), handleUnauthenticated),
-    [handleUnauthenticated]
-  );
-
   const login = useCallback(async (result: AuthResult) => {
     storeTokens(result.access_token, result.refresh_token);
     await setSessionCookie();
@@ -78,6 +72,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
   }, []);
+
+  // Build the ApiClient once, injecting a live token getter closure.
+  const api = useMemo(
+    () => createApiClient(() => getAccessToken(), handleUnauthenticated, refreshSession),
+    [handleUnauthenticated, refreshSession]
+  );
 
   const logout = useCallback(async () => {
     try {

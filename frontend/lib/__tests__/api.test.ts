@@ -86,6 +86,57 @@ describe("ApiClient", () => {
     expect(caught).toBeDefined();
   });
 
+  it("retries protected requests once after a 401 when refresh succeeds", async () => {
+    let attempts = 0;
+    let currentToken: string | null = "expired-token";
+
+    server.use(
+      http.get(`${BASE}/api/score`, ({ request }) => {
+        attempts += 1;
+        const authHeader = request.headers.get("Authorization");
+
+        if (authHeader === "Bearer fresh-token") {
+          return HttpResponse.json({
+            score: { score: 42, level: "warning", label: "Moderate load", signals: [] },
+            has_checkin: true,
+            streak: 3,
+            daily_forecast: {
+              score: 47,
+              delta: 5,
+              direction: "up",
+              confidence: "medium",
+              summary: "Tomorrow is likely to run about 5 points higher unless you reduce the load tonight.",
+            },
+            recommended_action: {
+              title: "Protect tonight's sleep",
+              detail: "Hard-stop work by 8 PM tonight.",
+              driver: "sleep",
+              confidence: "high",
+            },
+            trajectory: "stable",
+            explanation: "",
+            suggestion: "",
+            accuracy_label: "",
+          });
+        }
+
+        return HttpResponse.json({ error: "expired" }, { status: 401 });
+      })
+    );
+
+    const refreshAuth = vi.fn(async () => {
+      currentToken = "fresh-token";
+      return true;
+    });
+
+    const tokenClient = new ApiClient(BASE, () => currentToken, () => {}, refreshAuth);
+    const result = await tokenClient.get<{ score: { score: number } }>("/api/score");
+
+    expect(result.score.score).toBe(42);
+    expect(attempts).toBe(2);
+    expect(refreshAuth).toHaveBeenCalledTimes(1);
+  });
+
   it("attaches Authorization Bearer header when token provided", async () => {
     let authHeader: string | null = null;
     server.use(
