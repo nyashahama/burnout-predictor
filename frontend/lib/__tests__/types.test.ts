@@ -2,7 +2,6 @@ import { describe, it, expectTypeOf } from "vitest";
 import type {
   UserResponse,
   ScoreCardResult,
-  CheckIn,
   InsightBundle,
   NotificationPrefs,
   AuthResult,

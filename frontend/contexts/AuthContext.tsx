@@ -19,7 +19,7 @@ import {
   setOnboardedCookie,
   clearSessionCookie,
 } from "@/lib/auth";
-import { parseAuthResult, parseRefreshResult, parseUserResponse } from "@/lib/validators";
+import { parseRefreshResult, parseUserResponse } from "@/lib/validators";
 import type { AuthResult, RefreshResult, UserResponse } from "@/lib/types";
 
 interface AuthContextValue {

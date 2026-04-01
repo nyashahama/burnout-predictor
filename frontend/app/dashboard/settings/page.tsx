@@ -11,7 +11,7 @@ import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { parseNotificationPrefs, parseUserResponse } from "@/lib/validators";
 import { getTodayString } from "@/lib/date";
-import type { NotificationPrefs, UpdateProfileRequest, UserResponse } from "@/lib/types";
+import type { NotificationPrefs, UpdateProfileRequest } from "@/lib/types";
 
 function downloadFile(content: string, filename: string, mimeType = "application/json;charset=utf-8;") {
   const blob = new Blob([content], { type: mimeType });
@@ -24,9 +24,7 @@ function downloadFile(content: string, filename: string, mimeType = "application
 }
 
 export default function SettingsPage() {
-  const { api, user, updateUser } = useAuth();
-  const [profile, setProfile] = useState<UserResponse | null>(user);
-  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs | null>(null);
+  const { api, updateUser } = useAuth();
   const [name, setName] = useState("");
   const [role, setRole] = useState("engineer");
   const [sleep, setSleep] = useState("8");
@@ -42,8 +40,6 @@ export default function SettingsPage() {
       api.get("/api/notifications/prefs", parseNotificationPrefs),
     ])
       .then(([profileData, prefs]) => {
-        setProfile(profileData);
-        setNotifPrefs(prefs);
         setName(profileData.name);
         setRole(profileData.role);
         setSleep(String(profileData.sleep_baseline));
@@ -66,7 +62,6 @@ export default function SettingsPage() {
         sleep_baseline: Number(sleep),
       };
       const updated = await api.patch("/api/user", updates, parseUserResponse);
-      setProfile(updated);
       updateUser(updated);
       setMessage("Settings saved.");
     } catch (err) {
@@ -82,7 +77,7 @@ export default function SettingsPage() {
     setMessage("");
     try {
       const updated = await api.patch("/api/notifications/prefs", prefs, parseNotificationPrefs);
-      setNotifPrefs(updated);
+      void updated;
       setMessage("Notification preferences saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save preferences.");
