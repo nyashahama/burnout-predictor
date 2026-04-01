@@ -120,6 +120,7 @@ func TestAuthHandler_Register_ValidationErrors(t *testing.T) {
 		{"short_password", `{"email":"a@b.com","password":"short","role":"engineer","timezone":"UTC"}`},
 		{"bad_role", `{"email":"a@b.com","password":"password123","role":"ceo","timezone":"UTC"}`},
 		{"bad_sleep_baseline", `{"email":"a@b.com","password":"password123","role":"engineer","sleep_baseline":3,"timezone":"UTC"}`},
+		{"bad_estimated_score", `{"email":"a@b.com","password":"password123","role":"engineer","estimated_score":100,"timezone":"UTC"}`},
 		{"bad_timezone", `{"email":"a@b.com","password":"password123","role":"engineer","timezone":"NotReal/Zone"}`},
 	}
 	for _, tc := range tests {

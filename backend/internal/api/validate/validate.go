@@ -66,6 +66,13 @@ func SleepBaseline(v int16) error {
 	return nil
 }
 
+func EstimatedScore(v int16) error {
+	if v < 8 || v > 92 {
+		return errors.New("estimated_score must be between 8 and 92")
+	}
+	return nil
+}
+
 func NoteLength(s string) error {
 	if len([]rune(s)) > 280 {
 		return errors.New("note must be 280 characters or fewer")

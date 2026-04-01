@@ -141,8 +141,10 @@ func okRefreshToken(userID uuid.UUID) func(ctx context.Context, p db.CreateRefre
 
 func TestRegister_Success(t *testing.T) {
 	userID := uuid.New()
+	var capturedCreateUser db.CreateUserParams
 	store := &mockAuthStore{
 		createUser: func(_ context.Context, p db.CreateUserParams) (db.User, error) {
+			capturedCreateUser = p
 			return db.User{ID: userID, Email: p.Email, Name: p.Name, Role: p.Role, Tier: "free"}, nil
 		},
 		createRefreshToken: okRefreshToken(userID),
@@ -153,6 +155,7 @@ func TestRegister_Success(t *testing.T) {
 		Email:    "alice@example.com",
 		Password: "password123",
 		Name:     "Alice",
+		EstimatedScore: 28,
 	})
 
 	if err != nil {
@@ -166,6 +169,9 @@ func TestRegister_Success(t *testing.T) {
 	}
 	if res.RefreshToken == "" {
 		t.Error("RefreshToken is empty")
+	}
+	if !capturedCreateUser.EstimatedScore.Valid || capturedCreateUser.EstimatedScore.Int16 != 28 {
+		t.Errorf("EstimatedScore = %+v, want valid 28", capturedCreateUser.EstimatedScore)
 	}
 }
 

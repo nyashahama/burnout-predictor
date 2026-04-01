@@ -83,6 +83,7 @@ export default function OnboardingPage() {
           name: name.trim() || pending.name || "there",
           role,
           sleep_baseline: parseInt(sleep, 10),
+          estimated_score: score,
           timezone: tz,
         },
         parseAuthResult,
