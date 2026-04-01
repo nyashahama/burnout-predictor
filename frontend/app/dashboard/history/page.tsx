@@ -1,37 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import { RefreshCcw } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useDashboardData } from "@/contexts/DashboardDataContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { parseCheckIns } from "@/lib/validators";
 import { formatDateForDisplay } from "@/lib/date";
-import type { CheckIn } from "@/lib/types";
 
 export default function HistoryPage() {
-  const { api } = useAuth();
-  const [checkins, setCheckins] = useState<CheckIn[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const loadHistory = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const result = await api.get("/api/checkins", parseCheckIns);
-      setCheckins(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load history.");
-      setCheckins([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [api]);
-
-  useEffect(() => {
-    void loadHistory();
-  }, [loadHistory]);
+  const { checkins, loadingData, loadError, reload } = useDashboardData();
 
   const scores = checkins.map((entry) => entry.score);
   const average = scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : 0;
@@ -44,11 +20,11 @@ export default function HistoryPage() {
         <p className="text-muted-foreground">Every logged check-in, with the most recent entries first.</p>
       </div>
 
-      {error && (
+      {loadError && (
         <Card>
           <CardContent className="flex items-center justify-between gap-4 p-6">
-            <p className="text-sm text-destructive">{error}</p>
-            <Button variant="outline" onClick={() => void loadHistory()}>
+            <p className="text-sm text-destructive">{loadError}</p>
+            <Button variant="outline" onClick={() => void reload()}>
               <RefreshCcw className="h-4 w-4" />
               Retry
             </Button>
@@ -80,10 +56,10 @@ export default function HistoryPage() {
       <Card>
         <CardHeader>
           <CardTitle>Check-in log</CardTitle>
-          <CardDescription>{loading ? "Loading entries…" : "Your recorded history."}</CardDescription>
+          <CardDescription>{loadingData ? "Loading entries…" : "Your recorded history."}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {loading ? (
+          {loadingData ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : checkins.length === 0 ? (
             <p className="text-sm text-muted-foreground">No data yet. Your first check-in will populate this page.</p>
