@@ -63,7 +63,7 @@ export default function Home() {
             <Link href="/login" className={cn(buttonVariants({ size: "lg" }), "gap-2")}>
               Create account <ArrowRight className="h-4 w-4" />
             </Link>
-            <Link href="/dashboard/weekly" className={buttonVariants({ variant: "outline", size: "lg" })}>
+            <Link href="/dashboard/weekly" prefetch={false} className={buttonVariants({ variant: "outline", size: "lg" })}>
               See the weekly view
             </Link>
           </div>
