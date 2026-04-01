@@ -55,6 +55,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={false}
                   aria-current={pathname === item.href ? "page" : undefined}
                   className={cn(
                     buttonVariants({ variant: pathname === item.href ? "secondary" : "ghost" }),
@@ -96,6 +97,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={false}
                   className={cn(
                     "flex flex-col items-center rounded-lg px-2 py-2 text-xs",
                     pathname === item.href ? "bg-secondary text-foreground" : "text-muted-foreground",
