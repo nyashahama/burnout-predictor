@@ -49,9 +49,10 @@ export class ApiClient {
     });
 
     if (res.status === 401) {
-      const canRefresh = !hasRetried && !!this.refreshAuth && !path.startsWith("/api/auth/");
+      const refreshAuth = this.refreshAuth;
+      const canRefresh = !hasRetried && !!refreshAuth && !path.startsWith("/api/auth/");
       if (canRefresh) {
-        const refreshed = await this.refreshAuth();
+        const refreshed = await refreshAuth();
         if (refreshed) {
           return this.request<T>(method, path, body, validate, true);
         }
