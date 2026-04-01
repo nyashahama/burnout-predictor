@@ -65,18 +65,12 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 	secret := authService.JWTSecret()
 	authMW := middleware.Auth(pg, secret)
 
-	corsOrigin := cfg.CORSOrigin
-	if corsOrigin == "" {
-		corsOrigin = "*"
-		log.Warn("CORS_ORIGIN not set — defaulting to wildcard (*). Set CORS_ORIGIN explicitly in production.")
-	}
-
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID())
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.Timeout(30 * time.Second))
-	r.Use(corsMiddleware(corsOrigin))
+	r.Use(corsMiddleware(cfg.CORSOrigin))
 
 	// Health check — no auth, no rate limit.
 	r.With(requestBodyLimit(1 << 20)).Get("/health", healthHandler(cfg.Pool, cfg.StartTime))

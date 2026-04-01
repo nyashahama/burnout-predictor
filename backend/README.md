@@ -91,7 +91,8 @@ Optional:
 | Variable | Default | Description |
 |---|---|---|
 | `PORT` | `8080` | HTTP listen port |
-| `CORS_ORIGIN` | _(none)_ | Allowed CORS origin(s) |
+| `APP_ENV` | `development` | Environment mode (`development`, `test`, `production`, etc.) |
+| `CORS_ORIGIN` | `http://localhost:3000` in development | Allowed CORS origin(s); required outside development/test |
 | `RESEND_API_KEY` | _(none)_ | Enables transactional email |
 | `EMAIL_FROM` | `Overload <noreply@overload.app>` | Sender address |
 | `OPENAI_API_KEY` | _(none)_ | Enables AI-generated insights |
