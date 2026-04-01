@@ -129,6 +129,7 @@ describe("OnboardingPage", () => {
       name: "Bob",
       role: "engineer",
       sleep_baseline: 8,
+      estimated_score: 28,
     });
   });
 

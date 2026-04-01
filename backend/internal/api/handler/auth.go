@@ -62,6 +62,12 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if req.EstimatedScore != 0 {
+		if err := validate.EstimatedScore(req.EstimatedScore); err != nil {
+			respond.Error(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
 	if err := validate.Timezone(req.Timezone); err != nil {
 		respond.Error(w, http.StatusBadRequest, err.Error())
 		return

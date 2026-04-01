@@ -68,6 +68,7 @@ type RegisterRequest struct {
 	Name          string `json:"name"`
 	Role          string `json:"role"`
 	SleepBaseline int16  `json:"sleep_baseline"`
+	EstimatedScore int16 `json:"estimated_score"`
 	Timezone      string `json:"timezone"`
 }
 
@@ -164,6 +165,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (RegisterRe
 		Name:          req.Name,
 		Role:          req.Role,
 		SleepBaseline: req.SleepBaseline,
+		EstimatedScore: pgtype.Int2{Int16: req.EstimatedScore, Valid: req.EstimatedScore != 0},
 		Timezone:      req.Timezone,
 	})
 	if err != nil {
