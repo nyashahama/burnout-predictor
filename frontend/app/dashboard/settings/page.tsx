@@ -36,7 +36,7 @@ function downloadCSV(content: string, filename: string) {
 }
 
 export default function SettingsPage() {
-  const { api, user } = useAuth();
+  const { api, user, updateUser } = useAuth();
   const [profile, setProfile] = useState<UserResponse | null>(user);
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs | null>(null);
   const [name, setName] = useState("");
@@ -79,6 +79,7 @@ export default function SettingsPage() {
       };
       const updated = await api.patch("/api/user", updates, parseUserResponse);
       setProfile(updated);
+      updateUser(updated);
       setMessage("Settings saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save settings.");

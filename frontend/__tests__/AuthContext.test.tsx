@@ -261,5 +261,42 @@ describe("AuthProvider", () => {
     expect(screen.getByText("user:Restored User")).toBeInTheDocument();
     expect(document.cookie).toContain("overload-session=1");
     expect(document.cookie).toContain("overload-onboarded=1");
+    expect(localStorage.getItem("overload-name")).toBe("Restored User");
+  });
+
+  it("updateUser refreshes shared user state and local profile cache", async () => {
+    let capturedLogin: ((r: ReturnType<typeof makeAuthResult>) => Promise<void>) | null = null;
+    let capturedUpdateUser: ((user: ReturnType<typeof makeUser>) => void) | null = null;
+
+    function ConsumerLocal() {
+      const { user, login, updateUser, isLoading } = useAuth();
+      capturedLogin = login;
+      capturedUpdateUser = updateUser;
+      if (isLoading) return <div>loading</div>;
+      return <div>{user ? `user:${user.name}` : "no-user"}</div>;
+    }
+
+    render(
+      <AuthProvider>
+        <ConsumerLocal />
+      </AuthProvider>
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByText("loading")).not.toBeInTheDocument()
+    );
+
+    await act(async () => {
+      await capturedLogin!(makeAuthResult());
+    });
+
+    act(() => {
+      capturedUpdateUser!(makeUser({ name: "Updated Name", role: "manager", sleep_baseline: 9 }));
+    });
+
+    expect(screen.getByText("user:Updated Name")).toBeInTheDocument();
+    expect(localStorage.getItem("overload-name")).toBe("Updated Name");
+    expect(localStorage.getItem("overload-role")).toBe("manager");
+    expect(localStorage.getItem("overload-sleep")).toBe("9");
   });
 });
