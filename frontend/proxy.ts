@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { verifySignedValue } from "@/lib/session";
 import { getSessionSecret } from "@/lib/session-secret";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const secret = getSessionSecret();
   const session = await verifySignedValue(
     request.cookies.get("overload-session")?.value,
@@ -17,7 +17,6 @@ export async function middleware(request: NextRequest) {
   );
   const { pathname } = request.nextUrl;
 
-  // Protect dashboard: needs session + onboarding complete
   if (pathname.startsWith("/dashboard")) {
     if (!session) {
       return NextResponse.redirect(new URL("/login", request.url));
@@ -27,7 +26,6 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Protect onboarding: needs session
   if (pathname === "/onboarding") {
     if (!session) {
       return NextResponse.redirect(new URL("/login", request.url));
@@ -37,7 +35,6 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Redirect already-authenticated users away from login
   if (pathname === "/login" && session && onboarded) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
