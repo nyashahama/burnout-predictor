@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSignedValue } from "@/lib/session";
+import { getSessionSecret } from "@/lib/session-secret";
 
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 const SESSION_COOKIE = "overload-session";
 const ONBOARDED_COOKIE = "overload-onboarded";
 
-function getSecret() {
-  return process.env.SESSION_COOKIE_SECRET ?? "local-dev-session-secret";
-}
-
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as { onboarded?: boolean };
   const response = NextResponse.json({ ok: true });
-  const secret = getSecret();
+  const secret = getSessionSecret();
 
   const sessionValue = await createSignedValue("session", secret, SESSION_MAX_AGE);
   response.cookies.set(SESSION_COOKIE, sessionValue, {

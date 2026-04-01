@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifySignedValue } from "@/lib/session";
+import { getSessionSecret } from "@/lib/session-secret";
 
 export async function middleware(request: NextRequest) {
-  const secret = process.env.SESSION_COOKIE_SECRET ?? "local-dev-session-secret";
+  const secret = getSessionSecret();
   const session = await verifySignedValue(
     request.cookies.get("overload-session")?.value,
     "session",
