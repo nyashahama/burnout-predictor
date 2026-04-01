@@ -10,23 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { parseNotificationPrefs, parseUserResponse } from "@/lib/validators";
-import { safeParseJson } from "@/lib/storage";
 import { getTodayString } from "@/lib/date";
 import type { NotificationPrefs, UpdateProfileRequest, UserResponse } from "@/lib/types";
 
-function buildCSV() {
-  const rows: string[] = ["Date,Stress Level,Score,Note"];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key?.startsWith("checkin-")) continue;
-    const parsed = safeParseJson<{ stress?: number; score?: number; note?: string }>(localStorage.getItem(key), {});
-    rows.push(`${key.replace("checkin-", "")},${parsed.stress ?? 0},${parsed.score ?? 0},"${(parsed.note ?? "").replace(/"/g, '""')}"`);
-  }
-  return rows.join("\n");
-}
-
-function downloadCSV(content: string, filename: string) {
-  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+function downloadFile(content: string, filename: string, mimeType = "application/json;charset=utf-8;") {
+  const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -103,9 +91,22 @@ export default function SettingsPage() {
     }
   }
 
-  function handleExport() {
-    downloadCSV(buildCSV(), `overload-history-${getTodayString()}.csv`);
-    setMessage("History downloaded.");
+  async function handleExport() {
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      const exportPayload = await api.get("/api/user/export");
+      downloadFile(
+        JSON.stringify(exportPayload, null, 2),
+        `overload-export-${getTodayString()}.json`,
+      );
+      setMessage("Account export downloaded.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to export account data.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   function handleClearData() {
@@ -115,7 +116,7 @@ export default function SettingsPage() {
       if (key?.startsWith("checkin-") || key?.startsWith("recovery-checked-")) keys.push(key);
     }
     keys.forEach((key) => localStorage.removeItem(key));
-    setMessage("Local check-in data cleared.");
+    setMessage("Browser-only cached dashboard data cleared.");
   }
 
   return (
@@ -208,16 +209,16 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Your data</CardTitle>
-          <CardDescription>Export or clear the browser-stored check-in history.</CardDescription>
+          <CardDescription>Download your persisted account data or clear browser-only cached artifacts.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
-          <Button variant="outline" onClick={handleExport}>
+          <Button variant="outline" onClick={() => void handleExport()} disabled={saving}>
             <Download className="h-4 w-4" />
-            Download history
+            Download account export
           </Button>
           <Button variant="destructive" onClick={handleClearData}>
             <Trash2 className="h-4 w-4" />
-            Clear local history
+            Clear browser cache
           </Button>
         </CardContent>
       </Card>
