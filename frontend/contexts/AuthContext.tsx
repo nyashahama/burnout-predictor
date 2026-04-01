@@ -29,6 +29,7 @@ interface AuthContextValue {
   login: (result: AuthResult) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<boolean>;
+  updateUser: (user: UserResponse) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -38,6 +39,15 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const syncUserCache = useCallback((nextUser: UserResponse | null) => {
+    if (typeof window === "undefined") return;
+    if (!nextUser) return;
+
+    localStorage.setItem("overload-name", nextUser.name);
+    localStorage.setItem("overload-role", nextUser.role);
+    localStorage.setItem("overload-sleep", String(nextUser.sleep_baseline));
+  }, []);
 
   const handleUnauthenticated = useCallback(() => {
     clearTokens();
@@ -52,7 +62,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     storeTokens(result.access_token, result.refresh_token);
     await setSessionCookie();
     setUser(result.user);
-  }, []);
+    syncUserCache(result.user);
+  }, [syncUserCache]);
 
   const refreshSession = useCallback(async (): Promise<boolean> => {
     const rt = getRefreshToken();
@@ -90,6 +101,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, [api]);
 
+  const updateUser = useCallback((nextUser: UserResponse) => {
+    setUser(nextUser);
+    syncUserCache(nextUser);
+  }, [syncUserCache]);
+
   // On mount: try to restore session from stored refresh token.
   useEffect(() => {
     let cancelled = false;
@@ -108,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const profile = await api.get("/api/user", parseUserResponse);
           if (!cancelled) {
-            setUser(profile);
+            updateUser(profile);
             await setOnboardedCookie();
           }
         } catch {
@@ -128,7 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <AuthContext.Provider value={{ user, api, isLoading, login, logout, refreshSession }}>
+    <AuthContext.Provider value={{ user, api, isLoading, login, logout, refreshSession, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
