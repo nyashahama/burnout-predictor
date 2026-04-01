@@ -1,12 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { RefreshCcw } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useDashboardData } from "@/contexts/DashboardDataContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { parseCheckIns } from "@/lib/validators";
 import { formatDateForDisplay, getTodayString } from "@/lib/date";
 import type { CheckIn } from "@/lib/types";
 
@@ -41,28 +40,7 @@ function buildWeeklyData(checkins: CheckIn[]): WeeklyDay[] {
 }
 
 export default function WeeklyPage() {
-  const { api } = useAuth();
-  const [checkins, setCheckins] = useState<CheckIn[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const loadWeekly = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const result = await api.get("/api/checkins", parseCheckIns);
-      setCheckins(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load weekly data.");
-      setCheckins([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [api]);
-
-  useEffect(() => {
-    void loadWeekly();
-  }, [loadWeekly]);
+  const { checkins, loadingData, loadError, reload } = useDashboardData();
 
   const days = useMemo(() => buildWeeklyData(checkins), [checkins]);
   const realDays = days.filter((day) => day.score !== null);
@@ -79,11 +57,11 @@ export default function WeeklyPage() {
         <p className="text-muted-foreground">A summary of your last seven days, based on backend check-ins.</p>
       </div>
 
-      {error && (
+      {loadError && (
         <Card>
           <CardContent className="flex items-center justify-between gap-4 p-6">
-            <p className="text-sm text-destructive">{error}</p>
-            <Button variant="outline" onClick={() => void loadWeekly()}>
+            <p className="text-sm text-destructive">{loadError}</p>
+            <Button variant="outline" onClick={() => void reload()}>
               <RefreshCcw className="h-4 w-4" />
               Retry
             </Button>
@@ -95,19 +73,19 @@ export default function WeeklyPage() {
         <Card>
           <CardHeader>
             <CardDescription>Check-ins this week</CardDescription>
-            <CardTitle className="text-3xl">{loading ? "…" : realDays.length}</CardTitle>
+            <CardTitle className="text-3xl">{loadingData ? "…" : realDays.length}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader>
             <CardDescription>Average strain</CardDescription>
-            <CardTitle className="text-3xl">{loading ? "…" : avg}</CardTitle>
+            <CardTitle className="text-3xl">{loadingData ? "…" : avg}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader>
             <CardDescription>Peak day</CardDescription>
-            <CardTitle className="text-3xl">{loading ? "…" : peakDay?.label ?? "—"}</CardTitle>
+            <CardTitle className="text-3xl">{loadingData ? "…" : peakDay?.label ?? "—"}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -118,7 +96,7 @@ export default function WeeklyPage() {
           <CardDescription>Each bar reflects the saved backend score for that day.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {loading ? (
+          {loadingData ? (
             <p className="text-sm text-muted-foreground">Loading weekly data…</p>
           ) : (
             <>
