@@ -23,7 +23,8 @@ export class ApiClient {
   constructor(
     private baseUrl: string,
     private getToken: () => string | null,
-    private onUnauthenticated: () => void
+    private onUnauthenticated: () => void,
+    private refreshAuth?: () => Promise<boolean>,
   ) {}
 
   private async request<T>(
@@ -31,6 +32,7 @@ export class ApiClient {
     path: string,
     body?: unknown,
     validate?: Validator<T>,
+    hasRetried = false,
   ): Promise<T> {
     const token = this.getToken();
     const headers: Record<string, string> = {
@@ -47,8 +49,16 @@ export class ApiClient {
     });
 
     if (res.status === 401) {
+      const canRefresh = !hasRetried && !!this.refreshAuth && !path.startsWith("/api/auth/");
+      if (canRefresh) {
+        const refreshed = await this.refreshAuth();
+        if (refreshed) {
+          return this.request<T>(method, path, body, validate, true);
+        }
+      }
+
       if (token) {
-        // Authenticated request expired — clear session and redirect.
+        // Refresh failed or the token is invalid — clear session and redirect.
         this.onUnauthenticated();
         throw new ApiClientError(401, "Session expired");
       }
@@ -102,12 +112,14 @@ let _client: ApiClient | null = null;
 
 export function createApiClient(
   getToken: () => string | null,
-  onUnauthenticated: () => void
+  onUnauthenticated: () => void,
+  refreshAuth?: () => Promise<boolean>,
 ): ApiClient {
   _client = new ApiClient(
     process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080",
     getToken,
-    onUnauthenticated
+    onUnauthenticated,
+    refreshAuth,
   );
   return _client;
 }
