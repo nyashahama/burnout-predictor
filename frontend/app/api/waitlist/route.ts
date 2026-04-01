@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     );
 
     resendStatus = resendRes.status;
-    const resendBody = await resendRes.json().catch(() => null);
+    await resendRes.json().catch(() => null);
 
     if (resendStatus === 409) {
       // Already on list — silent success

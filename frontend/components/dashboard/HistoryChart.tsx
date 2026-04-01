@@ -11,11 +11,9 @@ type HistoryDay = { date: string; score: number; ghost?: boolean };
 
 export default function HistoryChart({
   data,
-  checkinCount = 0,
   showPatterns = false,
 }: {
   data: HistoryDay[];
-  checkinCount?: number;
   showPatterns?: boolean;
 }) {
   const [tooltip, setTooltip] = useState<{

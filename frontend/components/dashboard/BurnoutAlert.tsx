@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 const DISMISS_KEY = `burnout-dismissed-${new Date().toISOString().split("T")[0]}`;
 
@@ -44,11 +44,7 @@ export default function BurnoutAlert({
   dangerDaysAhead: number;
   recoveryDate: string;
 }) {
-  const [dismissed, setDismissed] = useState(true);
-
-  useEffect(() => {
-    setDismissed(!!localStorage.getItem(DISMISS_KEY));
-  }, []);
+  const [dismissed, setDismissed] = useState(() => !!localStorage.getItem(DISMISS_KEY));
 
   if (score <= 65 || dismissed) return null;
 

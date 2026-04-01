@@ -8,6 +8,7 @@ import { render, screen, act, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { server } from "../vitest.setup";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import type { AuthResult, UserResponse } from "@/lib/types";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,35 @@ function makeAuthResult(overrides: Record<string, unknown> = {}) {
     user: makeUser(),
     ...overrides,
   };
+}
+
+type AuthHarness = {
+  user: UserResponse | null;
+  login: (result: AuthResult) => Promise<void>;
+  logout: () => Promise<void>;
+  refreshSession: () => Promise<boolean>;
+  updateUser: (user: UserResponse) => void;
+};
+
+function AuthHarness({
+  onReady,
+}: {
+  onReady: (value: AuthHarness) => void;
+}) {
+  const auth = useAuth();
+
+  React.useEffect(() => {
+    onReady({
+      user: auth.user,
+      login: auth.login,
+      logout: auth.logout,
+      refreshSession: auth.refreshSession,
+      updateUser: auth.updateUser,
+    });
+  }, [auth, onReady]);
+
+  if (auth.isLoading) return <div>loading</div>;
+  return <div>{auth.user ? `user:${auth.user.name}` : "no-user"}</div>;
 }
 
 // ─── tests ───────────────────────────────────────────────────────────────────
@@ -85,21 +115,11 @@ describe("AuthProvider", () => {
   });
 
   it("login sets user and stores tokens in localStorage", async () => {
-    let capturedLogin: ((r: ReturnType<typeof makeAuthResult>) => void) | null =
-      null;
-    let capturedUser: ReturnType<typeof makeUser> | null = null;
-
-    function ConsumerLocal() {
-      const { user, login, isLoading } = useAuth();
-      capturedLogin = login;
-      capturedUser = user;
-      if (isLoading) return <div>loading</div>;
-      return <div>{user ? `user:${user.name}` : "no-user"}</div>;
-    }
+    let harness: AuthHarness | null = null;
 
     render(
       <AuthProvider>
-        <ConsumerLocal />
+        <AuthHarness onReady={(value) => { harness = value; }} />
       </AuthProvider>
     );
 
@@ -109,11 +129,11 @@ describe("AuthProvider", () => {
 
     const result = makeAuthResult();
     await act(async () => {
-      capturedLogin!(result);
+      await harness!.login(result as AuthResult);
     });
 
-    expect(capturedUser).not.toBeNull();
-    expect(capturedUser!.name).toBe("Test User");
+    expect(harness!.user).not.toBeNull();
+    expect(harness!.user!.name).toBe("Test User");
     expect(localStorage.getItem("overload-refresh-token")).toBe("rt-xyz");
   });
 
@@ -124,24 +144,11 @@ describe("AuthProvider", () => {
       )
     );
 
-    let capturedLogin: ((r: ReturnType<typeof makeAuthResult>) => void) | null =
-      null;
-    let capturedLogout: (() => Promise<void>) | null = null;
-    let capturedUser: ReturnType<typeof makeUser> | null | undefined =
-      undefined;
-
-    function ConsumerLocal() {
-      const { user, login, logout, isLoading } = useAuth();
-      capturedLogin = login;
-      capturedLogout = logout;
-      capturedUser = user;
-      if (isLoading) return <div>loading</div>;
-      return <div>{user ? `user:${user.name}` : "no-user"}</div>;
-    }
+    let harness: AuthHarness | null = null;
 
     render(
       <AuthProvider>
-        <ConsumerLocal />
+        <AuthHarness onReady={(value) => { harness = value; }} />
       </AuthProvider>
     );
 
@@ -151,32 +158,25 @@ describe("AuthProvider", () => {
 
     // Log in first
     await act(async () => {
-      capturedLogin!(makeAuthResult());
+      await harness!.login(makeAuthResult() as AuthResult);
     });
-    expect(capturedUser!.name).toBe("Test User");
+    expect(harness!.user!.name).toBe("Test User");
 
     // Now log out
     await act(async () => {
-      await capturedLogout!();
+      await harness!.logout();
     });
 
-    expect(capturedUser).toBeNull();
+    expect(harness!.user).toBeNull();
     expect(localStorage.getItem("overload-refresh-token")).toBeNull();
   });
 
   it("refreshSession returns false when no refresh token stored", async () => {
-    let capturedRefresh: (() => Promise<boolean>) | null = null;
-
-    function ConsumerLocal() {
-      const { refreshSession, isLoading } = useAuth();
-      capturedRefresh = refreshSession;
-      if (isLoading) return <div>loading</div>;
-      return <div>ready</div>;
-    }
+    let harness: AuthHarness | null = null;
 
     render(
       <AuthProvider>
-        <ConsumerLocal />
+        <AuthHarness onReady={(value) => { harness = value; }} />
       </AuthProvider>
     );
 
@@ -184,7 +184,7 @@ describe("AuthProvider", () => {
       expect(screen.queryByText("loading")).not.toBeInTheDocument()
     );
 
-    const result = await capturedRefresh!();
+    const result = await harness!.refreshSession();
     expect(result).toBe(false);
   });
 
@@ -204,18 +204,11 @@ describe("AuthProvider", () => {
       )
     );
 
-    let capturedRefresh: (() => Promise<boolean>) | null = null;
-
-    function ConsumerLocal() {
-      const { refreshSession, isLoading } = useAuth();
-      capturedRefresh = refreshSession;
-      if (isLoading) return <div>loading</div>;
-      return <div>ready</div>;
-    }
+    let harness: AuthHarness | null = null;
 
     render(
       <AuthProvider>
-        <ConsumerLocal />
+        <AuthHarness onReady={(value) => { harness = value; }} />
       </AuthProvider>
     );
 
@@ -223,7 +216,7 @@ describe("AuthProvider", () => {
       expect(screen.queryByText("loading")).not.toBeInTheDocument()
     );
 
-    const result = await act(async () => capturedRefresh!());
+    const result = await act(async () => harness!.refreshSession());
     expect(result).toBe(true);
   });
 
@@ -265,20 +258,11 @@ describe("AuthProvider", () => {
   });
 
   it("updateUser refreshes shared user state and local profile cache", async () => {
-    let capturedLogin: ((r: ReturnType<typeof makeAuthResult>) => Promise<void>) | null = null;
-    let capturedUpdateUser: ((user: ReturnType<typeof makeUser>) => void) | null = null;
-
-    function ConsumerLocal() {
-      const { user, login, updateUser, isLoading } = useAuth();
-      capturedLogin = login;
-      capturedUpdateUser = updateUser;
-      if (isLoading) return <div>loading</div>;
-      return <div>{user ? `user:${user.name}` : "no-user"}</div>;
-    }
+    let harness: AuthHarness | null = null;
 
     render(
       <AuthProvider>
-        <ConsumerLocal />
+        <AuthHarness onReady={(value) => { harness = value; }} />
       </AuthProvider>
     );
 
@@ -287,11 +271,11 @@ describe("AuthProvider", () => {
     );
 
     await act(async () => {
-      await capturedLogin!(makeAuthResult());
+      await harness!.login(makeAuthResult() as AuthResult);
     });
 
     act(() => {
-      capturedUpdateUser!(makeUser({ name: "Updated Name", role: "manager", sleep_baseline: 9 }));
+      harness!.updateUser(makeUser({ name: "Updated Name", role: "manager", sleep_baseline: 9 }) as UserResponse);
     });
 
     expect(screen.getByText("user:Updated Name")).toBeInTheDocument();

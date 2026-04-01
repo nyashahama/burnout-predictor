@@ -40,9 +40,9 @@ export default function FinalCta() {
       }
 
       setStatus("success");
-    } catch (err: any) {
+    } catch (err: unknown) {
       setStatus("error");
-      setErrorMsg(err.message || "Couldn't save your email. Try again.");
+      setErrorMsg(err instanceof Error ? err.message : "Couldn't save your email. Try again.");
     }
   };
 
