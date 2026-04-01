@@ -60,6 +60,8 @@ describe("useAuth", () => {
 describe("AuthProvider", () => {
   beforeEach(() => {
     localStorage.clear();
+    document.cookie = "overload-session=; max-age=0; path=/";
+    document.cookie = "overload-onboarded=; max-age=0; path=/";
   });
 
   it("resolves to no-user when no refresh token exists", async () => {
@@ -257,5 +259,7 @@ describe("AuthProvider", () => {
     );
 
     expect(screen.getByText("user:Restored User")).toBeInTheDocument();
+    expect(document.cookie).toContain("overload-session=1");
+    expect(document.cookie).toContain("overload-onboarded=1");
   });
 });

@@ -16,6 +16,7 @@ import {
   getAccessToken,
   clearTokens,
   setSessionCookie,
+  setOnboardedCookie,
   clearSessionCookie,
 } from "@/lib/auth";
 import { parseAuthResult, parseRefreshResult, parseUserResponse } from "@/lib/validators";
@@ -108,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const profile = await api.get("/api/user", parseUserResponse);
           if (!cancelled) {
             setUser(profile);
-            await setSessionCookie();
+            await setOnboardedCookie();
           }
         } catch {
           clearTokens();
