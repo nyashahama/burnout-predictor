@@ -61,11 +61,17 @@ export default function CheckIn({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <div
+          className="grid grid-cols-2 gap-3 sm:grid-cols-5"
+          role="radiogroup"
+          aria-label="Stress level"
+        >
           {stressLevels.map((option) => (
             <button
               key={option.value}
               type="button"
+              role="radio"
+              aria-checked={stress === option.value}
               aria-pressed={stress === option.value}
               className={cn(
                 "rounded-lg border px-3 py-4 text-left text-sm transition-colors",
@@ -80,13 +86,18 @@ export default function CheckIn({
         </div>
 
         <div className="space-y-2">
+          <label htmlFor="checkin-note" className="text-sm font-medium">
+            Context for today
+          </label>
           <Textarea
+            id="checkin-note"
             placeholder="Anything behind it? Deadlines, sleep, meetings, or anything else that explains today's load."
             value={note}
             onChange={(event) => setNote(event.target.value)}
             rows={4}
+            aria-describedby="checkin-note-help"
           />
-          <p className="text-sm text-muted-foreground">
+          <p id="checkin-note-help" className="text-sm text-muted-foreground">
             Specific notes help the dashboard explain your patterns later.
           </p>
         </div>
