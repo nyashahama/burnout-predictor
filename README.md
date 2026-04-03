@@ -194,7 +194,7 @@ DATABASE_URL=postgres://user:password@localhost:5432/burnout_predictor
 JWT_SECRET=change-me-in-production
 PORT=8080
 CORS_ORIGIN=http://localhost:3000
-APP_URL=https://overload.app
+APP_URL=https://burnout-predictor-ten.vercel.app
 ```
 
 Optional:
@@ -220,6 +220,19 @@ OWNER_EMAIL=you@yourdomain.com
 RESEND_AUDIENCE_ID=...
 ```
 
+Optional (for public EFT upgrade flow):
+```env
+NEXT_PUBLIC_PRO_PLAN_NAME=Overload Pro
+NEXT_PUBLIC_PRO_PRICE=R149
+NEXT_PUBLIC_EFT_ACCOUNT_NAME=Your Business Name
+NEXT_PUBLIC_EFT_BANK_NAME=Your Bank
+NEXT_PUBLIC_EFT_ACCOUNT_NUMBER=1234567890
+NEXT_PUBLIC_EFT_BRANCH_CODE=250655
+NEXT_PUBLIC_EFT_ACCOUNT_TYPE=Business Cheque
+NEXT_PUBLIC_BILLING_EMAIL=billing@yourdomain.com
+NEXT_PUBLIC_EFT_PROCESSING_TIME=within 1 business day
+```
+
 ---
 
 ## Pricing tiers (as designed)
@@ -232,6 +245,20 @@ RESEND_AUDIENCE_ID=...
 | Calendar suggestions | Basic | Specific |
 | AI recovery plans | — | Yes |
 | Weekly digest | — | Yes |
+
+---
+
+## Interim EFT launch flow
+
+If your South African card processor approval is still pending, the frontend now includes a temporary EFT upgrade flow:
+
+1. Users create a free account.
+2. They open `/upgrade` or the billing section in settings.
+3. They pay your configured EFT amount using the generated reference.
+4. They email proof of payment to your billing inbox.
+5. You upgrade the account manually by setting `users.tier = 'pro'` after you verify payment.
+
+This keeps launch moving without coupling customers to Paddle approval timing.
 
 ---
 
