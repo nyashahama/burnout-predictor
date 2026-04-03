@@ -116,6 +116,15 @@ export default function LoginPage() {
               ? "Sign in to your Overload dashboard."
               : "We'll send a reset link to your email."}
         </CardDescription>
+        {mode === "signup" && (
+          <div className="text-sm text-muted-foreground">
+            Paying customers in South Africa can upgrade by EFT for now.{" "}
+            <Link href="/upgrade" className="text-primary hover:underline">
+              See the payment steps
+            </Link>
+            .
+          </div>
+        )}
       </div>
 
       {forgotSent ? (
