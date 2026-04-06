@@ -236,11 +236,11 @@ func (s *Service) Verify(ctx context.Context, paymentID uuid.UUID, req VerifyPay
 	}
 
 	var newStatus string
-	if req.Action == "approve" {
+	switch req.Action {
+	case "approve":
 		newStatus = StatusVerified
 
-		// Create EFT subscription
-		periodEnd := time.Now().AddDate(0, 1, 0) // 1 month subscription
+		periodEnd := time.Now().AddDate(0, 1, 0)
 		_, err := s.store.UpsertEftSubscription(ctx, db.UpsertEftSubscriptionParams{
 			UserID:             payment.UserID,
 			PlanName:           payment.PlanName,
@@ -252,6 +252,7 @@ func (s *Service) Verify(ctx context.Context, paymentID uuid.UUID, req VerifyPay
 			CurrentPeriodStart: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 			CurrentPeriodEnd:   pgtype.Timestamptz{Time: periodEnd, Valid: true},
 		})
+
 		if err != nil {
 			return fmt.Errorf("upsert subscription: %w", err)
 		}
@@ -270,7 +271,7 @@ func (s *Service) Verify(ctx context.Context, paymentID uuid.UUID, req VerifyPay
 			"plan", payment.PlanName,
 		)
 
-	} else if req.Action == "reject" {
+	case "reject":
 		newStatus = StatusRejected
 
 		s.log.InfoContext(ctx, "eft: payment rejected",
@@ -279,7 +280,8 @@ func (s *Service) Verify(ctx context.Context, paymentID uuid.UUID, req VerifyPay
 			"admin_id", req.AdminUserID,
 			"note", req.Note,
 		)
-	} else {
+
+	default:
 		return fmt.Errorf("invalid action: %s (must be 'approve' or 'reject')", req.Action)
 	}
 
@@ -298,7 +300,7 @@ func (s *Service) Verify(ctx context.Context, paymentID uuid.UUID, req VerifyPay
 }
 
 // generateReference creates a unique payment reference.
-// Format: OVR-{first 8 chars of uuid}-{random 4 chars}
+// Format: OVR-{first 8 chars of uuid}-{random 4 chars}.
 func generateReference(userID string) (string, error) {
 	buf := make([]byte, 4)
 	if _, err := rand.Read(buf); err != nil {
