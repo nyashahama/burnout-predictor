@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -39,6 +40,23 @@ func GetPlanPrice(planName string) int {
 		return price
 	}
 	return DefaultProPriceRands
+}
+
+func getEFTBankDetails() BankDetails {
+	return BankDetails{
+		AccountName:   getEnv("EFT_ACCOUNT_NAME", "Overload"),
+		BankName:      getEnv("EFT_BANK_NAME", "FNB"),
+		AccountNumber: getEnv("EFT_ACCOUNT_NUMBER", "1234567890"),
+		BranchCode:    getEnv("EFT_BRANCH_CODE", "250655"),
+		AccountType:   getEnv("EFT_ACCOUNT_TYPE", "Business Cheque"),
+	}
+}
+
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }
 
 // paymentStore is the data-access contract for the payment service.
@@ -166,19 +184,13 @@ func (s *Service) Init(ctx context.Context, req InitPaymentRequest) (*InitPaymen
 	)
 
 	return &InitPaymentResponse{
-		PaymentID: payment.ID,
-		Reference: ref,
-		Amount:    amount,
-		Currency:  "ZAR",
-		PlanName:  req.PlanName,
-		ExpiresAt: expiresAt,
-		BankDetails: BankDetails{
-			AccountName:   "Overload",
-			BankName:      "FNB",
-			AccountNumber: "1234567890",
-			BranchCode:    "250655",
-			AccountType:   "Business Cheque",
-		},
+		PaymentID:   payment.ID,
+		Reference:   ref,
+		Amount:      amount,
+		Currency:    "ZAR",
+		PlanName:    req.PlanName,
+		ExpiresAt:   expiresAt,
+		BankDetails: getEFTBankDetails(),
 	}, nil
 }
 
