@@ -4,20 +4,21 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/google/uuid"
 
-	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/middleware"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/respond"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/validate"
+	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
 	checkinsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/checkin"
 )
 
 type checkinService interface {
 	Upsert(ctx context.Context, user db.User, req checkinsvc.UpsertRequest) (checkinsvc.UpsertResult, error)
 	GetScoreCard(ctx context.Context, user db.User) (checkinsvc.ScoreCardResult, error)
-	List(ctx context.Context, userID uuid.UUID) ([]db.CheckIn, error)
+	List(ctx context.Context, userID uuid.UUID, limit, offset int32) ([]db.CheckIn, error)
 }
 
 // CheckinHandler handles check-in endpoints.
@@ -64,7 +65,19 @@ func (h *CheckinHandler) GetScoreCard(w http.ResponseWriter, r *http.Request) {
 
 func (h *CheckinHandler) List(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromCtx(r.Context())
-	checkins, err := h.svc.List(r.Context(), user.ID)
+	limit := int32(30)
+	offset := int32(0)
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.ParseInt(l, 10, 32); err == nil {
+			limit = int32(parsed)
+		}
+	}
+	if o := r.URL.Query().Get("offset"); o != "" {
+		if parsed, err := strconv.ParseInt(o, 10, 32); err == nil {
+			offset = int32(parsed)
+		}
+	}
+	checkins, err := h.svc.List(r.Context(), user.ID, limit, offset)
 	if err != nil {
 		respond.ServiceError(w, err)
 		return

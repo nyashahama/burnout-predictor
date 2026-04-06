@@ -14,6 +14,8 @@
 //     open strings, catching bad inputs at the call site.
 package score
 
+import "math"
+
 // Level represents the traffic-light severity used on dashboard signals.
 type Level string
 
@@ -141,10 +143,8 @@ func clamp(v, lo, hi int) int {
 	return v
 }
 
-// roundInt rounds a float64 to the nearest integer.
+// roundInt rounds a float64 to the nearest integer using symmetric
+// round-half-away-from-zero (same behavior for positive and negative).
 func roundInt(f float64) int {
-	if f < 0 {
-		return int(f - 0.5)
-	}
-	return int(f + 0.5)
+	return int(math.Round(f))
 }
