@@ -158,11 +158,14 @@ func TestCalculate_RecentTrendBelowNeutral(t *testing.T) {
 }
 
 func TestCalculate_MeetingModifiers(t *testing.T) {
+	// NOTE: MeetingCount is hardcoded to -1 in BuildScoreInput (calendar integration deferred).
+	// The meetingMod call is disabled in Calculate. These test cases document what the
+	// meeting modifier SHOULD produce once calendar integration is implemented.
 	cases := []struct {
 		meetings int
 		wantMod  int
 	}{
-		{-1, 0},  // not connected
+		{-1, 0}, // not connected
 		{0, 0},
 		{2, 2},
 		{4, 5},
@@ -170,6 +173,8 @@ func TestCalculate_MeetingModifiers(t *testing.T) {
 		{8, 12},
 	}
 	for _, c := range cases {
+		// Currently MeetingCount is always -1, so meetingMod returns 0.
+		// This test verifies the expected behavior when calendar integration is enabled.
 		out := Calculate(Input{
 			TodayStress:   intPtr(3), // base 50
 			Role:          RoleEngineer,
@@ -394,7 +399,10 @@ func TestBuildSuggestion_DangerStreakWitness(t *testing.T) {
 }
 
 func TestBuildSuggestion_ScoreBands(t *testing.T) {
-	cases := []struct{ score int; sub string }{
+	cases := []struct {
+		score int
+		sub   string
+	}{
 		{80, "critical load"},
 		{70, "9–11 AM"},
 		{55, "moderate zone"},
@@ -941,7 +949,10 @@ func TestBuildSignatureNarrative_DeadlineTrigger(t *testing.T) {
 // ── roundInt / clamp ──────────────────────────────────────────────────────────
 
 func TestRoundInt(t *testing.T) {
-	cases := []struct{ f float64; want int }{
+	cases := []struct {
+		f    float64
+		want int
+	}{
 		{2.4, 2},
 		{2.5, 3},
 		{-2.5, -3},

@@ -52,14 +52,14 @@ export function calculateLiveScore({
   sleepBaseline,
   recentStresses,
   estimatedScore,
-  calendarConnected,
+  meetingCount,
 }: {
   todayStress: number | null;
   role: string;
   sleepBaseline: string;
   recentStresses: number[];
   estimatedScore: number | null;
-  calendarConnected?: boolean;
+  meetingCount?: number;
 }): number {
   // No check-in yet — surface the onboarding estimate so the score isn't generic
   if (todayStress === null) {
@@ -86,8 +86,17 @@ export function calculateLiveScore({
     score += Math.round((avg - 3) * 2.5); // 3 is neutral
   }
 
-  // Calendar integration — detects meeting density, adds realistic pressure
-  if (calendarConnected) score += 4;
+  // Calendar density modifier — matches backend meetingMod() logic
+  // 0 meetings: 0, 1-2 meetings: 2, 3-4 meetings: 5, 5-6 meetings: 9, 7+ meetings: 12
+  const meetingMod = (count: number): number => {
+    if (count < 0) return 0;  // not connected
+    if (count === 0) return 0;
+    if (count <= 2) return 2;
+    if (count <= 4) return 5;
+    if (count <= 6) return 9;
+    return 12;  // 7+
+  };
+  score += meetingMod(meetingCount ?? -1);
 
   return Math.max(8, Math.min(92, Math.round(score)));
 }
@@ -97,7 +106,7 @@ export function getLiveSignals(
   todayStress: number | null,
   role: string,
   sleepBaseline: string,
-  calendarConnected?: boolean,
+  meetingCount?: number,
 ): Signal[] {
   const results: Signal[] = [];
 
@@ -137,12 +146,18 @@ export function getLiveSignals(
   }
 
   // Calendar density signal (when Google Calendar is connected)
-  if (calendarConnected) {
+  if (meetingCount !== undefined && meetingCount >= 0) {
+    const level = meetingCount >= 7 ? "danger" : meetingCount >= 4 ? "warning" : "ok";
+    const detail = meetingCount === 0
+      ? "No meetings today — protected deep-work possible"
+      : meetingCount >= 7
+      ? `${meetingCount} meetings today — very limited deep-work blocks`
+      : `${meetingCount} meetings today — ${7 - meetingCount} hours of potential focus time`;
     results.push({
       label: "Calendar density",
-      detail: "6 meetings today — 0 protected deep-work blocks detected",
-      val: "Overloaded",
-      level: "warning",
+      detail,
+      val: meetingCount >= 7 ? "Overloaded" : meetingCount >= 4 ? "Busy" : "Manageable",
+      level,
     });
   }
 

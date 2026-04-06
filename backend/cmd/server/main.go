@@ -71,7 +71,11 @@ func main() {
 	}
 
 	if cfg.PaddleSecret == "" {
-		slog.Default().Warn("paddle webhook signature check disabled")
+		if cfg.Environment == "production" {
+			slog.Default().Error("PADDLE_WEBHOOK_SECRET is required in production — webhook signature verification would be disabled")
+			os.Exit(1)
+		}
+		slog.Default().Warn("paddle webhook signature check disabled (not enforced in dev/test)")
 	}
 
 	startTime := time.Now()
