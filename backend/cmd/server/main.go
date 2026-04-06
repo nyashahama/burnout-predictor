@@ -100,6 +100,7 @@ func main() {
 			PaddleSecret: cfg.PaddleSecret,
 			AppURL:       cfg.AppURL,
 			CORSOrigin:   cfg.CORSOrigin,
+			AdminEmails:  cfg.AdminEmails,
 			StartTime:    startTime,
 			Logger:       logger,
 		}),

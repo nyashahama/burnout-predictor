@@ -39,7 +39,7 @@ INSERT INTO users (
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8
 )
-RETURNING id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at
+RETURNING id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference
 `
 
 type CreateUserParams struct {
@@ -84,12 +84,13 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.DeletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EftPaymentReference,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at FROM users
+SELECT id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference FROM users
 WHERE email = $1
   AND deleted_at IS NULL
 `
@@ -116,12 +117,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.DeletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EftPaymentReference,
 	)
 	return i, err
 }
 
 const getUserByGoogleID = `-- name: GetUserByGoogleID :one
-SELECT id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at FROM users
+SELECT id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference FROM users
 WHERE google_id = $1
   AND deleted_at IS NULL
 `
@@ -148,12 +150,13 @@ func (q *Queries) GetUserByGoogleID(ctx context.Context, googleID pgtype.Text) (
 		&i.DeletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EftPaymentReference,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at FROM users
+SELECT id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference FROM users
 WHERE id = $1
   AND deleted_at IS NULL
 `
@@ -180,12 +183,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.DeletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EftPaymentReference,
 	)
 	return i, err
 }
 
 const getUserByPaddleCustomerID = `-- name: GetUserByPaddleCustomerID :one
-SELECT id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at FROM users
+SELECT id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference FROM users
 WHERE paddle_customer_id = $1
   AND deleted_at IS NULL
 `
@@ -212,6 +216,7 @@ func (q *Queries) GetUserByPaddleCustomerID(ctx context.Context, paddleCustomerI
 		&i.DeletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EftPaymentReference,
 	)
 	return i, err
 }
@@ -556,13 +561,30 @@ func (q *Queries) UpdateCalendarSyncedAt(ctx context.Context, id uuid.UUID) erro
 	return err
 }
 
+const updateUserEFTReference = `-- name: UpdateUserEFTReference :exec
+UPDATE users SET
+    eft_payment_reference = $2
+WHERE id = $1
+  AND deleted_at IS NULL
+`
+
+type UpdateUserEFTReferenceParams struct {
+	ID                  uuid.UUID   `db:"id" json:"id"`
+	EftPaymentReference pgtype.Text `db:"eft_payment_reference" json:"eft_payment_reference"`
+}
+
+func (q *Queries) UpdateUserEFTReference(ctx context.Context, arg UpdateUserEFTReferenceParams) error {
+	_, err := q.db.Exec(ctx, updateUserEFTReference, arg.ID, arg.EftPaymentReference)
+	return err
+}
+
 const updateUserEmail = `-- name: UpdateUserEmail :one
 UPDATE users SET
     email          = $2,
     email_verified = FALSE
 WHERE id = $1
   AND deleted_at IS NULL
-RETURNING id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at
+RETURNING id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference
 `
 
 type UpdateUserEmailParams struct {
@@ -592,6 +614,7 @@ func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams
 		&i.DeletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EftPaymentReference,
 	)
 	return i, err
 }
@@ -621,7 +644,7 @@ UPDATE users SET
     timezone        = COALESCE($5,       timezone)
 WHERE id = $1
   AND deleted_at IS NULL
-RETURNING id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at
+RETURNING id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference
 `
 
 type UpdateUserProfileParams struct {
@@ -660,6 +683,7 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.DeletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EftPaymentReference,
 	)
 	return i, err
 }

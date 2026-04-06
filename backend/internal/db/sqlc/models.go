@@ -48,6 +48,23 @@ type DismissedComponent struct {
 	DismissedAt  pgtype.Timestamptz `db:"dismissed_at" json:"dismissed_at"`
 }
 
+type EftPayment struct {
+	ID            uuid.UUID          `db:"id" json:"id"`
+	UserID        uuid.UUID          `db:"user_id" json:"user_id"`
+	Reference     string             `db:"reference" json:"reference"`
+	AmountCents   int32              `db:"amount_cents" json:"amount_cents"`
+	Currency      string             `db:"currency" json:"currency"`
+	PlanName      string             `db:"plan_name" json:"plan_name"`
+	Status        string             `db:"status" json:"status"`
+	ProofImageUrl pgtype.Text        `db:"proof_image_url" json:"proof_image_url"`
+	VerifiedBy    pgtype.UUID        `db:"verified_by" json:"verified_by"`
+	VerifiedAt    pgtype.Timestamptz `db:"verified_at" json:"verified_at"`
+	RejectionNote pgtype.Text        `db:"rejection_note" json:"rejection_note"`
+	ExpiresAt     pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 // Append-only log of all outbound emails. unique(user_id, dedup_key) prevents duplicate sends.
 type EmailLog struct {
 	ID       uuid.UUID   `db:"id" json:"id"`
@@ -157,6 +174,8 @@ type Subscription struct {
 	LastEventAt       pgtype.Timestamptz `db:"last_event_at" json:"last_event_at"`
 	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	PaymentMethod     pgtype.Text        `db:"payment_method" json:"payment_method"`
+	EftPaymentID      pgtype.UUID        `db:"eft_payment_id" json:"eft_payment_id"`
 }
 
 // Core identity and profile. One row per registered account.
@@ -176,14 +195,15 @@ type User struct {
 	CalendarToken    []byte             `db:"calendar_token" json:"calendar_token"`
 	CalendarSyncedAt pgtype.Timestamptz `db:"calendar_synced_at" json:"calendar_synced_at"`
 	// Billing tier; controlled exclusively by Paddle webhook handler.
-	Tier             string             `db:"tier" json:"tier"`
-	PaddleCustomerID pgtype.Text        `db:"paddle_customer_id" json:"paddle_customer_id"`
-	Timezone         string             `db:"timezone" json:"timezone"`
-	EmailVerified    bool               `db:"email_verified" json:"email_verified"`
-	GoogleID         pgtype.Text        `db:"google_id" json:"google_id"`
-	DeletedAt        pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
-	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	Tier                string             `db:"tier" json:"tier"`
+	PaddleCustomerID    pgtype.Text        `db:"paddle_customer_id" json:"paddle_customer_id"`
+	Timezone            string             `db:"timezone" json:"timezone"`
+	EmailVerified       bool               `db:"email_verified" json:"email_verified"`
+	GoogleID            pgtype.Text        `db:"google_id" json:"google_id"`
+	DeletedAt           pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EftPaymentReference pgtype.Text        `db:"eft_payment_reference" json:"eft_payment_reference"`
 }
 
 // Per-user notification opt-in/-out. Upserted on settings save.

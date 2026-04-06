@@ -109,6 +109,12 @@ UPDATE users SET
 WHERE id = $1
   AND deleted_at IS NULL;
 
+-- name: UpdateUserEFTReference :exec
+UPDATE users SET
+    eft_payment_reference = $2
+WHERE id = $1
+  AND deleted_at IS NULL;
+
 -- name: SoftDeleteUser :exec
 UPDATE users SET
     deleted_at = NOW(),

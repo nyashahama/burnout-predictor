@@ -13,15 +13,16 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/nyasha-hama/burnout-predictor-api/internal/ai"
-	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
-	eml "github.com/nyasha-hama/burnout-predictor-api/internal/email"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/handler"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/middleware"
-	"github.com/nyasha-hama/burnout-predictor-api/internal/store"
+	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
+	eml "github.com/nyasha-hama/burnout-predictor-api/internal/email"
 	authsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/auth"
 	billingsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/billing"
 	checkinsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/checkin"
 	insightsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/insight"
+	paymentsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/payment"
+	"github.com/nyasha-hama/burnout-predictor-api/internal/store"
 )
 
 // ServerConfig holds all dependencies needed to build the HTTP handler.
@@ -34,6 +35,7 @@ type ServerConfig struct {
 	PaddleSecret string
 	AppURL       string
 	CORSOrigin   string
+	AdminEmails  []string
 	StartTime    time.Time
 	Logger       *slog.Logger
 }
@@ -51,6 +53,7 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 	checkinService := checkinsvc.New(pg, cfg.AIClient, log)
 	insightService := insightsvc.New(pg)
 	billingService := billingsvc.New(pg, cfg.Pool, log)
+	paymentService := paymentsvc.New(pg, log)
 
 	authH := handler.NewAuthHandler(authService)
 	checkinH := handler.NewCheckinHandler(checkinService)
@@ -61,6 +64,7 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 	notifH := handler.NewNotifPrefsHandler(pg)
 	subH := handler.NewSubscriptionHandler(pg)
 	exportH := handler.NewExportHandler(pg)
+	paymentH := handler.NewPaymentHandler(paymentService)
 
 	secret := authService.JWTSecret()
 	authMW := middleware.Auth(pg, secret)
@@ -73,7 +77,7 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 	r.Use(corsMiddleware(cfg.CORSOrigin))
 
 	// Health check — no auth, no rate limit.
-	r.With(requestBodyLimit(1 << 20)).Get("/health", healthHandler(cfg.Pool, cfg.StartTime))
+	r.With(requestBodyLimit(1<<20)).Get("/health", healthHandler(cfg.Pool, cfg.StartTime))
 
 	// Public webhook.
 	r.Post("/api/webhooks/paddle", webhookH.Paddle)
@@ -118,6 +122,18 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 
 		r.Get("/api/follow-ups", followUpH.GetToday)
 		r.Post("/api/follow-ups/{id}/dismiss", followUpH.Dismiss)
+
+		r.Post("/api/payments/init", paymentH.Init)
+	})
+
+	// Admin routes — require admin email.
+	r.Group(func(r chi.Router) {
+		r.Use(requestBodyLimit(1 << 20))
+		r.Use(authMW)
+		r.Use(middleware.Admin(cfg.AdminEmails...))
+
+		r.Get("/api/admin/payments", paymentH.GetPending)
+		r.Post("/api/admin/payments/{id}/verify", paymentH.Verify)
 	})
 
 	return r
@@ -166,7 +182,12 @@ func healthHandler(pool *pgxpool.Pool, start time.Time) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(httpStatus)
 		if err := json.NewEncoder(w).Encode(map[string]any{
-			"status":         func() string { if httpStatus == http.StatusOK { return "ok" }; return "degraded" }(),
+			"status": func() string {
+				if httpStatus == http.StatusOK {
+					return "ok"
+				}
+				return "degraded"
+			}(),
 			"db":             dbStatus,
 			"uptime_seconds": math.Round(time.Since(start).Seconds()),
 		}); err != nil {

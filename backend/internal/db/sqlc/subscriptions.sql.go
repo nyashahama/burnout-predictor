@@ -68,7 +68,7 @@ func (q *Queries) CreatePaddleEvent(ctx context.Context, arg CreatePaddleEventPa
 }
 
 const getActiveSubscriptionByUserID = `-- name: GetActiveSubscriptionByUserID :one
-SELECT id, user_id, paddle_subscription_id, paddle_plan_id, paddle_transaction_id, plan_name, currency, unit_price_cents, status, trial_ends_at, current_period_start, current_period_end, cancel_at_period_end, cancelled_at, paused_at, seat_count, last_event_type, last_event_at, created_at, updated_at FROM subscriptions
+SELECT id, user_id, paddle_subscription_id, paddle_plan_id, paddle_transaction_id, plan_name, currency, unit_price_cents, status, trial_ends_at, current_period_start, current_period_end, cancel_at_period_end, cancelled_at, paused_at, seat_count, last_event_type, last_event_at, created_at, updated_at, payment_method, eft_payment_id FROM subscriptions
 WHERE user_id = $1
   AND status IN ('active', 'trialing')
 ORDER BY current_period_end DESC
@@ -99,12 +99,14 @@ func (q *Queries) GetActiveSubscriptionByUserID(ctx context.Context, userID uuid
 		&i.LastEventAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PaymentMethod,
+		&i.EftPaymentID,
 	)
 	return i, err
 }
 
 const getSubscriptionByPaddleID = `-- name: GetSubscriptionByPaddleID :one
-SELECT id, user_id, paddle_subscription_id, paddle_plan_id, paddle_transaction_id, plan_name, currency, unit_price_cents, status, trial_ends_at, current_period_start, current_period_end, cancel_at_period_end, cancelled_at, paused_at, seat_count, last_event_type, last_event_at, created_at, updated_at FROM subscriptions
+SELECT id, user_id, paddle_subscription_id, paddle_plan_id, paddle_transaction_id, plan_name, currency, unit_price_cents, status, trial_ends_at, current_period_start, current_period_end, cancel_at_period_end, cancelled_at, paused_at, seat_count, last_event_type, last_event_at, created_at, updated_at, payment_method, eft_payment_id FROM subscriptions
 WHERE paddle_subscription_id = $1
 `
 
@@ -132,12 +134,14 @@ func (q *Queries) GetSubscriptionByPaddleID(ctx context.Context, paddleSubscript
 		&i.LastEventAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PaymentMethod,
+		&i.EftPaymentID,
 	)
 	return i, err
 }
 
 const listExpiredSubscriptions = `-- name: ListExpiredSubscriptions :many
-SELECT s.id, s.user_id, s.paddle_subscription_id, s.paddle_plan_id, s.paddle_transaction_id, s.plan_name, s.currency, s.unit_price_cents, s.status, s.trial_ends_at, s.current_period_start, s.current_period_end, s.cancel_at_period_end, s.cancelled_at, s.paused_at, s.seat_count, s.last_event_type, s.last_event_at, s.created_at, s.updated_at, u.id AS uid
+SELECT s.id, s.user_id, s.paddle_subscription_id, s.paddle_plan_id, s.paddle_transaction_id, s.plan_name, s.currency, s.unit_price_cents, s.status, s.trial_ends_at, s.current_period_start, s.current_period_end, s.cancel_at_period_end, s.cancelled_at, s.paused_at, s.seat_count, s.last_event_type, s.last_event_at, s.created_at, s.updated_at, s.payment_method, s.eft_payment_id, u.id AS uid
 FROM subscriptions s
 JOIN users u ON u.id = s.user_id
 WHERE s.cancel_at_period_end = TRUE
@@ -166,6 +170,8 @@ type ListExpiredSubscriptionsRow struct {
 	LastEventAt          pgtype.Timestamptz `db:"last_event_at" json:"last_event_at"`
 	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt            pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	PaymentMethod        pgtype.Text        `db:"payment_method" json:"payment_method"`
+	EftPaymentID         pgtype.UUID        `db:"eft_payment_id" json:"eft_payment_id"`
 	Uid                  uuid.UUID          `db:"uid" json:"uid"`
 }
 
@@ -200,6 +206,8 @@ func (q *Queries) ListExpiredSubscriptions(ctx context.Context) ([]ListExpiredSu
 			&i.LastEventAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.PaymentMethod,
+			&i.EftPaymentID,
 			&i.Uid,
 		); err != nil {
 			return nil, err
@@ -236,6 +244,82 @@ WHERE paddle_subscription_id = $1
 func (q *Queries) SetSubscriptionPastDue(ctx context.Context, paddleSubscriptionID string) error {
 	_, err := q.db.Exec(ctx, setSubscriptionPastDue, paddleSubscriptionID)
 	return err
+}
+
+const upsertEftSubscription = `-- name: UpsertEftSubscription :one
+INSERT INTO subscriptions (
+    user_id,
+    plan_name,
+    currency,
+    unit_price_cents,
+    status,
+    payment_method,
+    eft_payment_id,
+    current_period_start,
+    current_period_end
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+ON CONFLICT (eft_payment_id) WHERE eft_payment_id IS NOT NULL
+DO UPDATE SET
+    plan_name           = EXCLUDED.plan_name,
+    currency            = EXCLUDED.currency,
+    unit_price_cents    = EXCLUDED.unit_price_cents,
+    status              = EXCLUDED.status,
+    current_period_end  = EXCLUDED.current_period_end,
+    updated_at          = NOW()
+RETURNING id, user_id, paddle_subscription_id, paddle_plan_id, paddle_transaction_id, plan_name, currency, unit_price_cents, status, trial_ends_at, current_period_start, current_period_end, cancel_at_period_end, cancelled_at, paused_at, seat_count, last_event_type, last_event_at, created_at, updated_at, payment_method, eft_payment_id
+`
+
+type UpsertEftSubscriptionParams struct {
+	UserID             uuid.UUID          `db:"user_id" json:"user_id"`
+	PlanName           string             `db:"plan_name" json:"plan_name"`
+	Currency           string             `db:"currency" json:"currency"`
+	UnitPriceCents     pgtype.Int4        `db:"unit_price_cents" json:"unit_price_cents"`
+	Status             string             `db:"status" json:"status"`
+	PaymentMethod      pgtype.Text        `db:"payment_method" json:"payment_method"`
+	EftPaymentID       pgtype.UUID        `db:"eft_payment_id" json:"eft_payment_id"`
+	CurrentPeriodStart pgtype.Timestamptz `db:"current_period_start" json:"current_period_start"`
+	CurrentPeriodEnd   pgtype.Timestamptz `db:"current_period_end" json:"current_period_end"`
+}
+
+// Creates or updates an EFT subscription. Idempotent on eft_payment_id.
+func (q *Queries) UpsertEftSubscription(ctx context.Context, arg UpsertEftSubscriptionParams) (Subscription, error) {
+	row := q.db.QueryRow(ctx, upsertEftSubscription,
+		arg.UserID,
+		arg.PlanName,
+		arg.Currency,
+		arg.UnitPriceCents,
+		arg.Status,
+		arg.PaymentMethod,
+		arg.EftPaymentID,
+		arg.CurrentPeriodStart,
+		arg.CurrentPeriodEnd,
+	)
+	var i Subscription
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.PaddleSubscriptionID,
+		&i.PaddlePlanID,
+		&i.PaddleTransactionID,
+		&i.PlanName,
+		&i.Currency,
+		&i.UnitPriceCents,
+		&i.Status,
+		&i.TrialEndsAt,
+		&i.CurrentPeriodStart,
+		&i.CurrentPeriodEnd,
+		&i.CancelAtPeriodEnd,
+		&i.CancelledAt,
+		&i.PausedAt,
+		&i.SeatCount,
+		&i.LastEventType,
+		&i.LastEventAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PaymentMethod,
+		&i.EftPaymentID,
+	)
+	return i, err
 }
 
 const upsertSubscription = `-- name: UpsertSubscription :one
@@ -275,7 +359,7 @@ DO UPDATE SET
     last_event_type         = EXCLUDED.last_event_type,
     last_event_at           = EXCLUDED.last_event_at,
     updated_at              = NOW()
-RETURNING id, user_id, paddle_subscription_id, paddle_plan_id, paddle_transaction_id, plan_name, currency, unit_price_cents, status, trial_ends_at, current_period_start, current_period_end, cancel_at_period_end, cancelled_at, paused_at, seat_count, last_event_type, last_event_at, created_at, updated_at
+RETURNING id, user_id, paddle_subscription_id, paddle_plan_id, paddle_transaction_id, plan_name, currency, unit_price_cents, status, trial_ends_at, current_period_start, current_period_end, cancel_at_period_end, cancelled_at, paused_at, seat_count, last_event_type, last_event_at, created_at, updated_at, payment_method, eft_payment_id
 `
 
 type UpsertSubscriptionParams struct {
@@ -339,6 +423,8 @@ func (q *Queries) UpsertSubscription(ctx context.Context, arg UpsertSubscription
 		&i.LastEventAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PaymentMethod,
+		&i.EftPaymentID,
 	)
 	return i, err
 }
