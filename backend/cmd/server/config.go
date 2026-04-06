@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 )
 
 // Config holds all configuration loaded from environment variables.
@@ -18,6 +19,7 @@ type Config struct {
 	PaddleSecret string
 	AppURL       string
 	CORSOrigin   string
+	AdminEmails  []string
 }
 
 func firstNonEmpty(vals ...string) string {
@@ -29,7 +31,25 @@ func firstNonEmpty(vals ...string) string {
 	return ""
 }
 
+func splitAndTrim(s, sep string) []string {
+	result := make([]string, 0)
+	for _, part := range strings.Split(s, sep) {
+		result = append(result, strings.TrimSpace(part))
+	}
+	return result
+}
+
 func load(getenv func(string) string) (Config, error) {
+	adminEnv := getenv("ADMIN_EMAILS")
+	var adminEmails []string
+	if adminEnv != "" {
+		for _, e := range splitAndTrim(adminEnv, ",") {
+			if e != "" {
+				adminEmails = append(adminEmails, e)
+			}
+		}
+	}
+
 	cfg := Config{
 		Environment:  firstNonEmpty(getenv("APP_ENV"), "development"),
 		DatabaseURL:  getenv("DATABASE_URL"),
@@ -41,6 +61,7 @@ func load(getenv func(string) string) (Config, error) {
 		PaddleSecret: getenv("PADDLE_WEBHOOK_SECRET"),
 		AppURL:       getenv("APP_URL"),
 		CORSOrigin:   getenv("CORS_ORIGIN"),
+		AdminEmails:  adminEmails,
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowRight, Copy, Mail, ShieldCheck } from "lucide-react";
+import { ArrowRight, Copy, Mail, ShieldCheck, Check, Loader2 } from "lucide-react";
 import { AppLogo } from "@/components/AppLogo";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from "@/contexts/AuthContext";
 import { billingConfig, getEftReference, hasPublicEftDetails } from "@/lib/billing";
 import { cn } from "@/lib/utils";
+import type { InitPaymentResponse } from "@/lib/types";
 
 function CopyButton({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
@@ -38,8 +39,35 @@ function CopyButton({ label, value }: { label: string; value: string }) {
 }
 
 export default function UpgradePage() {
-  const { user } = useAuth();
-  const reference = getEftReference(user?.email);
+  const { user, api } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [payment, setPayment] = useState<InitPaymentResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleInitiatePayment(planName: "pro" | "team") {
+    if (!user) return;
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await api.post<InitPaymentResponse>(
+        "/api/payments/init",
+        { plan_name: planName },
+        (v) => v as InitPaymentResponse
+      );
+      setPayment(result);
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Failed to initiate payment");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const reference = payment?.reference ?? getEftReference(user?.email);
 
   return (
     <main className="min-h-screen bg-background">
@@ -82,7 +110,7 @@ export default function UpgradePage() {
                 1. Create your Overload account.
               </div>
               <div className="rounded-lg border border-border bg-background px-4 py-3">
-                2. Pay <span className="font-semibold text-foreground">{billingConfig.proPrice}</span> via EFT using the reference below.
+                2. Pay via EFT using the reference below.
               </div>
               <div className="rounded-lg border border-border bg-background px-4 py-3">
                 3. Email your proof of payment to{" "}
@@ -96,60 +124,133 @@ export default function UpgradePage() {
         </div>
 
         <div className="space-y-6">
-          <Card className="shadow-lg shadow-primary/5">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between gap-3">
-                <span>{billingConfig.proPlanName}</span>
-                <span className="text-2xl">{billingConfig.proPrice}</span>
-              </CardTitle>
-              <CardDescription>Use this reference so you can be matched to the right account quickly.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-lg border border-border bg-muted/50 p-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Payment reference</div>
-                <div className="mt-2 break-all font-mono text-lg font-semibold text-foreground">{reference}</div>
-                <div className="mt-3">
-                  <CopyButton label="reference" value={reference} />
+          {payment ? (
+            <Card className="shadow-lg shadow-primary/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Check className="h-5 w-5 text-green-500" />
+                  Payment initiated
+                </CardTitle>
+                <CardDescription>Use this reference when making your EFT transfer.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-lg border border-border bg-muted/50 p-4">
+                  <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Payment reference</div>
+                  <div className="mt-2 break-all font-mono text-lg font-semibold text-foreground">{reference}</div>
+                  <div className="mt-3">
+                    <CopyButton label="reference" value={reference} />
+                  </div>
                 </div>
-              </div>
 
-              {hasPublicEftDetails ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-lg border border-border p-4">
-                    <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Account name</div>
-                    <div className="mt-2 font-medium">{billingConfig.accountName}</div>
+                <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm">
+                  <div className="font-medium text-green-800">Amount to pay:</div>
+                  <div className="text-2xl font-bold text-green-900">
+                    R{(payment.amount_cents / 100).toFixed(2)} {payment.currency}
                   </div>
-                  <div className="rounded-lg border border-border p-4">
-                    <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Bank</div>
-                    <div className="mt-2 font-medium">{billingConfig.bankName}</div>
-                  </div>
-                  <div className="rounded-lg border border-border p-4">
-                    <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Account number</div>
-                    <div className="mt-2 font-medium">{billingConfig.accountNumber}</div>
-                  </div>
-                  <div className="rounded-lg border border-border p-4">
-                    <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Branch code</div>
-                    <div className="mt-2 font-medium">{billingConfig.branchCode || "Use your bank default"}</div>
-                  </div>
-                  <div className="rounded-lg border border-border p-4">
-                    <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Account type</div>
-                    <div className="mt-2 font-medium">{billingConfig.accountType || "Business account"}</div>
-                  </div>
-                  <div className="rounded-lg border border-border p-4">
-                    <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Proof of payment</div>
-                    <div className="mt-2 flex items-center gap-2 font-medium">
-                      <Mail className="h-4 w-4 text-primary" />
-                      {billingConfig.billingEmail}
+                </div>
+
+                {hasPublicEftDetails ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg border border-border p-4">
+                      <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Account name</div>
+                      <div className="mt-2 font-medium">{payment.bank_details.account_name}</div>
+                    </div>
+                    <div className="rounded-lg border border-border p-4">
+                      <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Bank</div>
+                      <div className="mt-2 font-medium">{payment.bank_details.bank_name}</div>
+                    </div>
+                    <div className="rounded-lg border border-border p-4">
+                      <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Account number</div>
+                      <div className="mt-2 font-medium">{payment.bank_details.account_number}</div>
+                    </div>
+                    <div className="rounded-lg border border-border p-4">
+                      <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Branch code</div>
+                      <div className="mt-2 font-medium">{payment.bank_details.branch_code}</div>
+                    </div>
+                    <div className="rounded-lg border border-border p-4">
+                      <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Account type</div>
+                      <div className="mt-2 font-medium">{payment.bank_details.account_type}</div>
+                    </div>
+                    <div className="rounded-lg border border-border p-4">
+                      <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Proof of payment</div>
+                      <div className="mt-2 flex items-center gap-2 font-medium">
+                        <Mail className="h-4 w-4 text-primary" />
+                        {billingConfig.billingEmail}
+                      </div>
                     </div>
                   </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+                    EFT details are not configured yet.
+                  </div>
+                )}
+
+                <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm">
+                  <p className="font-medium text-amber-800">After making payment:</p>
+                  <p className="mt-1 text-amber-700">
+                    Email your proof of payment to {billingConfig.billingEmail || "the billing inbox"} with subject "Overload Payment - {user?.email}".
+                  </p>
                 </div>
-              ) : (
-                <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
-                  EFT details are not configured yet. Set the public billing environment variables before sending customers here.
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="shadow-lg shadow-primary/5">
+              <CardHeader>
+                <CardTitle>Choose your plan</CardTitle>
+                <CardDescription>Click to initiate your EFT payment</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {error && (
+                  <div className="rounded-lg bg-red-50 border border-red-200 p-4 text-sm text-red-700">
+                    {error}
+                  </div>
+                )}
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <button
+                    onClick={() => void handleInitiatePayment("pro")}
+                    disabled={loading || !user}
+                    className="flex flex-col items-start rounded-lg border-2 border-primary/20 p-4 text-left hover:border-primary/40 disabled:opacity-50"
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="font-semibold">{billingConfig.proPlanName}</span>
+                      <span className="text-lg font-bold">{billingConfig.proPrice}</span>
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">Monthly</p>
+                    {loading ? (
+                      <Loader2 className="mt-3 h-4 w-4 animate-spin" />
+                    ) : (
+                      <span className="mt-3 text-sm font-medium text-primary">Initiate payment →</span>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => void handleInitiatePayment("team")}
+                    disabled={loading || !user}
+                    className="flex flex-col items-start rounded-lg border-2 border-border p-4 text-left hover:border-primary/40 disabled:opacity-50"
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="font-semibold">Team</span>
+                      <span className="text-lg font-bold">R499</span>
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">Monthly • 5 seats</p>
+                    {loading ? (
+                      <Loader2 className="mt-3 h-4 w-4 animate-spin" />
+                    ) : (
+                      <span className="mt-3 text-sm font-medium text-primary">Initiate payment →</span>
+                    )}
+                  </button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+
+                {!user && (
+                  <p className="text-sm text-muted-foreground">
+                    <Link href="/login" className="text-primary hover:underline">Sign in</Link> or{" "}
+                    <Link href="/login" className="text-primary hover:underline">create an account</Link> to upgrade.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
