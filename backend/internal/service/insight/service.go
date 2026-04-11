@@ -9,9 +9,11 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
-	checkinsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/checkin"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/score"
+	checkinsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/checkin"
 )
+
+const insightHistoryDays = 30 // unified window for all pattern/arc/signature analysis
 
 // insightStore is the data-access contract for the insight service.
 // store.Postgres satisfies this implicitly.
@@ -47,11 +49,11 @@ type DismissRequest struct {
 
 // InsightBundle is the complete insight response — handler calls respond.JSON on it directly.
 type InsightBundle struct {
-	SessionContext      *score.SessionContext              `json:"session_context"`
+	SessionContext      *score.SessionContext             `json:"session_context"`
 	Patterns            []string                          `json:"patterns"`
 	PatternInsights     []score.PatternInsight            `json:"pattern_insights"`
 	EarnedPattern       *score.EarnedPatternInsightResult `json:"earned_pattern"`
-	Signature           *score.SignatureData               `json:"signature"`
+	Signature           *score.SignatureData              `json:"signature"`
 	SignatureNarrative  string                            `json:"signature_narrative"`
 	ArcNarrative        string                            `json:"arc_narrative"`
 	MonthlyArc          *score.MonthlyArcResult           `json:"monthly_arc"`
@@ -67,11 +69,11 @@ type InsightBundle struct {
 
 func (s *Service) Get(ctx context.Context, user db.User) (InsightBundle, error) {
 	today := localDate(user.Timezone)
-	ninetyDaysAgo := today.AddDate(0, 0, -90)
+	historyStart := today.AddDate(0, 0, -insightHistoryDays)
 
 	all, err := s.store.ListCheckInsInRange(ctx, db.ListCheckInsInRangeParams{
 		UserID:          user.ID,
-		CheckedInDate:   pgtype.Date{Time: ninetyDaysAgo, Valid: true},
+		CheckedInDate:   pgtype.Date{Time: historyStart, Valid: true},
 		CheckedInDate_2: pgtype.Date{Time: today, Valid: true},
 	})
 	if err != nil {

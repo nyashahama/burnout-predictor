@@ -53,13 +53,13 @@ type UpsertRequest struct {
 }
 
 type UpsertResult struct {
-	CheckIn            db.CheckIn                `json:"check_in"`
-	Score              score.Output              `json:"score"`
-	Explanation        string                    `json:"explanation"`
-	Suggestion         string                    `json:"suggestion"`
-	DailyForecast      score.DailyForecast       `json:"daily_forecast"`
-	RecommendedAction  score.RecommendedAction   `json:"recommended_action"`
-	RecoveryPlan       []score.PlanSection       `json:"recovery_plan,omitempty"`
+	CheckIn           db.CheckIn              `json:"check_in"`
+	Score             score.Output            `json:"score"`
+	Explanation       string                  `json:"explanation"`
+	Suggestion        string                  `json:"suggestion"`
+	DailyForecast     score.DailyForecast     `json:"daily_forecast"`
+	RecommendedAction score.RecommendedAction `json:"recommended_action"`
+	RecoveryPlan      []score.PlanSection     `json:"recovery_plan,omitempty"`
 }
 
 type ScoreCardResult struct {
@@ -441,11 +441,17 @@ func (s *Service) GetScoreCard(ctx context.Context, user db.User) (ScoreCardResu
 	}, nil
 }
 
-func (s *Service) List(ctx context.Context, userID uuid.UUID) ([]db.CheckIn, error) {
+func (s *Service) List(ctx context.Context, userID uuid.UUID, limit, offset int32) ([]db.CheckIn, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 30
+	}
+	if offset < 0 {
+		offset = 0
+	}
 	return s.store.ListCheckIns(ctx, db.ListCheckInsParams{
 		UserID: userID,
-		Limit:  30,
-		Offset: 0,
+		Limit:  limit,
+		Offset: offset,
 	})
 }
 
@@ -574,7 +580,7 @@ func extractSnippet(note, keyword string) string {
 func localDate(timezone string) time.Time {
 	loc := userLocation(timezone)
 	now := time.Now().In(loc)
-	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 }
 
 func userLocation(timezone string) *time.Location {

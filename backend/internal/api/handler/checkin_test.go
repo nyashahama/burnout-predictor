@@ -20,7 +20,7 @@ import (
 type mockCheckinService struct {
 	UpsertFn       func(context.Context, db.User, checkinsvc.UpsertRequest) (checkinsvc.UpsertResult, error)
 	GetScoreCardFn func(context.Context, db.User) (checkinsvc.ScoreCardResult, error)
-	ListFn         func(context.Context, uuid.UUID) ([]db.CheckIn, error)
+	ListFn         func(context.Context, uuid.UUID, int32, int32) ([]db.CheckIn, error)
 }
 
 func (m *mockCheckinService) Upsert(ctx context.Context, user db.User, req checkinsvc.UpsertRequest) (checkinsvc.UpsertResult, error) {
@@ -35,9 +35,9 @@ func (m *mockCheckinService) GetScoreCard(ctx context.Context, user db.User) (ch
 	}
 	return checkinsvc.ScoreCardResult{}, nil
 }
-func (m *mockCheckinService) List(ctx context.Context, userID uuid.UUID) ([]db.CheckIn, error) {
+func (m *mockCheckinService) List(ctx context.Context, userID uuid.UUID, limit, offset int32) ([]db.CheckIn, error) {
 	if m.ListFn != nil {
-		return m.ListFn(ctx, userID)
+		return m.ListFn(ctx, userID, limit, offset)
 	}
 	return nil, nil
 }
@@ -143,7 +143,7 @@ func TestCheckinHandler_GetScoreCard_Success(t *testing.T) {
 
 func TestCheckinHandler_List_ServiceError(t *testing.T) {
 	h := handler.NewCheckinHandler(&mockCheckinService{
-		ListFn: func(_ context.Context, _ uuid.UUID) ([]db.CheckIn, error) {
+		ListFn: func(_ context.Context, _ uuid.UUID, _, _ int32) ([]db.CheckIn, error) {
 			return nil, errors.New("db error")
 		},
 	})

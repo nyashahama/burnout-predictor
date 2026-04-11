@@ -215,3 +215,40 @@ export interface UpdateProfileRequest {
 export interface ApiError {
   error: string;
 }
+
+export interface BankDetails {
+  account_name: string;
+  bank_name: string;
+  account_number: string;
+  branch_code: string;
+  account_type: string;
+}
+
+export interface InitPaymentResponse {
+  payment_id: string;
+  reference: string;
+  amount_cents: number;
+  currency: string;
+  plan_name: string;
+  expires_at: string;
+  bank_details: BankDetails;
+}
+
+export interface PendingPayment {
+  id: string;
+  user_id: string;
+  user_email: string;
+  user_name: string;
+  reference: string;
+  amount_cents: number;
+  currency: string;
+  plan_name: string;
+  status: string;
+  proof_image_url?: string;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface PendingPaymentsResponse {
+  payments: PendingPayment[];
+}

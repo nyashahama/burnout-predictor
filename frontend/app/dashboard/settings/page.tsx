@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Download, Save, Trash2 } from "lucide-react";
+import { Copy, Download, Save, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { billingConfig, getEftReference, hasPublicEftDetails } from "@/lib/billing";
 import { parseNotificationPrefs, parseUserResponse } from "@/lib/validators";
 import { getTodayString } from "@/lib/date";
 import type { NotificationPrefs, UpdateProfileRequest } from "@/lib/types";
@@ -24,7 +26,7 @@ function downloadFile(content: string, filename: string, mimeType = "application
 }
 
 export default function SettingsPage() {
-  const { api, updateUser } = useAuth();
+  const { api, updateUser, user } = useAuth();
   const [name, setName] = useState("");
   const [role, setRole] = useState("engineer");
   const [sleep, setSleep] = useState("8");
@@ -33,6 +35,9 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [copiedReference, setCopiedReference] = useState(false);
+
+  const eftReference = getEftReference(user?.email);
 
   useEffect(() => {
     Promise.all([
@@ -112,6 +117,16 @@ export default function SettingsPage() {
     }
     keys.forEach((key) => localStorage.removeItem(key));
     setMessage("Browser-only cached dashboard data cleared.");
+  }
+
+  async function handleCopyReference() {
+    try {
+      await navigator.clipboard.writeText(eftReference);
+      setCopiedReference(true);
+      window.setTimeout(() => setCopiedReference(false), 2000);
+    } catch {
+      setCopiedReference(false);
+    }
   }
 
   return (
@@ -200,6 +215,72 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Billing</CardTitle>
+          <CardDescription>
+            Your current tier is <span className="font-medium text-foreground">{user?.tier ?? "free"}</span>.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {user?.tier === "pro" ? (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              Pro access is active on this account. If you need an invoice or billing help, email {billingConfig.billingEmail || "support"}.
+            </div>
+          ) : (
+            <>
+              <div className="rounded-lg border border-border p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">EFT upgrade reference</div>
+                <div className="mt-2 break-all font-mono text-lg font-semibold">{eftReference}</div>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <Button variant="outline" onClick={() => void handleCopyReference()}>
+                    <Copy className="h-4 w-4" />
+                    {copiedReference ? "Copied" : "Copy reference"}
+                  </Button>
+                  <Link href="/upgrade" className="inline-flex items-center rounded-md text-sm font-medium text-primary hover:underline">
+                    Full EFT instructions
+                  </Link>
+                </div>
+              </div>
+
+              {hasPublicEftDetails ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-lg border border-border p-4 text-sm">
+                    <div className="font-medium">Plan</div>
+                    <div className="mt-1 text-muted-foreground">{billingConfig.proPlanName} · {billingConfig.proPrice}</div>
+                  </div>
+                  <div className="rounded-lg border border-border p-4 text-sm">
+                    <div className="font-medium">Proof of payment</div>
+                    <div className="mt-1 text-muted-foreground">{billingConfig.billingEmail}</div>
+                  </div>
+                  <div className="rounded-lg border border-border p-4 text-sm">
+                    <div className="font-medium">Bank</div>
+                    <div className="mt-1 text-muted-foreground">
+                      {billingConfig.bankName}
+                      {billingConfig.branchCode ? ` · Branch ${billingConfig.branchCode}` : ""}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border p-4 text-sm">
+                    <div className="font-medium">Account</div>
+                    <div className="mt-1 text-muted-foreground">
+                      {billingConfig.accountName} · {billingConfig.accountNumber}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+                  EFT details have not been configured in the frontend environment yet.
+                </div>
+              )}
+
+              <div className="rounded-lg border border-primary/15 bg-primary/5 p-4 text-sm text-muted-foreground">
+                After you pay, send proof of payment and this reference. Access is upgraded manually {billingConfig.processingTime}.
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

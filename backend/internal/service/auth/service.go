@@ -16,10 +16,10 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/nyasha-hama/burnout-predictor-api/internal/api/validate"
 	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
 	eml "github.com/nyasha-hama/burnout-predictor-api/internal/email"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/reqid"
-	"github.com/nyasha-hama/burnout-predictor-api/internal/api/validate"
 )
 
 // authStore is the data-access contract for the auth service.
@@ -63,13 +63,13 @@ func New(store authStore, secret []byte, emailClient *eml.Client, appURL string,
 // ── Request / Response types ──────────────────────────────────────────────────
 
 type RegisterRequest struct {
-	Email         string `json:"email"`
-	Password      string `json:"password"`
-	Name          string `json:"name"`
-	Role          string `json:"role"`
-	SleepBaseline int16  `json:"sleep_baseline"`
-	EstimatedScore int16 `json:"estimated_score"`
-	Timezone      string `json:"timezone"`
+	Email          string `json:"email"`
+	Password       string `json:"password"`
+	Name           string `json:"name"`
+	Role           string `json:"role"`
+	SleepBaseline  int16  `json:"sleep_baseline"`
+	EstimatedScore int16  `json:"estimated_score"`
+	Timezone       string `json:"timezone"`
 }
 
 type LoginRequest struct {
@@ -144,9 +144,6 @@ type RefreshResult struct {
 // ── Public methods ────────────────────────────────────────────────────────────
 
 func (s *Service) Register(ctx context.Context, req RegisterRequest) (RegisterResult, error) {
-	if req.Role == "" {
-		req.Role = "other"
-	}
 	if req.SleepBaseline == 0 {
 		req.SleepBaseline = 8
 	}
@@ -160,13 +157,13 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (RegisterRe
 	}
 
 	user, err := s.store.CreateUser(ctx, db.CreateUserParams{
-		Email:         req.Email,
-		PasswordHash:  pgtype.Text{String: string(hash), Valid: true},
-		Name:          req.Name,
-		Role:          req.Role,
-		SleepBaseline: req.SleepBaseline,
+		Email:          req.Email,
+		PasswordHash:   pgtype.Text{String: string(hash), Valid: true},
+		Name:           req.Name,
+		Role:           req.Role,
+		SleepBaseline:  req.SleepBaseline,
 		EstimatedScore: pgtype.Int2{Int16: req.EstimatedScore, Valid: req.EstimatedScore != 0},
-		Timezone:      req.Timezone,
+		Timezone:       req.Timezone,
 	})
 	if err != nil {
 		var pgErr *pgconn.PgError
