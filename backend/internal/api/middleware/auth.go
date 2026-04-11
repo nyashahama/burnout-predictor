@@ -9,8 +9,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 
-	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/respond"
+	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
 )
 
 type contextKey string
@@ -63,7 +63,7 @@ func Auth(store userGetter, secret []byte) func(http.Handler) http.Handler {
 
 			user, err := store.GetUserByID(r.Context(), userID)
 			if err != nil {
-				respond.Error(w, http.StatusUnauthorized, "user not found")
+				respond.Error(w, http.StatusUnauthorized, "invalid token")
 				return
 			}
 

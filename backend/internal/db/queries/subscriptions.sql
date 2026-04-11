@@ -76,6 +76,29 @@ WHERE s.cancel_at_period_end = TRUE
   AND s.current_period_end   < NOW()
   AND s.status               != 'cancelled';
 
+-- name: UpsertEftSubscription :one
+-- Creates or updates an EFT subscription. Idempotent on eft_payment_id.
+INSERT INTO subscriptions (
+    user_id,
+    plan_name,
+    currency,
+    unit_price_cents,
+    status,
+    payment_method,
+    eft_payment_id,
+    current_period_start,
+    current_period_end
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+ON CONFLICT (eft_payment_id) WHERE eft_payment_id IS NOT NULL
+DO UPDATE SET
+    plan_name           = EXCLUDED.plan_name,
+    currency            = EXCLUDED.currency,
+    unit_price_cents    = EXCLUDED.unit_price_cents,
+    status              = EXCLUDED.status,
+    current_period_end  = EXCLUDED.current_period_end,
+    updated_at          = NOW()
+RETURNING *;
+
 -- ── Paddle events ────────────────────────────────────────────────────────────
 
 -- name: CreatePaddleEvent :one

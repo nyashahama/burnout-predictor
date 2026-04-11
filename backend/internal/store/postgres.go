@@ -354,3 +354,32 @@ func (p *Postgres) UpsertSubscription(ctx context.Context, arg db.UpsertSubscrip
 	return p.q.UpsertSubscription(ctx, arg)
 }
 
+// ── EFT Payments ───────────────────────────────────────────────────────────────
+
+func (p *Postgres) CreateEFTPayment(ctx context.Context, arg db.CreateEFTPaymentParams) (db.EftPayment, error) {
+	return p.q.CreateEFTPayment(ctx, arg)
+}
+
+func (p *Postgres) GetEFTPaymentByID(ctx context.Context, id uuid.UUID) (db.EftPayment, error) {
+	return p.q.GetEFTPaymentByID(ctx, id)
+}
+
+func (p *Postgres) GetEFTPaymentByReference(ctx context.Context, reference string) (db.EftPayment, error) {
+	return p.q.GetEFTPaymentByReference(ctx, reference)
+}
+
+func (p *Postgres) GetPendingEFTPayments(ctx context.Context) ([]db.EftPayment, error) {
+	return p.q.GetPendingEFTPayments(ctx)
+}
+
+func (p *Postgres) UpdateEFTPaymentStatus(ctx context.Context, arg db.UpdateEFTPaymentStatusParams) error {
+	return p.q.UpdateEFTPaymentStatus(ctx, arg)
+}
+
+func (p *Postgres) UpsertEftSubscription(ctx context.Context, arg db.UpsertEftSubscriptionParams) (db.Subscription, error) {
+	return p.q.UpsertEftSubscription(ctx, arg)
+}
+
+func (p *Postgres) UpdateUserEFTReference(ctx context.Context, arg db.UpdateUserEFTReferenceParams) error {
+	return p.q.UpdateUserEFTReference(ctx, arg)
+}

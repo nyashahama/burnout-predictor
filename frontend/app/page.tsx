@@ -7,6 +7,7 @@ import { AppLogo } from "@/components/AppLogo";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { billingConfig } from "@/lib/billing";
 import { cn } from "@/lib/utils";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
@@ -141,6 +142,61 @@ export default function Home() {
               </CardHeader>
             </Card>
           ))}
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-4 pb-24 sm:px-6">
+        <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-3">
+            <Badge variant="secondary" className="rounded-full px-4 py-1 text-xs uppercase tracking-[0.18em]">
+              Pricing
+            </Badge>
+            <div>
+              <h2 className="text-3xl tracking-tight sm:text-4xl">Launch now, upgrade by EFT later.</h2>
+              <p className="mt-2 max-w-2xl text-muted-foreground">
+                South African customers can start free, then move onto {billingConfig.proPlanName} by EFT while card payments are still being approved.
+              </p>
+            </div>
+          </div>
+          <Link href="/upgrade" className={buttonVariants({ variant: "outline" })}>
+            View EFT details
+          </Link>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Free</CardTitle>
+              <CardDescription>Start using Overload immediately.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-4xl font-semibold">R0</div>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>Daily score, short-range forecast, and the core dashboard.</p>
+                <p>No payment step. Just create an account and start tracking.</p>
+              </div>
+              <Link href="/login" className={buttonVariants()}>
+                Create free account
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card className="border-primary/20 shadow-lg shadow-primary/5">
+            <CardHeader>
+              <CardTitle>{billingConfig.proPlanName}</CardTitle>
+              <CardDescription>Manual EFT upgrade for the launch window.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-4xl font-semibold">{billingConfig.proPrice}</div>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>14-day forecast, deeper pattern insight, and the full early-warning workflow.</p>
+                <p>Pay by EFT, send proof of payment, and access is enabled manually once confirmed.</p>
+              </div>
+              <Link href="/upgrade" className={cn(buttonVariants(), "gap-2")}>
+                Pay with EFT <ArrowRight className="h-4 w-4" />
+              </Link>
+            </CardContent>
+          </Card>
         </div>
       </section>
     </main>

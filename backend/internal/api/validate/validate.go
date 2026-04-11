@@ -41,7 +41,7 @@ func Email(s string) error {
 
 func Role(s string) error {
 	if s == "" {
-		return nil
+		return errors.New("role is required")
 	}
 	if !validRoles[s] {
 		return errors.New("role must be one of: engineer, designer, pm, manager, founder, other")
