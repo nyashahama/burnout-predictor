@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { parseCheckIns, parseInsightBundle, parseScoreCardResult } from "@/lib/validators";
-import type { ScoreCardResult, CheckIn, InsightBundle, UpsertCheckInResult } from "@/lib/types";
+import type { ScoreCardResult, CheckIn, InsightBundle, UpsertCheckInResult, FollowUpInfo } from "@/lib/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
@@ -21,6 +21,8 @@ interface DashboardDataContextValue {
   loadingMessage: string;
   loadError: string;
   ready: boolean;
+  followUp: FollowUpInfo | null;
+  dismissFollowUp: () => Promise<void>;
   handleCheckInComplete: (result: UpsertCheckInResult) => void;
   reload: () => Promise<void>;
 }
@@ -33,6 +35,7 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
   const [scoreCard, setScoreCard]         = useState<ScoreCardResult | null>(null);
   const [checkins, setCheckins]           = useState<CheckIn[]>([]);
   const [insightBundle, setInsightBundle] = useState<InsightBundle | null>(null);
+  const [followUp, setFollowUp]         = useState<FollowUpInfo | null>(null);
   const [loadingData, setLoadingData]     = useState(true);
   const [loadingMessage, setLoadingMessage] = useState("Connecting to the API…");
   const [loadError, setLoadError]         = useState("");
@@ -109,11 +112,30 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
     } catch {
       setInsightBundle(null);
     }
+
+    try {
+      const fuResponse = await api.get<FollowUpInfo | null>("/api/follow-ups", (data: unknown) => {
+        if (typeof data === "object" && data !== null && "follow_up" in (data as Record<string, unknown>)) {
+          return (data as { follow_up: { question: string; source_date: string } | null }).follow_up;
+        }
+        return null;
+      });
+      setFollowUp(fuResponse);
+    } catch {
+      setFollowUp(null);
+    }
   }, [api, authLoading, warmBackend, withTimeout]);
 
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  const dismissFollowUp = useCallback(async () => {
+    try {
+      await api.post("/api/follow-ups/dismiss-today", {});
+      setFollowUp(null);
+    } catch {}
+  }, [api]);
 
   const handleCheckInComplete = useCallback((result: UpsertCheckInResult) => {
     setScoreCard(prev => prev ? {
@@ -129,7 +151,8 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
       result.check_in,
       ...prev.filter(c => c.checked_in_date !== result.check_in.checked_in_date),
     ]);
-  }, []);
+    void reload();
+  }, [reload]);
 
   return (
     <DashboardDataContext.Provider
@@ -137,6 +160,8 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
         scoreCard,
         checkins,
         insightBundle,
+        followUp,
+        dismissFollowUp,
         loadingData,
         loadingMessage,
         loadError,
