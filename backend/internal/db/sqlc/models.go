@@ -38,6 +38,8 @@ type CheckIn struct {
 	HoursWorked pgtype.Numeric `db:"hours_worked" json:"hours_worked"`
 	// Array of reported symptoms. Valid values: headache, muscle_tension, fatigue, trouble_sleeping, appetite_changes. Only collected when stress >= 4. Element validation is enforced in the application layer (CheckinSignals validator), not in the schema.
 	PhysicalSymptoms []string `db:"physical_symptoms" json:"physical_symptoms"`
+	// User-reported recovery action that helped today (e.g. "walked outside", "slept early").
+	SmallWins pgtype.Text `db:"small_wins" json:"small_wins"`
 }
 
 // Records which ephemeral UI cards the user has dismissed, cross-device.

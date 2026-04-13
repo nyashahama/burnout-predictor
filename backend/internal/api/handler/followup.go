@@ -10,9 +10,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/middleware"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/respond"
+	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
 )
 
 type followUpStore interface {
@@ -81,6 +81,30 @@ func (h *FollowUpHandler) Dismiss(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.store.DismissFollowUp(r.Context(), db.DismissFollowUpParams{
 		ID:     fuID,
+		UserID: user.ID,
+	}); err != nil {
+		respond.Error(w, http.StatusInternalServerError, "failed to dismiss follow-up")
+		return
+	}
+
+	respond.JSON(w, http.StatusOK, map[string]string{"status": "dismissed"})
+}
+
+func (h *FollowUpHandler) DismissToday(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromCtx(r.Context())
+	today := localDate(user.Timezone)
+
+	fu, err := h.store.GetTodayFollowUp(r.Context(), db.GetTodayFollowUpParams{
+		UserID:   user.ID,
+		FireDate: pgtype.Date{Time: today, Valid: true},
+	})
+	if err != nil {
+		respond.JSON(w, http.StatusOK, map[string]string{"status": "no_follow_up"})
+		return
+	}
+
+	if err := h.store.DismissFollowUp(r.Context(), db.DismissFollowUpParams{
+		ID:     fu.ID,
 		UserID: user.ID,
 	}); err != nil {
 		respond.Error(w, http.StatusInternalServerError, "failed to dismiss follow-up")
