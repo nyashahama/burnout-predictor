@@ -27,9 +27,10 @@ INSERT INTO check_ins (
     energy_level,
     focus_quality,
     hours_worked,
-    physical_symptoms
+    physical_symptoms,
+    small_wins
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
 )
 ON CONFLICT (user_id, checked_in_date)
 DO UPDATE SET
@@ -43,6 +44,7 @@ DO UPDATE SET
     focus_quality      = EXCLUDED.focus_quality,
     hours_worked       = EXCLUDED.hours_worked,
     physical_symptoms  = EXCLUDED.physical_symptoms,
+    small_wins         = EXCLUDED.small_wins,
     -- reset AI plan when check-in is meaningfully edited
     ai_recovery_plan    = CASE
                             WHEN check_ins.stress != EXCLUDED.stress
@@ -99,7 +101,8 @@ SELECT
     energy_level,
     focus_quality,
     hours_worked,
-    physical_symptoms
+    physical_symptoms,
+    small_wins
 FROM check_ins
 WHERE user_id = $1
   AND checked_in_date >= CURRENT_DATE - $2::INT
