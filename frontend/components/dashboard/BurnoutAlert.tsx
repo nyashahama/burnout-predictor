@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
-const DISMISS_KEY = `burnout-dismissed-${new Date().toISOString().split("T")[0]}`;
+import { useAuth } from "@/contexts/AuthContext";
 
 function buildAlertBody(
   score: number,
@@ -44,13 +43,14 @@ export default function BurnoutAlert({
   dangerDaysAhead: number;
   recoveryDate: string;
 }) {
-  const [dismissed, setDismissed] = useState(() => !!localStorage.getItem(DISMISS_KEY));
+  const { api } = useAuth();
+  const [dismissed, setDismissed] = useState(false);
 
   if (score <= 65 || dismissed) return null;
 
   function dismiss() {
-    localStorage.setItem(DISMISS_KEY, "1");
     setDismissed(true);
+    void api.post("/api/insights/dismiss", { component_key: `burnout-alert-${new Date().toISOString().split("T")[0]}` });
   }
 
   const body = buildAlertBody(score, dangerStreak, trend, dangerDaysAhead, recoveryDate);

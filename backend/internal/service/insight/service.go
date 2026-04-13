@@ -3,6 +3,7 @@ package insight
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,6 +26,7 @@ type insightStore interface {
 	// Callers must pass a pgtype.Date value.
 	GetYesterdayCheckIn(ctx context.Context, params db.GetYesterdayCheckInParams) (db.CheckIn, error)
 	CountCheckIns(ctx context.Context, userID uuid.UUID) (int64, error)
+	GetCheckInStreak(ctx context.Context, userID uuid.UUID) (int32, error)
 	GetInsightMetadata(ctx context.Context, params db.GetInsightMetadataParams) (db.InsightMetadatum, error)
 	SetInsightMetadata(ctx context.Context, params db.SetInsightMetadataParams) (db.InsightMetadatum, error)
 	ListInsightMetadataByPrefix(ctx context.Context, params db.ListInsightMetadataByPrefixParams) ([]db.InsightMetadatum, error)
@@ -47,6 +49,17 @@ type DismissRequest struct {
 	ComponentKey string `json:"component_key"`
 }
 
+type StreakMilestone struct {
+	Day     int    `json:"day"`
+	Message string `json:"message"`
+}
+
+type WhatWorkedToday struct {
+	Action      string `json:"action"`
+	Improvement int    `json:"improvement"`
+	Evidence    string `json:"evidence"`
+}
+
 // InsightBundle is the complete insight response — handler calls respond.JSON on it directly.
 type InsightBundle struct {
 	SessionContext      *score.SessionContext             `json:"session_context"`
@@ -63,6 +76,9 @@ type InsightBundle struct {
 	CheckInCount        int64                             `json:"check_in_count"`
 	AccuracyLabel       string                            `json:"accuracy_label"`
 	DismissedComponents []string                          `json:"dismissed_components"`
+	StreakMilestones    []StreakMilestone                 `json:"streak_milestones"`
+	StreakForgiven      bool                              `json:"streak_forgiven"`
+	WhatWorkedToday     *WhatWorkedToday                  `json:"what_worked_today,omitempty"`
 }
 
 // ── Public methods ────────────────────────────────────────────────────────────
@@ -132,6 +148,53 @@ func (s *Service) Get(ctx context.Context, user db.User) (InsightBundle, error) 
 	recoveryFeedback := score.BuildRecoveryFeedback(analysisEntries)
 	milestone := s.buildMilestone(ctx, user, int(totalCount), signatureEntries)
 
+	var streakMilestones []StreakMilestone
+	streak, _ := s.store.GetCheckInStreak(ctx, user.ID)
+	milestoneThresholds := []struct {
+		day int
+		msg string
+	}{
+		{3, "You're building the habit. Three days of data."},
+		{7, "One full week. Your data is getting meaningful. Patterns are starting to form."},
+		{14, "Pattern unlocked. The app can now see your personal trends."},
+		{30, "Signature discovered. Your burnout fingerprint is clear."},
+		{60, "Long arc visible. You can see your trajectory over months."},
+	}
+	for _, m := range milestoneThresholds {
+		if int(streak) == m.day {
+			seenKey := fmt.Sprintf("streak-milestone-%d", m.day)
+			_, seenErr := s.store.GetInsightMetadata(ctx, db.GetInsightMetadataParams{
+				UserID: user.ID,
+				Key:    seenKey,
+			})
+			if seenErr != nil {
+				streakMilestones = append(streakMilestones, StreakMilestone{Day: m.day, Message: m.msg})
+				_, _ = s.store.SetInsightMetadata(ctx, db.SetInsightMetadataParams{
+					UserID: user.ID,
+					Key:    seenKey,
+					Value:  pgtype.Text{String: "true", Valid: true},
+				})
+			}
+		}
+	}
+
+	var streakForgiven bool
+	if yesterdayErr != nil && streak >= 3 {
+		streakForgiven = true
+	}
+
+	var whatWorkedToday *WhatWorkedToday
+	if todayErr == nil && todayCI.SmallWins.Valid && todayCI.SmallWins.String != "" {
+		improvement := score.FindSmallWinsImpact(noteEntries, todayCI.SmallWins.String)
+		if improvement > 0 {
+			whatWorkedToday = &WhatWorkedToday{
+				Action:      todayCI.SmallWins.String,
+				Improvement: improvement,
+				Evidence:    fmt.Sprintf("When you %s, your next-day score improved by an average of %d points.", strings.ToLower(todayCI.SmallWins.String), improvement),
+			}
+		}
+	}
+
 	knownComponents := make([]string, 0, len(knownDismissableComponents))
 	for k := range knownDismissableComponents {
 		knownComponents = append(knownComponents, k)
@@ -159,23 +222,37 @@ func (s *Service) Get(ctx context.Context, user db.User) (InsightBundle, error) 
 		CheckInCount:        totalCount,
 		AccuracyLabel:       score.AccuracyLabel(int(totalCount)),
 		DismissedComponents: dismissed,
+		StreakMilestones:    streakMilestones,
+		StreakForgiven:      streakForgiven,
+		WhatWorkedToday:     whatWorkedToday,
 	}, nil
 }
 
 var knownDismissableComponents = map[string]bool{
-	"session-context": true,
-	"earned-pattern":  true,
-	"arc-narrative":   true,
-	"monthly-arc":     true,
-	"what-works":      true,
-	"signature":       true,
-	"milestone-30":    true,
-	"milestone-60":    true,
-	"milestone-90":    true,
+	"session-context":     true,
+	"earned-pattern":      true,
+	"arc-narrative":       true,
+	"monthly-arc":         true,
+	"what-works":          true,
+	"signature":           true,
+	"milestone-30":        true,
+	"milestone-60":        true,
+	"milestone-90":        true,
+	"streak-milestone-3":  true,
+	"streak-milestone-7":  true,
+	"streak-milestone-14": true,
+	"streak-milestone-30": true,
+	"streak-milestone-60": true,
 }
 
 func (s *Service) DismissComponent(ctx context.Context, userID uuid.UUID, req DismissRequest) error {
-	if req.ComponentKey == "" || !knownDismissableComponents[req.ComponentKey] {
+	if req.ComponentKey == "" {
+		return ErrInvalidComponent
+	}
+	if !knownDismissableComponents[req.ComponentKey] &&
+		!strings.HasPrefix(req.ComponentKey, "burnout-alert-") &&
+		!strings.HasPrefix(req.ComponentKey, "streak-milestone-") &&
+		!strings.HasPrefix(req.ComponentKey, "pattern-") {
 		return ErrInvalidComponent
 	}
 	return s.store.DismissComponent(ctx, db.DismissComponentParams{

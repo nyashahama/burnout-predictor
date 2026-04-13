@@ -1,13 +1,20 @@
 "use client";
 
-import { Activity, RefreshCcw, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
+import { Activity, RefreshCcw, TrendingDown, TrendingUp } from "lucide-react";
 import CheckIn from "@/components/dashboard/CheckIn";
+import ActionPlan from "@/components/dashboard/ActionPlan";
+import StreakDots from "@/components/dashboard/StreakDots";
+import StreakMilestoneCard from "@/components/dashboard/StreakMilestoneCard";
+import ConsistencyMetric from "@/components/dashboard/ConsistencyMetric";
+import NextDayFeedbackCard from "@/components/dashboard/NextDayFeedbackCard";
+import InsightRevealCard from "@/components/dashboard/InsightRevealCard";
 import { useDashboardData } from "@/contexts/DashboardDataContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateForDisplay, getTodayString } from "@/lib/date";
+import { buildDynamicRecoveryPlan } from "@/app/dashboard/data";
 
 function getLevel(score: number) {
   if (score > 65) return { label: "High strain", tone: "destructive" as const };
@@ -22,7 +29,7 @@ function forecastCopy(delta: number) {
 }
 
 export default function DashboardPage() {
-  const { scoreCard, checkins, insightBundle, loadingData, loadingMessage, loadError, reload, handleCheckInComplete } = useDashboardData();
+  const { scoreCard, checkins, insightBundle, loadingData, loadingMessage, loadError, reload, handleCheckInComplete, followUp, dismissFollowUp } = useDashboardData();
 
   if (loadingData) {
     return (
@@ -71,16 +78,36 @@ export default function DashboardPage() {
   const dangerDays = checkins.filter((entry) => entry.score > 65).length;
   const todayCheckIn = checkins.find((entry) => entry.checked_in_date === getTodayString());
   const forecast = scoreCard?.daily_forecast;
-  const action = scoreCard?.recommended_action;
+
+  const consistencyPct = scoreCard?.consistency_pct ?? 0;
+  const streakMilestones = insightBundle?.streak_milestones ?? [];
+  const whatWorkedToday = insightBundle?.what_worked_today ?? null;
   const patternInsights = insightBundle?.pattern_insights ?? [];
-  const recoveryFeedback = insightBundle?.recovery_feedback ?? [];
+  const whatWorks = insightBundle?.what_works ?? "";
+
+  const trend = recent.length >= 2 ? recent[recent.length - 1].score - recent[0].score : 0;
+
+  let dangerStreak = 0;
+  for (const entry of checkins) {
+    if (entry.score > 65) dangerStreak++;
+    else break;
+  }
+
+  const plan = todayCheckIn && todayCheckIn.stress >= 4
+    ? buildDynamicRecoveryPlan({
+        note: todayCheckIn?.note ?? undefined,
+        stress: todayCheckIn.stress,
+        consecutiveDays: dangerDays,
+        role: "engineer",
+      })
+    : [];
 
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-4xl tracking-tight">Dashboard</h1>
+        <h1 className="text-4xl tracking-tight">How are you?</h1>
         <p className="text-muted-foreground">
-          Your current score, tomorrow risk, and the best move to make today.
+          Check in, get your action plan, and track what works.
         </p>
       </div>
 
@@ -101,13 +128,9 @@ export default function DashboardPage() {
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="rounded-lg border border-border p-4">
-                  <div className="text-sm text-muted-foreground">Streak</div>
-                  <div className="mt-2 text-2xl font-semibold">{streak}</div>
+                  <StreakDots streak={streak} checkins={checkins} />
                 </div>
-                <div className="rounded-lg border border-border p-4">
-                  <div className="text-sm text-muted-foreground">Danger days</div>
-                  <div className="mt-2 text-2xl font-semibold">{dangerDays}</div>
-                </div>
+                <ConsistencyMetric consistencyPct={consistencyPct} />
                 <div className="rounded-lg border border-border p-4">
                   <div className="text-sm text-muted-foreground">Today</div>
                   <div className="mt-2 text-2xl font-semibold">{todayCheckIn ? todayCheckIn.stress : "—"}</div>
@@ -126,8 +149,32 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <CheckIn checkins={checkins} streakFromApi={streak} onComplete={handleCheckInComplete} />
+        <CheckIn checkins={checkins} followUp={followUp} onComplete={handleCheckInComplete} onDismissFollowUp={dismissFollowUp} />
       </div>
+
+      <StreakMilestoneCard milestones={streakMilestones} />
+
+      <ActionPlan
+        score={liveScore}
+        trend={trend}
+        dangerStreak={dangerStreak}
+        dangerDaysAhead={0}
+        recoveryDate=""
+        plan={plan}
+        note={todayCheckIn?.note ?? undefined}
+        stress={todayCheckIn?.stress}
+        consecutiveDays={dangerDays}
+        role=""
+        smallWins={todayCheckIn?.small_wins ?? null}
+      />
+
+      <NextDayFeedbackCard whatWorked={whatWorkedToday} />
+
+      <InsightRevealCard
+        patternInsights={patternInsights}
+        whatWorks={whatWorks}
+        checkInCount={insightBundle?.check_in_count ?? 0}
+      />
 
       <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
         <Card>
@@ -153,42 +200,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              Best move today
-            </CardTitle>
-            <CardDescription>One action chosen from the strongest driver behind your score.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="text-xl font-semibold">{action?.title ?? "Complete today’s check-in"}</div>
-            <p className="text-sm leading-7 text-muted-foreground">
-              {action?.detail ?? scoreCard?.suggestion ?? "Log a check-in to get a concrete move for today."}
-            </p>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>Driver:</span>
-              <Badge variant="outline">{action?.driver ?? "pending"}</Badge>
-              <span className="capitalize">{action?.confidence ?? "low"} confidence</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Calibration</CardTitle>
-            <CardDescription>How much real signal the system has collected from you.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="text-3xl font-semibold">{scoreCard?.accuracy_label || "Still learning"}</div>
-            <p className="text-sm leading-7 text-muted-foreground">
-              More real check-ins increase the reliability of forecasts, pattern detection, and recovery feedback.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -219,61 +230,17 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Why the score is moving</CardTitle>
-            <CardDescription>Cause-based patterns with evidence behind them.</CardDescription>
+            <CardTitle>Calibration</CardTitle>
+            <CardDescription>How much real signal the system has collected from you.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {patternInsights.length ? (
-              patternInsights.map((pattern) => (
-                <div key={`${pattern.driver}-${pattern.title}`} className="rounded-lg border border-border px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="font-medium">{pattern.title}</div>
-                    <Badge variant="outline" className="capitalize">{pattern.confidence}</Badge>
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{pattern.explanation}</p>
-                  <p className="mt-2 text-xs uppercase tracking-[0.15em] text-muted-foreground">{pattern.evidence}</p>
-                </div>
-              ))
-            ) : insightBundle?.patterns?.length ? (
-              insightBundle.patterns.map((pattern, index) => (
-                <div key={index} className="rounded-lg border border-border px-4 py-3 text-sm leading-6">
-                  {pattern}
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Check in consistently for a few days and the dashboard will start surfacing evidence-backed drivers behind your score.
-              </p>
-            )}
+            <div className="text-3xl font-semibold">{scoreCard?.accuracy_label || "Still learning"}</div>
+            <p className="text-sm leading-7 text-muted-foreground">
+              More real check-ins increase the reliability of forecasts, pattern detection, and recovery feedback.
+            </p>
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>What actually helped</CardTitle>
-          <CardDescription>Recovery evidence based on what happened the following day.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {recoveryFeedback.length ? (
-            recoveryFeedback.map((item) => (
-              <div key={`${item.driver}-${item.title}`} className="rounded-lg border border-border px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="font-medium">{item.title}</div>
-                  <Badge variant="outline" className="capitalize">{item.confidence}</Badge>
-                </div>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.explanation}</p>
-                <p className="mt-2 text-xs uppercase tracking-[0.15em] text-muted-foreground">{item.evidence}</p>
-              </div>
-            ))
-          ) : (
-            <div className="rounded-lg border border-primary/15 bg-primary/5 px-4 py-3 text-sm leading-6">
-              <span className="font-medium text-primary">Still learning:</span>{" "}
-              {insightBundle?.what_works || "Once a few recovery cycles are logged, the dashboard will start showing what actually improves your next-day score."}
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

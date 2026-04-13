@@ -28,6 +28,8 @@ type checkinStore interface {
 	CountCheckIns(ctx context.Context, userID uuid.UUID) (int64, error)
 	SetAIRecoveryPlan(ctx context.Context, params db.SetAIRecoveryPlanParams) error
 	CreateFollowUp(ctx context.Context, params db.CreateFollowUpParams) (db.FollowUp, error)
+	GetTodayFollowUp(ctx context.Context, params db.GetTodayFollowUpParams) (db.FollowUp, error)
+	CountCheckInsInRange(ctx context.Context, params db.CountCheckInsInRangeParams) (int64, error)
 }
 
 // Service owns check-in persistence, score computation, and follow-up scheduling.
@@ -50,6 +52,7 @@ type UpsertRequest struct {
 	FocusQuality     *int     `json:"focus_quality,omitempty"`
 	HoursWorked      *float64 `json:"hours_worked,omitempty"`
 	PhysicalSymptoms []string `json:"physical_symptoms,omitempty"`
+	SmallWins        string   `json:"small_wins,omitempty"`
 }
 
 type UpsertResult struct {
@@ -72,6 +75,14 @@ type ScoreCardResult struct {
 	Accuracy          string                  `json:"accuracy_label"`
 	Streak            int32                   `json:"streak"`
 	HasCheckIn        bool                    `json:"has_checkin"`
+	ConsistencyPct    int32                   `json:"consistency_pct"`
+	HasFollowUp       bool                    `json:"has_follow_up"`
+	FollowUp          *FollowUpInfo           `json:"follow_up,omitempty"`
+}
+
+type FollowUpInfo struct {
+	Question   string `json:"question"`
+	SourceDate string `json:"source_date"`
 }
 
 // ── Exported helper ───────────────────────────────────────────────────────────
@@ -177,6 +188,11 @@ func (s *Service) Upsert(ctx context.Context, user db.User, req UpsertRequest) (
 		physicalSymptoms = req.PhysicalSymptoms
 	}
 
+	var smallWins pgtype.Text
+	if req.SmallWins != "" {
+		smallWins = pgtype.Text{String: req.SmallWins, Valid: true}
+	}
+
 	checkin, err := s.store.UpsertCheckIn(ctx, db.UpsertCheckInParams{
 		UserID:           user.ID,
 		CheckedInDate:    pgtype.Date{Time: today, Valid: true},
@@ -189,6 +205,7 @@ func (s *Service) Upsert(ctx context.Context, user db.User, req UpsertRequest) (
 		FocusQuality:     focusQuality,
 		HoursWorked:      hoursWorked,
 		PhysicalSymptoms: physicalSymptoms,
+		SmallWins:        smallWins,
 	})
 	if err != nil {
 		return UpsertResult{}, err
@@ -328,6 +345,36 @@ func (s *Service) GetScoreCard(ctx context.Context, user db.User) (ScoreCardResu
 		s.log.WarnContext(ctx, "count check-ins failed", "err", countErr)
 	}
 
+	twentyOneDaysAgo := today.AddDate(0, 0, -21)
+	consistencyN, _ := s.store.CountCheckInsInRange(ctx, db.CountCheckInsInRangeParams{
+		UserID:          user.ID,
+		CheckedInDate:   pgtype.Date{Time: twentyOneDaysAgo, Valid: true},
+		CheckedInDate_2: pgtype.Date{Time: today, Valid: true},
+	})
+	var consistencyPct int32
+	if consistencyN > 0 {
+		consistencyPct = int32(float64(consistencyN) / 21.0 * 100)
+		if consistencyPct > 100 {
+			consistencyPct = 100
+		}
+	}
+
+	var followUp *FollowUpInfo
+	fu, fuErr := s.store.GetTodayFollowUp(ctx, db.GetTodayFollowUpParams{
+		UserID:   user.ID,
+		FireDate: pgtype.Date{Time: today, Valid: true},
+	})
+	if fuErr == nil {
+		var sourceDate string
+		if fu.FireDate.Valid {
+			sourceDate = fu.FireDate.Time.Format("2006-01-02")
+		}
+		followUp = &FollowUpInfo{
+			Question:   fu.Question,
+			SourceDate: sourceDate,
+		}
+	}
+
 	trajectory := score.BuildTrajectoryInsight(score.TrajectoryInput{
 		Score:                 out.Score,
 		RecentStresses:        in.RecentStresses,
@@ -438,6 +485,9 @@ func (s *Service) GetScoreCard(ctx context.Context, user db.User) (ScoreCardResu
 		Accuracy:          score.AccuracyLabel(int(count)),
 		Streak:            streak,
 		HasCheckIn:        hasTodayCI,
+		ConsistencyPct:    consistencyPct,
+		HasFollowUp:       followUp != nil,
+		FollowUp:          followUp,
 	}, nil
 }
 
