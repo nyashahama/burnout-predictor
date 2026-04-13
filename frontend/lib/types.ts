@@ -34,6 +34,22 @@ export interface RecommendedAction {
   confidence: InsightConfidence;
 }
 
+export interface FollowUpInfo {
+  question: string;
+  source_date: string;
+}
+
+export interface StreakMilestone {
+  day: number;
+  message: string;
+}
+
+export interface WhatWorkedToday {
+  action: string;
+  improvement: number;
+  evidence: string;
+}
+
 export interface PatternInsightCard {
   title: string;
   explanation: string;
@@ -89,6 +105,11 @@ export interface ScoreCardResult {
   accuracy_label: string;
   streak: number;
   has_checkin: boolean;
+  consistency_pct: number;
+  has_follow_up: boolean;
+  follow_up: FollowUpInfo | null;
+  streak_forgiven: boolean;
+  streak_milestones: StreakMilestone[];
 }
 
 export interface CheckIn {
@@ -109,6 +130,7 @@ export interface CheckIn {
   focus_quality: number | null;     // pgtype.Int2
   hours_worked: number | null;      // pgtype.Numeric
   physical_symptoms: string[] | null;
+  small_wins: string | null;
 }
 
 export interface UpsertCheckInRequest {
@@ -118,6 +140,7 @@ export interface UpsertCheckInRequest {
   focus_quality?: number;
   hours_worked?: number;
   physical_symptoms?: string[];
+  small_wins?: string;
 }
 
 export interface UpsertCheckInResult {
@@ -191,6 +214,9 @@ export interface InsightBundle {
   check_in_count: number; // Go int64 — safe as number for realistic check-in counts (well below 2^53)
   accuracy_label: string;
   dismissed_components: string[];
+  what_worked_today: WhatWorkedToday | null;
+  streak_milestones: StreakMilestone[];
+  streak_forgiven: boolean;
 }
 
 // NotificationPrefs matches handler.NotifPrefsResponse exactly.
