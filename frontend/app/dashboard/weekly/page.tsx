@@ -72,7 +72,7 @@ function averageScore(days: WeeklyDay[]) {
 function buildWeeklyNarrative(days: WeeklyDay[], previousWeek: WeeklyDay[]) {
   const realDays = days.filter((day) => day.score !== null);
   if (!realDays.length) {
-    return "No weekly pattern yet. Your first few check-ins will turn this into a real weekly read instead of a blank summary.";
+    return "No pattern yet. Your first few check-ins will turn this into a real weekly read instead of a blank summary.";
   }
 
   const avg = averageScore(days) ?? 0;
@@ -83,22 +83,22 @@ function buildWeeklyNarrative(days: WeeklyDay[], previousWeek: WeeklyDay[]) {
   if (previousAvg !== null) {
     const delta = avg - previousAvg;
     if (delta >= 6) {
-      return `This week ran ${delta} points heavier than the week before. ${peakDay.label} was the pressure point, so that is the day to redesign first.`;
+      return `The last 7 days ran ${delta} points heavier than the prior period. ${peakDay.label} was the pressure point, so that is the day to redesign first.`;
     }
     if (delta <= -6) {
-      return `This week came in ${Math.abs(delta)} points lighter than the week before. ${lowDays[0]?.label ?? "One of your lighter days"} is worth protecting because it is helping the week recover.`;
+      return `The last 7 days came in ${Math.abs(delta)} points lighter than the prior period. ${lowDays[0]?.label ?? "One of your lighter days"} is worth protecting because it is helping recovery.`;
     }
   }
 
   if ((peakDay.score ?? 0) > 65) {
-    return `${peakDay.label} was the clear spike this week. If next week only changes in one place, change that day before the pressure compounds.`;
+    return `${peakDay.label} was the clear spike in the last 7 days. If the next period only changes in one place, change that day before the pressure compounds.`;
   }
 
   if (lowDays.length >= 2) {
-    return `${lowDays.map((day) => day.label).join(" and ")} gave you real breathing room this week. Guard those days instead of letting meetings flood them.`;
+    return `${lowDays.map((day) => day.label).join(" and ")} gave you real breathing room in this period. Guard those days instead of letting meetings flood them.`;
   }
 
-  return "The week stayed relatively even. That is useful too: your load is steady enough that small changes could bend the next week in your favor.";
+  return "The period stayed relatively even. That is useful too: your load is steady enough that small changes could bend the next period in your favor.";
 }
 
 function buildNotePattern(days: WeeklyDay[]) {
@@ -166,7 +166,7 @@ export default function WeeklyPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardDescription>Check-ins this week</CardDescription>
+            <CardDescription>Check-ins in the last 7 days</CardDescription>
             <CardTitle className="text-3xl">{loadingData ? "…" : realDays.length}</CardTitle>
           </CardHeader>
         </Card>
@@ -207,7 +207,7 @@ export default function WeeklyPage() {
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
             {realDays.length === 7
-              ? "You logged every day this week."
+              ? "You logged every day in this period."
               : `${realDays.length} of 7 days have real check-ins.`}
           </CardContent>
         </Card>
@@ -224,7 +224,7 @@ export default function WeeklyPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>What this week says</CardTitle>
+          <CardTitle>Weekly read</CardTitle>
           <CardDescription>A plain-language read of the last seven days.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -239,7 +239,7 @@ export default function WeeklyPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>This week</CardTitle>
+          <CardTitle>Last 7 check-ins</CardTitle>
           <CardDescription>Each bar reflects the saved backend score for that day, with your daily stress attached where available.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
