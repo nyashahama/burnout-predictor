@@ -26,6 +26,8 @@ type mockCheckinStore struct {
 	countCheckIns            func(ctx context.Context, userID uuid.UUID) (int64, error)
 	setAIRecoveryPlan        func(ctx context.Context, p db.SetAIRecoveryPlanParams) error
 	createFollowUp           func(ctx context.Context, p db.CreateFollowUpParams) (db.FollowUp, error)
+	getTodayFollowUp         func(ctx context.Context, p db.GetTodayFollowUpParams) (db.FollowUp, error)
+	countCheckInsInRange     func(ctx context.Context, p db.CountCheckInsInRangeParams) (int64, error)
 }
 
 func (m *mockCheckinStore) UpsertCheckIn(ctx context.Context, p db.UpsertCheckInParams) (db.CheckIn, error) {
@@ -78,6 +80,18 @@ func (m *mockCheckinStore) CreateFollowUp(ctx context.Context, p db.CreateFollow
 		return m.createFollowUp(ctx, p)
 	}
 	return db.FollowUp{}, nil
+}
+func (m *mockCheckinStore) GetTodayFollowUp(ctx context.Context, p db.GetTodayFollowUpParams) (db.FollowUp, error) {
+	if m.getTodayFollowUp != nil {
+		return m.getTodayFollowUp(ctx, p)
+	}
+	return db.FollowUp{}, errors.New("no follow-up")
+}
+func (m *mockCheckinStore) CountCheckInsInRange(ctx context.Context, p db.CountCheckInsInRangeParams) (int64, error) {
+	if m.countCheckInsInRange != nil {
+		return m.countCheckInsInRange(ctx, p)
+	}
+	return 0, nil
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
