@@ -121,6 +121,7 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 		r.Post("/api/insights/dismiss", insightH.DismissComponent)
 
 		r.Get("/api/follow-ups", followUpH.GetToday)
+		r.Post("/api/follow-ups/dismiss-today", followUpH.DismissToday)
 		r.Post("/api/follow-ups/{id}/dismiss", followUpH.Dismiss)
 
 		r.Post("/api/payments/init", paymentH.Init)
