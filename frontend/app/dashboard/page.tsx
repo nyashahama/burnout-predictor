@@ -7,6 +7,8 @@ import StreakDots from "@/components/dashboard/StreakDots";
 import StreakMilestoneCard from "@/components/dashboard/StreakMilestoneCard";
 import ConsistencyMetric from "@/components/dashboard/ConsistencyMetric";
 import InsightRevealCard from "@/components/dashboard/InsightRevealCard";
+import PersonalizationProgress from "@/components/dashboard/PersonalizationProgress";
+import PlaybookPanel from "@/components/dashboard/PlaybookPanel";
 import { useDashboardData } from "@/contexts/DashboardDataContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -166,22 +168,36 @@ export default function DashboardPage() {
         <CheckIn checkins={checkins} followUp={followUp} onComplete={handleCheckInComplete} onDismissFollowUp={dismissFollowUp} />
       </div>
 
-      <StreakMilestoneCard milestones={streakMilestones} />
+<StreakMilestoneCard milestones={streakMilestones} />
 
       {scoreCard && (
-        <TodayBriefing
-          scoreCard={scoreCard}
-          todayCheckIn={todayCheckIn}
-          plan={plan}
-          trend={trend}
-          dangerStreak={dangerStreak}
-          dangerDaysAhead={0}
-          recoveryDate=""
-          reason={briefingReason}
-          confidenceCopy={briefingConfidence}
-          newLearning={briefingNewLearning}
-          whatWorkedToday={whatWorkedToday}
-        />
+        <>
+          <TodayBriefing
+            scoreCard={scoreCard}
+            todayCheckIn={todayCheckIn}
+            plan={plan}
+            trend={trend}
+            dangerStreak={dangerStreak}
+            dangerDaysAhead={0}
+            recoveryDate=""
+            reason={briefingReason}
+            confidenceCopy={briefingConfidence}
+            newLearning={briefingNewLearning}
+            whatWorkedToday={whatWorkedToday}
+          />
+
+          <PersonalizationProgress
+            progress={insightBundle?.personalization_progress ?? null}
+            accuracyLabel={scoreCard?.accuracy_label ?? "Still learning"}
+          />
+
+          <PlaybookPanel
+            title="Your Playbook"
+            subtitle="The durable memory behind today's recommendation."
+            playbook={insightBundle?.playbook ?? null}
+            compact
+          />
+        </>
       )}
 
       <InsightRevealCard
