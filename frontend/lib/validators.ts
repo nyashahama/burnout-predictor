@@ -106,13 +106,11 @@ export const parseNotificationPrefs = (value: unknown): NotificationPrefs => {
 
 export const parseInsightBundle = (value: unknown): InsightBundle => {
   if (!isRecord(value)) throw new Error("Invalid API response: insight bundle must be an object.");
-  if (
-    !Array.isArray(value.patterns) ||
-    !Array.isArray(value.pattern_insights) ||
-    !Array.isArray(value.recovery_feedback) ||
-    !Array.isArray(value.dismissed_components)
-  ) {
-    throw new Error("Invalid API response: insight bundle arrays are malformed.");
-  }
+  if (!Array.isArray(value.patterns)) throw new Error("Invalid API response: patterns must be an array.");
+  if (!Array.isArray(value.pattern_insights)) throw new Error("Invalid API response: pattern_insights must be an array.");
+  if (!Array.isArray(value.recovery_feedback)) throw new Error("Invalid API response: recovery_feedback must be an array.");
+  if (!Array.isArray(value.dismissed_components)) throw new Error("Invalid API response: dismissed_components must be an array.");
+  if (!isRecord(value.personalization_progress)) throw new Error("Invalid API response: personalization_progress must be an object.");
+  if (!isRecord(value.playbook)) throw new Error("Invalid API response: playbook must be an object.");
   return value as unknown as InsightBundle;
 };

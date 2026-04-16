@@ -62,23 +62,27 @@ type WhatWorkedToday struct {
 
 // InsightBundle is the complete insight response — handler calls respond.JSON on it directly.
 type InsightBundle struct {
-	SessionContext      *score.SessionContext             `json:"session_context"`
-	Patterns            []string                          `json:"patterns"`
-	PatternInsights     []score.PatternInsight            `json:"pattern_insights"`
-	EarnedPattern       *score.EarnedPatternInsightResult `json:"earned_pattern"`
-	Signature           *score.SignatureData              `json:"signature"`
-	SignatureNarrative  string                            `json:"signature_narrative"`
-	ArcNarrative        string                            `json:"arc_narrative"`
-	MonthlyArc          *score.MonthlyArcResult           `json:"monthly_arc"`
-	WhatWorks           string                            `json:"what_works"`
-	RecoveryFeedback    []score.RecoveryFeedback          `json:"recovery_feedback"`
-	Milestone           *score.MilestoneData              `json:"milestone"`
-	CheckInCount        int64                             `json:"check_in_count"`
-	AccuracyLabel       string                            `json:"accuracy_label"`
-	DismissedComponents []string                          `json:"dismissed_components"`
-	StreakMilestones    []StreakMilestone                 `json:"streak_milestones"`
-	StreakForgiven      bool                              `json:"streak_forgiven"`
-	WhatWorkedToday     *WhatWorkedToday                  `json:"what_worked_today,omitempty"`
+	SessionContext          *score.SessionContext             `json:"session_context"`
+	Patterns                []string                          `json:"patterns"`
+	PatternInsights         []score.PatternInsight            `json:"pattern_insights"`
+	EarnedPattern           *score.EarnedPatternInsightResult `json:"earned_pattern"`
+	Signature               *score.SignatureData              `json:"signature"`
+	SignatureNarrative      string                            `json:"signature_narrative"`
+	ArcNarrative            string                            `json:"arc_narrative"`
+	MonthlyArc              *score.MonthlyArcResult           `json:"monthly_arc"`
+	WhatWorks               string                            `json:"what_works"`
+	RecoveryFeedback        []score.RecoveryFeedback          `json:"recovery_feedback"`
+	Milestone               *score.MilestoneData              `json:"milestone"`
+	CheckInCount            int64                             `json:"check_in_count"`
+	AccuracyLabel           string                            `json:"accuracy_label"`
+	DismissedComponents     []string                          `json:"dismissed_components"`
+	StreakMilestones        []StreakMilestone                 `json:"streak_milestones"`
+	StreakForgiven          bool                              `json:"streak_forgiven"`
+	WhatWorkedToday         *WhatWorkedToday                  `json:"what_worked_today,omitempty"`
+	PersonalizationProgress PersonalizationProgress           `json:"personalization_progress"`
+	RecommendationBasis     *RecommendationBasis              `json:"recommendation_basis,omitempty"`
+	BriefingChange          *BriefingChange                   `json:"briefing_change,omitempty"`
+	Playbook                PlaybookSections                  `json:"playbook"`
 }
 
 // ── Public methods ────────────────────────────────────────────────────────────
@@ -207,24 +211,58 @@ func (s *Service) Get(ctx context.Context, user db.User) (InsightBundle, error) 
 		dismissed = []string{}
 	}
 
+	lastSeenDate := today.Format("2006-01-02")
+	view := BuildPersonalizationView(patternInsights, recoveryFeedback, whatWorkedToday, totalCount, lastSeenDate)
+
+	currentChangeKey := ""
+	currentChangeBody := ""
+	if len(view.Playbook.ConfirmedTriggers) > 0 {
+		currentChangeKey = "trigger:" + view.Playbook.ConfirmedTriggers[0].Key
+		currentChangeBody = view.Playbook.ConfirmedTriggers[0].Detail
+	} else if len(view.Playbook.ConfirmedRecoveryLevers) > 0 {
+		currentChangeKey = "recovery:" + view.Playbook.ConfirmedRecoveryLevers[0].Key
+		currentChangeBody = view.Playbook.ConfirmedRecoveryLevers[0].Detail
+	}
+
+	previousChangeKey := ""
+	meta, metaErr := s.store.GetInsightMetadata(ctx, db.GetInsightMetadataParams{
+		UserID: user.ID,
+		Key:    "briefing-change-key",
+	})
+	if metaErr == nil && meta.Value.Valid {
+		previousChangeKey = meta.Value.String
+	}
+	briefingChange := BuildBriefingChange(currentChangeKey, previousChangeKey, currentChangeBody)
+	if currentChangeKey != "" && currentChangeKey != previousChangeKey {
+		_, _ = s.store.SetInsightMetadata(ctx, db.SetInsightMetadataParams{
+			UserID: user.ID,
+			Key:    "briefing-change-key",
+			Value:  pgtype.Text{String: currentChangeKey, Valid: true},
+		})
+	}
+
 	return InsightBundle{
-		SessionContext:      sessionCtx,
-		Patterns:            patterns.Patterns,
-		PatternInsights:     patternInsights,
-		EarnedPattern:       earnedPattern,
-		Signature:           sig,
-		SignatureNarrative:  sigNarrative,
-		ArcNarrative:        arcNarrative,
-		MonthlyArc:          monthlyArc,
-		WhatWorks:           whatWorks,
-		RecoveryFeedback:    recoveryFeedback,
-		Milestone:           milestone,
-		CheckInCount:        totalCount,
-		AccuracyLabel:       score.AccuracyLabel(int(totalCount)),
-		DismissedComponents: dismissed,
-		StreakMilestones:    streakMilestones,
-		StreakForgiven:      streakForgiven,
-		WhatWorkedToday:     whatWorkedToday,
+		SessionContext:          sessionCtx,
+		Patterns:                patterns.Patterns,
+		PatternInsights:         patternInsights,
+		EarnedPattern:           earnedPattern,
+		Signature:               sig,
+		SignatureNarrative:      sigNarrative,
+		ArcNarrative:            arcNarrative,
+		MonthlyArc:              monthlyArc,
+		WhatWorks:               whatWorks,
+		RecoveryFeedback:        recoveryFeedback,
+		Milestone:               milestone,
+		CheckInCount:            totalCount,
+		AccuracyLabel:           score.AccuracyLabel(int(totalCount)),
+		DismissedComponents:     dismissed,
+		StreakMilestones:        streakMilestones,
+		StreakForgiven:          streakForgiven,
+		WhatWorkedToday:         whatWorkedToday,
+		PersonalizationProgress: view.Progress,
+		RecommendationBasis:     view.RecommendationBasis,
+		BriefingChange:          briefingChange,
+		Playbook:                view.Playbook,
 	}, nil
 }
 
