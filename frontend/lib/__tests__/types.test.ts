@@ -48,4 +48,8 @@ describe("API types", () => {
     expectTypeOf<InsightBundle>().toHaveProperty("recovery_feedback");
     expectTypeOf<InsightBundle>().toHaveProperty("dismissed_components");
   });
+
+  it("InsightBundle exposes briefing_recommendation", () => {
+    expectTypeOf<InsightBundle>().toHaveProperty("briefing_recommendation");
+  });
 });

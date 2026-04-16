@@ -135,5 +135,8 @@ export const parseInsightBundle = (value: unknown): InsightBundle => {
     briefing_change: isRecord(bundle.briefing_change)
       ? (bundle.briefing_change as InsightBundle["briefing_change"])
       : null,
+    briefing_recommendation: isRecord(bundle.briefing_recommendation)
+      ? (bundle.briefing_recommendation as InsightBundle["briefing_recommendation"])
+      : null,
   } as InsightBundle;
 };
