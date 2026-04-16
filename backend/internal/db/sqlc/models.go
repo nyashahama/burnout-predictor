@@ -141,6 +141,28 @@ type PasswordReset struct {
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
+type RecommendationCommitment struct {
+	ID                   uuid.UUID          `db:"id" json:"id"`
+	UserID               uuid.UUID          `db:"user_id" json:"user_id"`
+	RecommendationKey    string             `db:"recommendation_key" json:"recommendation_key"`
+	RecommendationTitle  string             `db:"recommendation_title" json:"recommendation_title"`
+	RecommendationDetail string             `db:"recommendation_detail" json:"recommendation_detail"`
+	WhyThisAction        string             `db:"why_this_action" json:"why_this_action"`
+	WhyNow               string             `db:"why_now" json:"why_now"`
+	TargetDay            string             `db:"target_day" json:"target_day"`
+	BasisKind            string             `db:"basis_kind" json:"basis_kind"`
+	BasisState           string             `db:"basis_state" json:"basis_state"`
+	PredictedScoreDelta  int32              `db:"predicted_score_delta" json:"predicted_score_delta"`
+	Status               string             `db:"status" json:"status"`
+	CommittedAt          pgtype.Timestamptz `db:"committed_at" json:"committed_at"`
+	DueAt                pgtype.Timestamptz `db:"due_at" json:"due_at"`
+	CompletedAt          pgtype.Timestamptz `db:"completed_at" json:"completed_at"`
+	OutcomeHelpfulness   pgtype.Text        `db:"outcome_helpfulness" json:"outcome_helpfulness"`
+	EvaluatedAt          pgtype.Timestamptz `db:"evaluated_at" json:"evaluated_at"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 // Stores user feedback on recommendations (helpful/not helpful) for personalization loop.
 type RecommendationFeedback struct {
 	ID     uuid.UUID `db:"id" json:"id"`

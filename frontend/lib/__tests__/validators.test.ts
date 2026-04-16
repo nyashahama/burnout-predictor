@@ -107,4 +107,65 @@ describe("parseInsightBundle", () => {
 
     expect(bundle.briefing_recommendation?.primary_action.key).toBe("protect_focus_block");
   });
+
+  it("parses active commitment and pending outcome prompt when present", () => {
+    const bundle = parseInsightBundle({
+      session_context: null,
+      patterns: [],
+      pattern_insights: [],
+      earned_pattern: null,
+      signature: null,
+      signature_narrative: "",
+      arc_narrative: "",
+      monthly_arc: null,
+      what_works: "",
+      recovery_feedback: [],
+      milestone: null,
+      check_in_count: 9,
+      accuracy_label: "Based on 9 real check-ins",
+      dismissed_components: [],
+      what_worked_today: null,
+      streak_milestones: [],
+      streak_forgiven: false,
+      personalization_progress: {
+        confirmed_triggers: 1,
+        confirmed_recovery_levers: 1,
+        experiments: 1,
+        confidence_trend: "up",
+      },
+      recommendation_basis: null,
+      briefing_change: null,
+      playbook: {
+        confirmed_triggers: [],
+        confirmed_recovery_levers: [],
+        experiments: [],
+      },
+      briefing_recommendation: null,
+      active_commitment: {
+        id: "33333333-3333-3333-3333-333333333333",
+        recommendation_key: "shutdown_on_time",
+        recommendation_title: "End work by 6 PM tonight",
+        recommendation_detail: "Use an earlier shutdown to reduce tomorrow's load.",
+        why_this_action: "Late work is pushing your strain up.",
+        why_now: "There is still time for this to matter.",
+        target_day: "today",
+        status: "committed",
+        predicted_score_delta: 4,
+        committed_at: "2026-04-16T09:00:00Z",
+        due_at: "2026-04-16T23:59:59Z",
+        completed_at: null,
+        outcome_helpfulness: null,
+        evaluated_at: null,
+        basis: null,
+      },
+      pending_outcome_prompt: {
+        commitment_id: "44444444-4444-4444-4444-444444444444",
+        recommendation_title: "Protect a 90-minute focus block tomorrow morning",
+        prompt: "Did this help?",
+      },
+    });
+
+    expect(bundle.active_commitment?.status).toBe("committed");
+    expect(bundle.pending_outcome_prompt?.prompt).toBe("Did this help?");
+  });
 });
