@@ -138,5 +138,11 @@ export const parseInsightBundle = (value: unknown): InsightBundle => {
     briefing_recommendation: isRecord(bundle.briefing_recommendation)
       ? (bundle.briefing_recommendation as InsightBundle["briefing_recommendation"])
       : null,
+    active_commitment: isRecord(bundle.active_commitment)
+      ? (bundle.active_commitment as InsightBundle["active_commitment"])
+      : null,
+    pending_outcome_prompt: isRecord(bundle.pending_outcome_prompt)
+      ? (bundle.pending_outcome_prompt as InsightBundle["pending_outcome_prompt"])
+      : null,
   } as InsightBundle;
 };
