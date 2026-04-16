@@ -263,6 +263,33 @@ export interface MilestoneData {
   TotalEntries: number;
 }
 
+export type CommitmentStatus = "committed" | "completed" | "skipped" | "expired" | "evaluated";
+export type OutcomeHelpfulness = "helped" | "a_bit" | "did_not_help";
+
+export interface RecommendationCommitment {
+  id: string;
+  recommendation_key: string;
+  recommendation_title: string;
+  recommendation_detail: string;
+  why_this_action: string;
+  why_now: string;
+  target_day: RecommendationTargetDay;
+  status: CommitmentStatus;
+  predicted_score_delta: number;
+  committed_at: string;
+  due_at: string;
+  completed_at: string | null;
+  outcome_helpfulness: OutcomeHelpfulness | null;
+  evaluated_at: string | null;
+  basis: RecommendationBasis | null;
+}
+
+export interface PendingOutcomePrompt {
+  commitment_id: string;
+  recommendation_title: string;
+  prompt: string;
+}
+
 export interface InsightBundle {
   session_context: SessionContext | null;
   patterns: string[];
@@ -286,6 +313,8 @@ export interface InsightBundle {
   briefing_change: BriefingChange | null;
   playbook: PlaybookSections;
   briefing_recommendation: BriefingRecommendation | null;
+  active_commitment: RecommendationCommitment | null;
+  pending_outcome_prompt: PendingOutcomePrompt | null;
 }
 
 // NotificationPrefs matches handler.NotifPrefsResponse exactly.
