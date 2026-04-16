@@ -185,6 +185,7 @@ export default function DashboardPage() {
             newLearning={briefingNewLearning}
             whatWorkedToday={whatWorkedToday}
             feedbackSubmittedForToday={scoreCard.feedback_submitted_for_today}
+            briefingRecommendation={insightBundle?.briefing_recommendation ?? null}
           />
 
           <PersonalizationProgress

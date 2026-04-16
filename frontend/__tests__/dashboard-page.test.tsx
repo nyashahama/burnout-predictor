@@ -137,6 +137,37 @@ const mockDashboardData = {
         },
       ],
     },
+    briefing_recommendation: {
+      headline: "Best move for tomorrow",
+      target_day: "tomorrow",
+      primary_action: {
+        key: "protect_focus_block",
+        title: "Protect a 90-minute focus block tomorrow morning",
+        detail: "Keep the first deep-work block clear.",
+        timeframe: "tomorrow",
+        kind: "trigger",
+        state: "confirmed",
+      },
+      fallback_action: {
+        key: "shutdown_on_time",
+        title: "End work by 6 PM tonight",
+        detail: "Use an earlier shutdown to reduce tomorrow's load.",
+        timeframe: "today",
+        kind: "recovery",
+        state: "emerging",
+      },
+      predicted_score_delta: 6,
+      risk_reduction_summary: "Reduces the chance of a crash day.",
+      why_this_action: "Meetings are your strongest confirmed trigger.",
+      why_now: "This is easiest to set up before tomorrow starts.",
+      confidence: "confirmed",
+      basis: {
+        kind: "trigger",
+        state: "confirmed",
+        summary: "Back-to-back meeting mornings are your strongest trigger.",
+        evidence_count: 4,
+      },
+    },
   } as unknown as InsightBundle,
   loadingData: false,
   loadingMessage: "",
@@ -181,8 +212,8 @@ describe("DashboardPage", () => {
     render(<DashboardPage />);
 
     expect(screen.getByRole("heading", { name: /today's briefing/i })).toBeInTheDocument();
-    expect(screen.getByText(/what should i do today/i)).toBeInTheDocument();
-    expect(screen.getByText(/protect tomorrow morning from meetings/i)).toBeInTheDocument();
+    expect(screen.getByText(/best move for tomorrow/i)).toBeInTheDocument();
+    expect(screen.getByText(/protect a 90-minute focus block/i)).toBeInTheDocument();
     expect(screen.getByText(/why this is showing up/i)).toBeInTheDocument();
     expect(screen.getByText(/tomorrow forecast/i)).toBeInTheDocument();
     expect(screen.getAllByText(/personalization progress/i).length).toBeGreaterThanOrEqual(1);

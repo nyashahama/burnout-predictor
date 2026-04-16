@@ -1,11 +1,11 @@
 "use client";
 
 import ActionPlan from "@/components/dashboard/ActionPlan";
+import BriefingRecommendationSection from "@/components/dashboard/BriefingRecommendationSection";
 import NextDayFeedbackCard from "@/components/dashboard/NextDayFeedbackCard";
-import RecommendationFeedback from "@/components/dashboard/RecommendationFeedback";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { CheckIn, PlanSection, ScoreCardResult, WhatWorkedToday } from "@/lib/types";
+import type { BriefingRecommendation, CheckIn, PlanSection, ScoreCardResult, WhatWorkedToday } from "@/lib/types";
 
 interface TodayBriefingProps {
   scoreCard: ScoreCardResult;
@@ -20,6 +20,7 @@ interface TodayBriefingProps {
   newLearning: string;
   whatWorkedToday: WhatWorkedToday | null;
   feedbackSubmittedForToday: string | null;
+  briefingRecommendation: BriefingRecommendation | null;
 }
 
 export default function TodayBriefing({
@@ -35,6 +36,7 @@ export default function TodayBriefing({
   newLearning,
   whatWorkedToday,
   feedbackSubmittedForToday,
+  briefingRecommendation,
 }: TodayBriefingProps) {
   return (
     <Card className="border-primary/15 bg-primary/[0.03]">
@@ -48,15 +50,11 @@ export default function TodayBriefing({
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
-        <section className="space-y-2">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">What should I do today?</h2>
-          <p className="text-2xl font-semibold text-foreground">{scoreCard.recommended_action.title}</p>
-          <p className="text-sm leading-6 text-muted-foreground">{scoreCard.recommended_action.detail}</p>
-          <RecommendationFeedback
-            recommendedActionKey={scoreCard.recommended_action.driver}
-            feedbackSubmittedForToday={feedbackSubmittedForToday}
-          />
-        </section>
+        <BriefingRecommendationSection
+          recommendation={briefingRecommendation}
+          legacyAction={scoreCard.recommended_action}
+          feedbackSubmittedForToday={feedbackSubmittedForToday}
+        />
 
         <section className="space-y-2">
           <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Why this is showing up</h2>

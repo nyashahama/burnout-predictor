@@ -19,6 +19,30 @@ export interface ScoreOutput {
 export type RecommendationState = "generic" | "observed" | "emerging" | "confirmed";
 export type PersonalizationKind = "trigger" | "recovery" | "experiment";
 
+export type RecommendationTargetDay = "today" | "tomorrow";
+
+export interface BriefingActionCandidate {
+  key: string;
+  title: string;
+  detail: string;
+  timeframe: RecommendationTargetDay;
+  kind: PersonalizationKind;
+  state: RecommendationState;
+}
+
+export interface BriefingRecommendation {
+  headline: string;
+  target_day: RecommendationTargetDay;
+  primary_action: BriefingActionCandidate;
+  fallback_action: BriefingActionCandidate | null;
+  predicted_score_delta: number;
+  risk_reduction_summary: string;
+  why_this_action: string;
+  why_now: string;
+  confidence: RecommendationState | "generic";
+  basis: RecommendationBasis | null;
+}
+
 export interface RecommendationBasis {
   kind: PersonalizationKind;
   state: RecommendationState;
@@ -261,6 +285,7 @@ export interface InsightBundle {
   recommendation_basis: RecommendationBasis | null;
   briefing_change: BriefingChange | null;
   playbook: PlaybookSections;
+  briefing_recommendation: BriefingRecommendation | null;
 }
 
 // NotificationPrefs matches handler.NotifPrefsResponse exactly.
