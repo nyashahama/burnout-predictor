@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -42,6 +43,7 @@ type notificationStore interface {
 	DeleteExpiredRefreshTokens(ctx context.Context) error
 	DeleteExpiredPasswordResets(ctx context.Context) error
 	DeleteOldDismissals(ctx context.Context) error
+	GetInsightMetadata(ctx context.Context, params db.GetInsightMetadataParams) (db.InsightMetadatum, error)
 }
 
 // Service owns all email dispatch and background maintenance tasks.
@@ -154,10 +156,32 @@ func (s *Service) sendCheckinReminders(ctx context.Context) {
 
 		streak, _ := s.store.GetCheckInStreak(ctx, u.ID)
 		danger, _ := s.store.GetConsecutiveDangerDays(ctx, u.ID)
+
+		var confidenceLevel, topTrigger, topRecovery string
+		if meta, err := s.store.GetInsightMetadata(ctx, db.GetInsightMetadataParams{
+			UserID: u.ID,
+			Key:    "confidence-level",
+		}); err == nil && meta.Value.Valid {
+			confidenceLevel = meta.Value.String
+		}
+		if meta, err := s.store.GetInsightMetadata(ctx, db.GetInsightMetadataParams{
+			UserID: u.ID,
+			Key:    "briefing-change-key",
+		}); err == nil && meta.Value.Valid {
+			if strings.HasPrefix(meta.Value.String, "trigger:") {
+				topTrigger = strings.TrimPrefix(meta.Value.String, "trigger:")
+			} else if strings.HasPrefix(meta.Value.String, "recovery:") {
+				topRecovery = strings.TrimPrefix(meta.Value.String, "recovery:")
+			}
+		}
+
 		title, body := score.BuildNotificationText(score.NotificationInput{
 			Streak:                int(streak),
 			ConsecutiveDangerDays: int(danger),
 			Name:                  u.Name,
+			TopTrigger:            topTrigger,
+			TopRecoveryLever:      topRecovery,
+			ConfidenceLevel:       confidenceLevel,
 		})
 
 		subject, html := eml.CheckinReminder(title, body)

@@ -52,7 +52,7 @@ func BuildLongArcNarrative(entries []ArcEntry, now time.Time) string {
 	var turningPointLabel string
 	for i := runEnd + 1; i < len(entries)-6; i++ {
 		beforeSlice := entries[intMax(0, i-7):i]
-		afterSlice := entries[i : intMin(len(entries), i+7)]
+		afterSlice := entries[i:intMin(len(entries), i+7)]
 		if len(beforeSlice) < 3 {
 			continue
 		}
@@ -242,6 +242,11 @@ type NotificationInput struct {
 	Streak                int
 	ConsecutiveDangerDays int
 	Name                  string // empty = no name
+
+	// Personalization signals (empty when generic)
+	TopTrigger       string // confirmed trigger driver (e.g., "meetings", "sleep")
+	TopRecoveryLever string // confirmed recovery lever driver (e.g., "shutdown", "exercise")
+	ConfidenceLevel  string // "calibrating", "low", "medium", "high"
 }
 
 // BuildNotificationText returns a notification title + body that responds to
@@ -261,12 +266,23 @@ func BuildNotificationText(in NotificationInput) (title, body string) {
 		return "Keep the streak going",
 			fmt.Sprintf("%d days in a row. One more tonight.", in.Streak)
 	default:
+		var personalTouch string
+		switch {
+		case in.ConfidenceLevel == "high" && in.TopTrigger != "":
+			personalTouch = fmt.Sprintf(" Your top trigger is %s — worth watching today.", in.TopTrigger)
+		case in.ConfidenceLevel == "high" && in.TopRecoveryLever != "":
+			personalTouch = fmt.Sprintf(" %s helped last time — try it if today gets heavy.", in.TopRecoveryLever)
+		case in.ConfidenceLevel == "medium":
+			personalTouch = " Patterns are emerging — keep checking in to confirm them."
+		case in.ConfidenceLevel == "calibrating":
+			personalTouch = ""
+		}
 		if in.Name != "" {
 			return fmt.Sprintf("How are you carrying it, %s?", in.Name),
-				"Take 30 seconds. The data gets smarter every time you check in."
+				"Take 30 seconds. The data gets smarter every time you check in." + personalTouch
 		}
 		return "How are you carrying it?",
-			"Take 30 seconds. The data gets smarter every time you check in."
+			"Take 30 seconds. The data gets smarter every time you check in." + personalTouch
 	}
 }
 
