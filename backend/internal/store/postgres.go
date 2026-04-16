@@ -354,6 +354,24 @@ func (p *Postgres) UpsertSubscription(ctx context.Context, arg db.UpsertSubscrip
 	return p.q.UpsertSubscription(ctx, arg)
 }
 
+// ── recommendation_feedback ─────────────────────────────────────────────────
+
+func (p *Postgres) UpsertRecommendationFeedback(ctx context.Context, arg db.UpsertRecommendationFeedbackParams) (db.RecommendationFeedback, error) {
+	return p.q.UpsertRecommendationFeedback(ctx, arg)
+}
+
+func (p *Postgres) GetTodayFeedback(ctx context.Context, arg db.GetTodayFeedbackParams) (db.RecommendationFeedback, error) {
+	return p.q.GetTodayFeedback(ctx, arg)
+}
+
+func (p *Postgres) ListRecentFeedback(ctx context.Context, arg db.ListRecentFeedbackParams) ([]db.RecommendationFeedback, error) {
+	return p.q.ListRecentFeedback(ctx, arg)
+}
+
+func (p *Postgres) GetFeedbackCountsByKey(ctx context.Context, arg db.GetFeedbackCountsByKeyParams) ([]db.GetFeedbackCountsByKeyRow, error) {
+	return p.q.GetFeedbackCountsByKey(ctx, arg)
+}
+
 // ── EFT Payments ───────────────────────────────────────────────────────────────
 
 func (p *Postgres) CreateEFTPayment(ctx context.Context, arg db.CreateEFTPaymentParams) (db.EftPayment, error) {
