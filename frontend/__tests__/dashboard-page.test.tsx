@@ -1,5 +1,6 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
+import type { InsightBundle, ScoreCardResult } from "@/lib/types";
 
 const mockDashboardData = {
   scoreCard: {
@@ -28,7 +29,7 @@ const mockDashboardData = {
     follow_up: null,
     streak_forgiven: false,
     streak_milestones: [],
-  } as any,
+  } as ScoreCardResult,
   checkins: [
     {
       id: "c1",
@@ -81,7 +82,7 @@ const mockDashboardData = {
     },
     streak_milestones: [],
     streak_forgiven: false,
-  } as any,
+  } as unknown as InsightBundle,
   loadingData: false,
   loadingMessage: "",
   loadError: "",

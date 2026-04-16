@@ -2,11 +2,10 @@
 
 import { Activity, RefreshCcw, TrendingDown, TrendingUp } from "lucide-react";
 import CheckIn from "@/components/dashboard/CheckIn";
-import ActionPlan from "@/components/dashboard/ActionPlan";
+import TodayBriefing from "@/components/dashboard/TodayBriefing";
 import StreakDots from "@/components/dashboard/StreakDots";
 import StreakMilestoneCard from "@/components/dashboard/StreakMilestoneCard";
 import ConsistencyMetric from "@/components/dashboard/ConsistencyMetric";
-import NextDayFeedbackCard from "@/components/dashboard/NextDayFeedbackCard";
 import InsightRevealCard from "@/components/dashboard/InsightRevealCard";
 import { useDashboardData } from "@/contexts/DashboardDataContext";
 import { Button } from "@/components/ui/button";
@@ -85,6 +84,21 @@ export default function DashboardPage() {
   const patternInsights = insightBundle?.pattern_insights ?? [];
   const whatWorks = insightBundle?.what_works ?? "";
 
+  const briefingReason =
+    patternInsights[0]?.explanation ??
+    whatWorks ??
+    scoreCard?.explanation ??
+    "Check in today to start turning repeated patterns into personal guidance.";
+
+  const briefingConfidence = scoreCard?.accuracy_label
+    ? `${scoreCard.accuracy_label}. More check-ins make this recommendation more personal.`
+    : "Generic for now. Add a few more check-ins and notes so Overload can separate real patterns from noise.";
+
+  const briefingNewLearning =
+    whatWorkedToday?.evidence ??
+    patternInsights[0]?.evidence ??
+    "No new patterns confirmed yet. Keep checking in and Overload will turn repeated signals into something personal.";
+
   const trend = recent.length >= 2 ? recent[recent.length - 1].score - recent[0].score : 0;
 
   let dangerStreak = 0;
@@ -154,21 +168,21 @@ export default function DashboardPage() {
 
       <StreakMilestoneCard milestones={streakMilestones} />
 
-      <ActionPlan
-        score={liveScore}
-        trend={trend}
-        dangerStreak={dangerStreak}
-        dangerDaysAhead={0}
-        recoveryDate=""
-        plan={plan}
-        note={todayCheckIn?.note ?? undefined}
-        stress={todayCheckIn?.stress}
-        consecutiveDays={dangerDays}
-        role=""
-        smallWins={todayCheckIn?.small_wins ?? null}
-      />
-
-      <NextDayFeedbackCard whatWorked={whatWorkedToday} />
+      {scoreCard && (
+        <TodayBriefing
+          scoreCard={scoreCard}
+          todayCheckIn={todayCheckIn}
+          plan={plan}
+          trend={trend}
+          dangerStreak={dangerStreak}
+          dangerDaysAhead={0}
+          recoveryDate=""
+          reason={briefingReason}
+          confidenceCopy={briefingConfidence}
+          newLearning={briefingNewLearning}
+          whatWorkedToday={whatWorkedToday}
+        />
+      )}
 
       <InsightRevealCard
         patternInsights={patternInsights}
