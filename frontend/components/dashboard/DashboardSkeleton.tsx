@@ -1,3 +1,6 @@
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+
 interface Props {
   showCalculatingLabel?: boolean;
 }
@@ -10,102 +13,104 @@ export default function DashboardSkeleton({ showCalculatingLabel }: Props) {
   );
 
   return (
-    <div
-      className="dash-content"
-      role="status"
-      aria-label="Loading dashboard"
-      aria-busy="true"
-    >
-      <header className="dash-header">
-        <div className="skel" style={{ height: 32, width: 240, borderRadius: 8 }} />
-        <div className="skel" style={{ height: 13, width: 170, marginTop: 8 }} />
-      </header>
+    <div role="status" aria-label="Loading dashboard" aria-busy="true" className="space-y-6">
+      <div className="space-y-2">
+        <Skeleton className="h-9 w-60" />
+        <Skeleton className="h-4 w-44" />
+      </div>
 
-      <div className="dash-hero">
-        <div className="dash-grid">
-          {/* ScoreCard skeleton */}
-          <div className="dash-card" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div className="skel" style={{ height: 11, width: 130 }} />
-              <div className="skel" style={{ height: 24, width: 84, borderRadius: 100 }} />
+      <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
+        <Card>
+          <CardHeader className="space-y-6">
+            <div className="flex items-center justify-between gap-4">
+              <div className="space-y-2">
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="h-4 w-56" />
+              </div>
+              <Skeleton className="h-6 w-24 rounded-full" />
             </div>
-            <div className="skel" style={{ height: 68, width: 110, borderRadius: 8 }} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {[120, 180, 145, 100].map((w, i) => (
-                <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                  <div
-                    className="skel"
-                    style={{ width: 7, height: 7, borderRadius: "50%", marginTop: 5, flexShrink: 0 }}
-                  />
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-                    <div className="skel" style={{ height: 12, width: w }} />
-                    <div className="skel" style={{ height: 10, width: w + 40 }} />
+          </CardHeader>
+          <CardContent className="grid gap-6 md:grid-cols-[220px_1fr] md:items-center">
+            <div className="rounded-2xl border border-border/70 bg-primary/5 p-6">
+              <Skeleton className="mx-auto h-16 w-24" />
+              <Skeleton className="mx-auto mt-3 h-3 w-20" />
+            </div>
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-3">
+                {[0, 1, 2].map((index) => (
+                  <div key={index} className="rounded-lg border border-border/70 p-4">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="mt-3 h-8 w-12" />
                   </div>
-                  <div className="skel" style={{ height: 12, width: 46, flexShrink: 0 }} />
-                </div>
+                ))}
+              </div>
+              <div className="space-y-3">
+                {[0, 1, 2].map((index) => (
+                  <Skeleton key={index} className="h-4 w-full" />
+                ))}
+              </div>
+              {showCalculatingLabel && (
+                <p className="text-sm text-muted-foreground">Calculating your score…</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="space-y-2">
+            <Skeleton className="h-5 w-28" />
+            <Skeleton className="h-4 w-52" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-4 w-44" />
+            <div className="grid grid-cols-5 gap-3">
+              {[0, 1, 2, 3, 4].map((index) => (
+                <Skeleton key={index} className="h-20 w-full rounded-lg" />
               ))}
             </div>
-            <div className="skel" style={{ height: 72, borderRadius: 12 }} />
-            {showCalculatingLabel && (
-              <p className="skel-score-label">Calculating your score…</p>
-            )}
-          </div>
+            <Skeleton className="h-10 w-32" />
+          </CardContent>
+        </Card>
+      </div>
 
-          {/* ForecastChart skeleton */}
-          <div className="dash-card" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <div className="skel" style={{ height: 14, width: 100 }} />
-              <div className="skel" style={{ height: 11, width: 150 }} />
-            </div>
-            <div style={{ display: "flex", gap: 6, height: 140, alignItems: "flex-end" }}>
-              {forecastHeights.map((h, i) => (
-                <div
-                  key={i}
-                  style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4, height: "100%", justifyContent: "flex-end" }}
-                >
-                  <div
-                    className="skel"
-                    style={{ width: "100%", height: `${h}%`, borderRadius: "4px 4px 0 0" }}
-                  />
-                </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="space-y-2">
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-4 w-60" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex h-36 items-end gap-2">
+              {forecastHeights.map((height, index) => (
+                <Skeleton
+                  key={index}
+                  className="w-full rounded-md"
+                  style={{ height: `${height}%` }}
+                />
               ))}
             </div>
-            <div className="skel" style={{ height: 11, width: 200 }} />
-          </div>
-        </div>
-      </div>
+            <Skeleton className="h-4 w-48" />
+          </CardContent>
+        </Card>
 
-      {/* CheckIn skeleton */}
-      <div className="dash-card" style={{ display: "flex", flexDirection: "column", gap: 18, marginBottom: 16 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <div className="skel" style={{ height: 14, width: 110 }} />
-          <div className="skel" style={{ height: 11, width: 220 }} />
-        </div>
-        <div className="skel" style={{ height: 14, width: 250 }} />
-        <div style={{ display: "flex", gap: 8 }}>
-          {[0, 1, 2, 3, 4].map((i) => (
-            <div key={i} className="skel" style={{ flex: 1, height: 76, borderRadius: 12 }} />
-          ))}
-        </div>
-        <div className="skel" style={{ height: 38, width: 120, borderRadius: 100 }} />
-      </div>
-
-      {/* HistoryChart skeleton */}
-      <div className="dash-card" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <div className="skel" style={{ height: 14, width: 100 }} />
-          <div className="skel" style={{ height: 11, width: 230 }} />
-        </div>
-        <div style={{ display: "flex", gap: 3, height: 120, alignItems: "flex-end" }}>
-          {historyHeights.map((h, i) => (
-            <div
-              key={i}
-              className="skel"
-              style={{ flex: 1, height: `${h}%`, borderRadius: "2px 2px 0 0" }}
-            />
-          ))}
-        </div>
-        <div className="skel" style={{ height: 11, width: 280 }} />
+        <Card>
+          <CardHeader className="space-y-2">
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-4 w-64" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex h-32 items-end gap-1">
+              {historyHeights.map((height, index) => (
+                <Skeleton
+                  key={index}
+                  className="w-full rounded-sm"
+                  style={{ height: `${height}%` }}
+                />
+              ))}
+            </div>
+            <Skeleton className="h-4 w-72" />
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -2,6 +2,15 @@
 
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  CalendarRange,
+  Footprints,
+  MoonStar,
+  TriangleAlert,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 function buildAlertBody(
   score: number,
@@ -54,33 +63,50 @@ export default function BurnoutAlert({
   }
 
   const body = buildAlertBody(score, dangerStreak, trend, dangerDaysAhead, recoveryDate);
+  const actions = [
+    {
+      icon: MoonStar,
+      text: "Sleep 8+ hours tonight. Set a hard shutdown at 10 PM. It's your highest-leverage action right now.",
+    },
+    {
+      icon: CalendarRange,
+      text: "Block tomorrow 9-11 AM before your calendar fills. Guard it like an appointment you can't move.",
+    },
+    {
+      icon: Footprints,
+      text: "Take twenty minutes outside today without your phone. Movement lowers cortisol faster than another hour at your desk.",
+    },
+  ];
 
   return (
-    <div className="burnout-alert">
-      <div className="burnout-alert-top">
-        <div className="burnout-alert-icon">⚠</div>
-        <div className="burnout-alert-body">
-          <div className="burnout-alert-heading">Something&apos;s building.</div>
-          <p className="burnout-alert-text">{body}</p>
-          <div className="burnout-alert-actions">
-            <div className="burnout-alert-action">
-              <span className="burnout-alert-action-icon">😴</span>
-              <span>Sleep 8+ hours tonight. Set a hard shutdown at 10 PM — it&apos;s your highest-leverage action right now.</span>
-            </div>
-            <div className="burnout-alert-action">
-              <span className="burnout-alert-action-icon">📅</span>
-              <span>Block tomorrow 9–11 AM before your calendar fills. Guard it like an appointment you can&apos;t move.</span>
-            </div>
-            <div className="burnout-alert-action">
-              <span className="burnout-alert-action-icon">🚶</span>
-              <span>Twenty minutes outside today. No podcast, no phone. Movement lowers cortisol in ways nothing else does.</span>
-            </div>
+    <Card role="alert" className="border-destructive/25 bg-destructive/5">
+      <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+        <div className="flex items-start gap-3">
+          <div className="rounded-full bg-destructive/10 p-2 text-destructive">
+            <TriangleAlert className="h-5 w-5" />
+          </div>
+          <div className="space-y-2">
+            <CardTitle className="text-2xl">Something&apos;s building.</CardTitle>
+            <p className="text-sm leading-6 text-muted-foreground">{body}</p>
           </div>
         </div>
-        <button className="burnout-alert-dismiss" onClick={dismiss} aria-label="Dismiss">
-          ✕
-        </button>
-      </div>
-    </div>
+        <Button type="button" variant="ghost" size="icon" aria-label="Dismiss" onClick={dismiss}>
+          <X className="h-4 w-4" />
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {actions.map((action) => (
+          <div
+            key={action.text}
+            className="flex items-start gap-3 rounded-lg border border-border/70 bg-background/90 px-4 py-3 text-sm leading-6"
+          >
+            <div className="rounded-full bg-primary/10 p-2 text-primary">
+              <action.icon className="h-4 w-4" />
+            </div>
+            <span>{action.text}</span>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }

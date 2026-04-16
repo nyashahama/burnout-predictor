@@ -1,6 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import type { InsightBundle } from "@/lib/types";
 
@@ -35,78 +44,138 @@ export default function PersonalizedInsight({ bundle }: Props) {
   } = bundle;
 
   const dismissed = new Set(dismissed_components ?? []);
+  const sections = [
+    session_context && !dismissed.has("session_context")
+      ? {
+          key: "session_context",
+          label: "Session context",
+          content: (
+            <p className="text-sm leading-6 text-muted-foreground">
+              {session_context.Message}
+            </p>
+          ),
+        }
+      : null,
+    patterns && patterns.length > 0 && !dismissed.has("patterns")
+      ? {
+          key: "patterns",
+          label: "Recurring patterns",
+          content: (
+            <ul className="space-y-2 text-sm leading-6 text-muted-foreground">
+              {patterns.map((pattern, index) => (
+                <li key={index} className="rounded-lg border border-border/70 bg-background/80 px-3 py-2">
+                  {pattern}
+                </li>
+              ))}
+            </ul>
+          ),
+        }
+      : null,
+    arc_narrative && !dismissed.has("arc_narrative")
+      ? {
+          key: "arc_narrative",
+          label: "Longer arc",
+          content: (
+            <p className="text-sm leading-6 text-muted-foreground">
+              {arc_narrative}
+            </p>
+          ),
+        }
+      : null,
+    signature_narrative && !dismissed.has("signature_narrative")
+      ? {
+          key: "signature_narrative",
+          label: "Signature pattern",
+          content: (
+            <p className="text-sm leading-6 text-muted-foreground">
+              {signature_narrative}
+            </p>
+          ),
+        }
+      : null,
+    monthly_arc?.Message && !dismissed.has("monthly_arc")
+      ? {
+          key: "monthly_arc",
+          label: "Monthly arc",
+          content: (
+            <p className="text-sm leading-6 text-muted-foreground">
+              {monthly_arc.Message}
+            </p>
+          ),
+        }
+      : null,
+    what_works && !dismissed.has("what_works")
+      ? {
+          key: "what_works",
+          label: "What helps",
+          content: (
+            <p className="text-sm leading-6 text-muted-foreground">
+              {what_works}
+            </p>
+          ),
+        }
+      : null,
+    milestone && !dismissed.has("milestone")
+      ? {
+          key: "milestone",
+          label: "Milestone",
+          content: (
+            <p className="text-sm leading-6 text-muted-foreground">
+              {milestone.Milestone}-check-in milestone reached.
+            </p>
+          ),
+        }
+      : null,
+  ].filter(Boolean) as Array<{
+    key: string;
+    label: string;
+    content: ReactNode;
+  }>;
 
   return (
-    <div className="dash-card personalized-insight">
-      <div className="pi-label">What your data says</div>
-      {dismissError && <div className="auth-error" role="alert">{dismissError}</div>}
-
-      {session_context && !dismissed.has("session_context") && (
-        <div className="pi-section pi-session-context">
-          <p className="pi-text">{session_context.Message}</p>
-          <button className="pi-dismiss" onClick={() => dismiss("session_context")}>
-            Dismiss
-          </button>
+    <Card className="border-primary/10">
+      <CardHeader className="space-y-3">
+        <div className="flex items-center gap-3">
+          <Badge variant="secondary">Data-backed insight</Badge>
+          <CardDescription>Patterns from your saved history</CardDescription>
         </div>
-      )}
+        <CardTitle className="text-2xl">What your data says</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {dismissError && (
+          <div
+            className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            role="alert"
+          >
+            {dismissError}
+          </div>
+        )}
 
-      {patterns && patterns.length > 0 && !dismissed.has("patterns") && (
-        <div className="pi-section pi-patterns">
-          <ul className="pi-pattern-list">
-            {patterns.map((p, i) => (
-              <li key={i} className="pi-pattern-item">{p}</li>
-            ))}
-          </ul>
-          <button className="pi-dismiss" onClick={() => dismiss("patterns")}>
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {arc_narrative && !dismissed.has("arc_narrative") && (
-        <div className="pi-section pi-arc">
-          <p className="pi-text">{arc_narrative}</p>
-          <button className="pi-dismiss" onClick={() => dismiss("arc_narrative")}>
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {signature_narrative && !dismissed.has("signature_narrative") && (
-        <div className="pi-section pi-signature">
-          <p className="pi-text">{signature_narrative}</p>
-          <button className="pi-dismiss" onClick={() => dismiss("signature_narrative")}>
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {monthly_arc?.Message && !dismissed.has("monthly_arc") && (
-        <div className="pi-section pi-monthly-arc">
-          <p className="pi-text">{monthly_arc.Message}</p>
-          <button className="pi-dismiss" onClick={() => dismiss("monthly_arc")}>
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {what_works && !dismissed.has("what_works") && (
-        <div className="pi-section pi-what-works">
-          <p className="pi-text">{what_works}</p>
-          <button className="pi-dismiss" onClick={() => dismiss("what_works")}>
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {milestone && !dismissed.has("milestone") && (
-        <div className="pi-section pi-milestone">
-          <p className="pi-text pi-milestone-num">{milestone.Milestone}</p>
-          <button className="pi-dismiss" onClick={() => dismiss("milestone")}>
-            Dismiss
-          </button>
-        </div>
-      )}
-    </div>
+        {sections.map((section) => (
+          <section
+            key={section.key}
+            className="rounded-xl border border-border/70 bg-background/90 p-4"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {section.label}
+                </h3>
+                {section.content}
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="shrink-0"
+                onClick={() => dismiss(section.key)}
+              >
+                Dismiss
+              </Button>
+            </div>
+          </section>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
