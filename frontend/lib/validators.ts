@@ -110,7 +110,29 @@ export const parseInsightBundle = (value: unknown): InsightBundle => {
   if (!Array.isArray(value.pattern_insights)) throw new Error("Invalid API response: pattern_insights must be an array.");
   if (!Array.isArray(value.recovery_feedback)) throw new Error("Invalid API response: recovery_feedback must be an array.");
   if (!Array.isArray(value.dismissed_components)) throw new Error("Invalid API response: dismissed_components must be an array.");
-  if (!isRecord(value.personalization_progress)) throw new Error("Invalid API response: personalization_progress must be an object.");
-  if (!isRecord(value.playbook)) throw new Error("Invalid API response: playbook must be an object.");
-  return value as unknown as InsightBundle;
+
+  return {
+    ...(value as InsightBundle),
+    personalization_progress: isRecord(value.personalization_progress)
+      ? (value.personalization_progress as InsightBundle["personalization_progress"])
+      : {
+          confirmed_triggers: 0,
+          confirmed_recovery_levers: 0,
+          experiments: 0,
+          confidence_trend: "flat",
+        },
+    playbook: isRecord(value.playbook)
+      ? (value.playbook as InsightBundle["playbook"])
+      : {
+          confirmed_triggers: [],
+          confirmed_recovery_levers: [],
+          experiments: [],
+        },
+    recommendation_basis: isRecord(value.recommendation_basis)
+      ? (value.recommendation_basis as InsightBundle["recommendation_basis"])
+      : null,
+    briefing_change: isRecord(value.briefing_change)
+      ? (value.briefing_change as InsightBundle["briefing_change"])
+      : null,
+  };
 };
