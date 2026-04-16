@@ -83,6 +83,7 @@ type InsightBundle struct {
 	RecommendationBasis     *RecommendationBasis              `json:"recommendation_basis,omitempty"`
 	BriefingChange          *BriefingChange                   `json:"briefing_change,omitempty"`
 	Playbook                PlaybookSections                  `json:"playbook"`
+	BriefingRecommendation  *BriefingRecommendation           `json:"briefing_recommendation,omitempty"`
 }
 
 // ── Public methods ────────────────────────────────────────────────────────────
@@ -241,6 +242,15 @@ func (s *Service) Get(ctx context.Context, user db.User) (InsightBundle, error) 
 		})
 	}
 
+	now := time.Now().In(userLocation(user.Timezone))
+	briefingRecommendation := BuildBriefingRecommendation(BriefingRecommendationInput{
+		PatternInsights:  patternInsights,
+		RecoveryFeedback: recoveryFeedback,
+		WhatWorkedToday:  whatWorkedToday,
+		CheckInCount:     totalCount,
+		Now:              now,
+	})
+
 	return InsightBundle{
 		SessionContext:          sessionCtx,
 		Patterns:                patterns.Patterns,
@@ -263,6 +273,7 @@ func (s *Service) Get(ctx context.Context, user db.User) (InsightBundle, error) 
 		RecommendationBasis:     view.RecommendationBasis,
 		BriefingChange:          briefingChange,
 		Playbook:                view.Playbook,
+		BriefingRecommendation:  briefingRecommendation,
 	}, nil
 }
 

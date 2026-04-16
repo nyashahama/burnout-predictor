@@ -63,6 +63,39 @@ func TestInsightHandler_Get_Success(t *testing.T) {
 	}
 }
 
+func TestInsightHandler_Get_SerializesBriefingRecommendation(t *testing.T) {
+	h := handler.NewInsightHandler(&mockInsightService{
+		GetFn: func(_ context.Context, _ db.User) (insightsvc.InsightBundle, error) {
+			return insightsvc.InsightBundle{
+				BriefingRecommendation: &insightsvc.BriefingRecommendation{
+					Headline:  "Best move for tomorrow",
+					TargetDay: insightsvc.RecommendationTargetTomorrow,
+					PrimaryAction: insightsvc.RecommendedActionCandidate{
+						Key:       "protect_focus_block",
+						Title:     "Protect a 90-minute focus block tomorrow morning",
+						Detail:    "Keep the first deep-work block clear.",
+						Timeframe: insightsvc.RecommendationTargetTomorrow,
+						Kind:      insightsvc.PersonalizationKindTrigger,
+						State:     insightsvc.RecommendationStateConfirmed,
+					},
+					PredictedScoreDelta:  6,
+					RiskReductionSummary: "Reduces the chance of a crash day.",
+				},
+			}, nil
+		},
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req = withUser(req, testUser)
+
+	h.Get(rec, req)
+
+	if !strings.Contains(rec.Body.String(), `"briefing_recommendation"`) {
+		t.Fatalf("body = %s, want briefing_recommendation field", rec.Body.String())
+	}
+}
+
 // ── DismissComponent ──────────────────────────────────────────────────────────
 
 func TestInsightHandler_DismissComponent_InvalidJSON(t *testing.T) {
