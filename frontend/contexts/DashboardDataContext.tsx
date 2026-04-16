@@ -25,6 +25,10 @@ interface DashboardDataContextValue {
   dismissFollowUp: () => Promise<void>;
   handleCheckInComplete: (result: UpsertCheckInResult) => void;
   reload: () => Promise<void>;
+  commitRecommendation: () => Promise<void>;
+  completeCommitment: (id: string) => Promise<void>;
+  skipCommitment: (id: string) => Promise<void>;
+  submitCommitmentOutcome: (id: string, helpfulness: "helped" | "a_bit" | "did_not_help") => Promise<void>;
 }
 
 const DashboardDataContext = createContext<DashboardDataContextValue | null>(null);
@@ -154,6 +158,26 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
     void reload();
   }, [reload]);
 
+  const commitRecommendation = useCallback(async () => {
+    await api.post("/api/recommendations/commit", {});
+    await reload();
+  }, [api, reload]);
+
+  const completeCommitment = useCallback(async (id: string) => {
+    await api.post(`/api/recommendations/${id}/complete`, {});
+    await reload();
+  }, [api, reload]);
+
+  const skipCommitment = useCallback(async (id: string) => {
+    await api.post(`/api/recommendations/${id}/skip`, {});
+    await reload();
+  }, [api, reload]);
+
+  const submitCommitmentOutcome = useCallback(async (id: string, helpfulness: "helped" | "a_bit" | "did_not_help") => {
+    await api.post(`/api/recommendations/${id}/outcome`, { helpfulness });
+    await reload();
+  }, [api, reload]);
+
   return (
     <DashboardDataContext.Provider
       value={{
@@ -168,6 +192,10 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
         ready,
         handleCheckInComplete,
         reload,
+        commitRecommendation,
+        completeCommitment,
+        skipCommitment,
+        submitCommitmentOutcome,
       }}
     >
       {children}
