@@ -141,6 +141,19 @@ type PasswordReset struct {
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
+// Stores user feedback on recommendations (helpful/not helpful) for personalization loop.
+type RecommendationFeedback struct {
+	ID     uuid.UUID `db:"id" json:"id"`
+	UserID uuid.UUID `db:"user_id" json:"user_id"`
+	// The driver or key from recommended_action (e.g., meetings, sleep, shutdown)
+	RecommendedActionKey string `db:"recommended_action_key" json:"recommended_action_key"`
+	// True if user found the recommendation useful
+	Helpful      bool               `db:"helpful" json:"helpful"`
+	CheckInID    pgtype.UUID        `db:"check_in_id" json:"check_in_id"`
+	FeedbackDate pgtype.Date        `db:"feedback_date" json:"feedback_date"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
 // Hashed refresh tokens for stateful JWT rotation. Rotated on every use.
 type RefreshToken struct {
 	ID     uuid.UUID `db:"id" json:"id"`

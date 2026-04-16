@@ -65,6 +65,7 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 	subH := handler.NewSubscriptionHandler(pg)
 	exportH := handler.NewExportHandler(pg)
 	paymentH := handler.NewPaymentHandler(paymentService)
+	recommendationH := handler.NewRecommendationHandler(pg)
 
 	secret := authService.JWTSecret()
 	authMW := middleware.Auth(pg, secret)
@@ -119,6 +120,9 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 
 		r.Get("/api/insights", insightH.Get)
 		r.Post("/api/insights/dismiss", insightH.DismissComponent)
+
+		r.Get("/api/recommendations/feedback", recommendationH.GetTodayFeedback)
+		r.Post("/api/recommendations/feedback", recommendationH.UpsertFeedback)
 
 		r.Get("/api/follow-ups", followUpH.GetToday)
 		r.Post("/api/follow-ups/dismiss-today", followUpH.DismissToday)

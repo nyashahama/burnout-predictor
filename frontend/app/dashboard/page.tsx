@@ -184,6 +184,7 @@ export default function DashboardPage() {
             confidenceCopy={briefingConfidence}
             newLearning={briefingNewLearning}
             whatWorkedToday={whatWorkedToday}
+            feedbackSubmittedForToday={scoreCard.feedback_submitted_for_today}
           />
 
           <PersonalizationProgress
