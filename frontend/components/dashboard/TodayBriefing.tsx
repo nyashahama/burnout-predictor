@@ -5,7 +5,7 @@ import BriefingRecommendationSection from "@/components/dashboard/BriefingRecomm
 import NextDayFeedbackCard from "@/components/dashboard/NextDayFeedbackCard";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { BriefingRecommendation, CheckIn, PlanSection, ScoreCardResult, WhatWorkedToday } from "@/lib/types";
+import type { BriefingRecommendation, CheckIn, PlanSection, RecommendationCommitment, ScoreCardResult, WhatWorkedToday } from "@/lib/types";
 
 interface TodayBriefingProps {
   scoreCard: ScoreCardResult;
@@ -21,6 +21,10 @@ interface TodayBriefingProps {
   whatWorkedToday: WhatWorkedToday | null;
   feedbackSubmittedForToday: string | null;
   briefingRecommendation: BriefingRecommendation | null;
+  activeCommitment: RecommendationCommitment | null;
+  onCommitRecommendation: () => Promise<void>;
+  onCompleteCommitment: (id: string) => Promise<void>;
+  onSkipCommitment: (id: string) => Promise<void>;
 }
 
 export default function TodayBriefing({
@@ -37,6 +41,10 @@ export default function TodayBriefing({
   whatWorkedToday,
   feedbackSubmittedForToday,
   briefingRecommendation,
+  activeCommitment,
+  onCommitRecommendation,
+  onCompleteCommitment,
+  onSkipCommitment,
 }: TodayBriefingProps) {
   return (
     <Card className="border-primary/15 bg-primary/[0.03]">
@@ -54,6 +62,10 @@ export default function TodayBriefing({
           recommendation={briefingRecommendation}
           legacyAction={scoreCard.recommended_action}
           feedbackSubmittedForToday={feedbackSubmittedForToday}
+          activeCommitment={activeCommitment}
+          onCommitRecommendation={onCommitRecommendation}
+          onCompleteCommitment={onCompleteCommitment}
+          onSkipCommitment={onSkipCommitment}
         />
 
         <section className="space-y-2">

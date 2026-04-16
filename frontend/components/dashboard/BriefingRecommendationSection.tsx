@@ -1,16 +1,25 @@
 "use client";
 
+import RecommendationCommitmentPanel from "@/components/dashboard/RecommendationCommitmentPanel";
 import RecommendationFeedback from "@/components/dashboard/RecommendationFeedback";
-import type { BriefingRecommendation, ScoreCardResult } from "@/lib/types";
+import type { BriefingRecommendation, RecommendationCommitment, ScoreCardResult } from "@/lib/types";
 
 export default function BriefingRecommendationSection({
   recommendation,
   legacyAction,
   feedbackSubmittedForToday,
+  activeCommitment,
+  onCommitRecommendation,
+  onCompleteCommitment,
+  onSkipCommitment,
 }: {
   recommendation: BriefingRecommendation | null;
   legacyAction: ScoreCardResult["recommended_action"];
   feedbackSubmittedForToday: string | null;
+  activeCommitment: RecommendationCommitment | null;
+  onCommitRecommendation: () => Promise<void>;
+  onCompleteCommitment: (id: string) => Promise<void>;
+  onSkipCommitment: (id: string) => Promise<void>;
 }) {
   const primaryKey = recommendation?.primary_action.key ?? legacyAction.driver;
 
@@ -23,6 +32,13 @@ export default function BriefingRecommendationSection({
         <RecommendationFeedback
           recommendedActionKey={primaryKey}
           feedbackSubmittedForToday={feedbackSubmittedForToday}
+        />
+        <RecommendationCommitmentPanel
+          recommendation={null}
+          activeCommitment={activeCommitment}
+          onCommit={onCommitRecommendation}
+          onComplete={onCompleteCommitment}
+          onSkip={onSkipCommitment}
         />
       </section>
     );
@@ -48,6 +64,13 @@ export default function BriefingRecommendationSection({
       <RecommendationFeedback
         recommendedActionKey={primaryKey}
         feedbackSubmittedForToday={feedbackSubmittedForToday}
+      />
+      <RecommendationCommitmentPanel
+        recommendation={recommendation}
+        activeCommitment={activeCommitment}
+        onCommit={onCommitRecommendation}
+        onComplete={onCompleteCommitment}
+        onSkip={onSkipCommitment}
       />
     </section>
   );
