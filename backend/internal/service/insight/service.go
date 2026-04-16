@@ -32,15 +32,23 @@ type insightStore interface {
 	ListInsightMetadataByPrefix(ctx context.Context, params db.ListInsightMetadataByPrefixParams) ([]db.InsightMetadatum, error)
 	ListDismissedComponents(ctx context.Context, params db.ListDismissedComponentsParams) ([]string, error)
 	DismissComponent(ctx context.Context, params db.DismissComponentParams) error
+	GetActiveRecommendationCommitment(ctx context.Context, userID uuid.UUID) (db.RecommendationCommitment, error)
+	GetRecommendationCommitmentByID(ctx context.Context, params db.GetRecommendationCommitmentByIDParams) (db.RecommendationCommitment, error)
+	CreateRecommendationCommitment(ctx context.Context, params db.CreateRecommendationCommitmentParams) (db.RecommendationCommitment, error)
+	UpdateRecommendationCommitmentStatus(ctx context.Context, params db.UpdateRecommendationCommitmentStatusParams) (db.RecommendationCommitment, error)
+	SetRecommendationCommitmentOutcome(ctx context.Context, params db.SetRecommendationCommitmentOutcomeParams) (db.RecommendationCommitment, error)
+	ExpireRecommendationCommitment(ctx context.Context, params db.ExpireRecommendationCommitmentParams) (db.RecommendationCommitment, error)
 }
 
 // Service owns all eight insight computations and component dismissal.
 type Service struct {
-	store insightStore
+	store       insightStore
+	commitments *CommitmentManager
 }
 
 func New(store insightStore) *Service {
-	return &Service{store: store}
+	cm := NewCommitmentManager(store)
+	return &Service{store: store, commitments: cm}
 }
 
 // ── Request / Response types ──────────────────────────────────────────────────
@@ -84,6 +92,8 @@ type InsightBundle struct {
 	BriefingChange          *BriefingChange                   `json:"briefing_change,omitempty"`
 	Playbook                PlaybookSections                  `json:"playbook"`
 	BriefingRecommendation  *BriefingRecommendation           `json:"briefing_recommendation,omitempty"`
+	ActiveCommitment        *RecommendationCommitment         `json:"active_commitment,omitempty"`
+	PendingOutcomePrompt    *PendingOutcomePrompt             `json:"pending_outcome_prompt,omitempty"`
 }
 
 // ── Public methods ────────────────────────────────────────────────────────────
@@ -251,6 +261,11 @@ func (s *Service) Get(ctx context.Context, user db.User) (InsightBundle, error) 
 		Now:              now,
 	})
 
+	activeCommitment, pendingOutcomePrompt, err := s.commitments.GetActiveView(ctx, user.ID, now)
+	if err != nil {
+		return InsightBundle{}, err
+	}
+
 	return InsightBundle{
 		SessionContext:          sessionCtx,
 		Patterns:                patterns.Patterns,
@@ -274,6 +289,8 @@ func (s *Service) Get(ctx context.Context, user db.User) (InsightBundle, error) 
 		BriefingChange:          briefingChange,
 		Playbook:                view.Playbook,
 		BriefingRecommendation:  briefingRecommendation,
+		ActiveCommitment:        activeCommitment,
+		PendingOutcomePrompt:    pendingOutcomePrompt,
 	}, nil
 }
 
@@ -308,6 +325,26 @@ func (s *Service) DismissComponent(ctx context.Context, userID uuid.UUID, req Di
 		UserID:       userID,
 		ComponentKey: req.ComponentKey,
 	})
+}
+
+func (s *Service) CommitCurrentRecommendation(ctx context.Context, user db.User) (*RecommendationCommitment, error) {
+	bundle, err := s.Get(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+	return s.commitments.CommitCurrentRecommendation(ctx, user, bundle.BriefingRecommendation, time.Now().In(userLocation(user.Timezone)))
+}
+
+func (s *Service) CompleteCommitment(ctx context.Context, userID uuid.UUID, commitmentID uuid.UUID) (*RecommendationCommitment, error) {
+	return s.commitments.CompleteCommitment(ctx, userID, commitmentID)
+}
+
+func (s *Service) SkipCommitment(ctx context.Context, userID uuid.UUID, commitmentID uuid.UUID) (*RecommendationCommitment, error) {
+	return s.commitments.SkipCommitment(ctx, userID, commitmentID)
+}
+
+func (s *Service) RecordOutcome(ctx context.Context, userID uuid.UUID, commitmentID uuid.UUID, helpfulness OutcomeHelpfulness) (*RecommendationCommitment, error) {
+	return s.commitments.RecordOutcome(ctx, userID, commitmentID, helpfulness)
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────
