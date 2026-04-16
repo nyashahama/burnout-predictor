@@ -66,18 +66,19 @@ type UpsertResult struct {
 }
 
 type ScoreCardResult struct {
-	Score             score.Output            `json:"score"`
-	Explanation       string                  `json:"explanation"`
-	Suggestion        string                  `json:"suggestion"`
-	DailyForecast     score.DailyForecast     `json:"daily_forecast"`
-	RecommendedAction score.RecommendedAction `json:"recommended_action"`
-	Trajectory        string                  `json:"trajectory"`
-	Accuracy          string                  `json:"accuracy_label"`
-	Streak            int32                   `json:"streak"`
-	HasCheckIn        bool                    `json:"has_checkin"`
-	ConsistencyPct    int32                   `json:"consistency_pct"`
-	HasFollowUp       bool                    `json:"has_follow_up"`
-	FollowUp          *FollowUpInfo           `json:"follow_up,omitempty"`
+	Score                     score.Output            `json:"score"`
+	Explanation               string                  `json:"explanation"`
+	Suggestion                string                  `json:"suggestion"`
+	DailyForecast             score.DailyForecast     `json:"daily_forecast"`
+	RecommendedAction         score.RecommendedAction `json:"recommended_action"`
+	Trajectory                string                  `json:"trajectory"`
+	Accuracy                  string                  `json:"accuracy_label"`
+	Streak                    int32                   `json:"streak"`
+	HasCheckIn                bool                    `json:"has_checkin"`
+	ConsistencyPct            int32                   `json:"consistency_pct"`
+	HasFollowUp               bool                    `json:"has_follow_up"`
+	FollowUp                  *FollowUpInfo           `json:"follow_up,omitempty"`
+	FeedbackSubmittedForToday *string                 `json:"feedback_submitted_for_today,omitempty"`
 }
 
 type FollowUpInfo struct {

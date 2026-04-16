@@ -29,7 +29,7 @@ const mockDashboardData = {
     follow_up: null,
     streak_forgiven: false,
     streak_milestones: [],
-    feedback_submitted_for_today: false,
+    feedback_submitted_for_today: null,
   } as unknown as ScoreCardResult,
   checkins: [
     {
