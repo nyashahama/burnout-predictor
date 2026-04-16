@@ -16,6 +16,45 @@ export interface ScoreOutput {
   signals: Signal[];
 }
 
+export type RecommendationState = "generic" | "observed" | "emerging" | "confirmed";
+export type PersonalizationKind = "trigger" | "recovery" | "experiment";
+
+export interface RecommendationBasis {
+  kind: PersonalizationKind;
+  state: RecommendationState;
+  summary: string;
+  evidence_count: number;
+}
+
+export interface BriefingChange {
+  title: string;
+  body: string;
+}
+
+export interface PersonalizationProgressSummary {
+  confirmed_triggers: number;
+  confirmed_recovery_levers: number;
+  experiments: number;
+  confidence_trend: string;
+}
+
+export interface PlaybookItem {
+  key: string;
+  title: string;
+  detail: string;
+  kind: PersonalizationKind;
+  state: RecommendationState;
+  evidence_count: number;
+  last_seen_date: string;
+  trend: string;
+}
+
+export interface PlaybookSections {
+  confirmed_triggers: PlaybookItem[];
+  confirmed_recovery_levers: PlaybookItem[];
+  experiments: PlaybookItem[];
+}
+
 export type InsightConfidence = "low" | "medium" | "high";
 export type ForecastDirection = "down" | "stable" | "up";
 
@@ -110,6 +149,7 @@ export interface ScoreCardResult {
   follow_up: FollowUpInfo | null;
   streak_forgiven: boolean;
   streak_milestones: StreakMilestone[];
+  feedback_submitted_for_today: boolean;
 }
 
 export interface CheckIn {
@@ -217,6 +257,10 @@ export interface InsightBundle {
   what_worked_today: WhatWorkedToday | null;
   streak_milestones: StreakMilestone[];
   streak_forgiven: boolean;
+  personalization_progress: PersonalizationProgressSummary;
+  recommendation_basis: RecommendationBasis | null;
+  briefing_change: BriefingChange | null;
+  playbook: PlaybookSections;
 }
 
 // NotificationPrefs matches handler.NotifPrefsResponse exactly.
