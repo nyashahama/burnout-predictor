@@ -401,3 +401,29 @@ func (p *Postgres) UpsertEftSubscription(ctx context.Context, arg db.UpsertEftSu
 func (p *Postgres) UpdateUserEFTReference(ctx context.Context, arg db.UpdateUserEFTReferenceParams) error {
 	return p.q.UpdateUserEFTReference(ctx, arg)
 }
+
+// ── recommendation_commitments ────────────────────────────────────────────────
+
+func (p *Postgres) CreateRecommendationCommitment(ctx context.Context, arg db.CreateRecommendationCommitmentParams) (db.RecommendationCommitment, error) {
+	return p.q.CreateRecommendationCommitment(ctx, arg)
+}
+
+func (p *Postgres) GetActiveRecommendationCommitment(ctx context.Context, userID uuid.UUID) (db.RecommendationCommitment, error) {
+	return p.q.GetActiveRecommendationCommitment(ctx, userID)
+}
+
+func (p *Postgres) GetRecommendationCommitmentByID(ctx context.Context, arg db.GetRecommendationCommitmentByIDParams) (db.RecommendationCommitment, error) {
+	return p.q.GetRecommendationCommitmentByID(ctx, arg)
+}
+
+func (p *Postgres) UpdateRecommendationCommitmentStatus(ctx context.Context, arg db.UpdateRecommendationCommitmentStatusParams) (db.RecommendationCommitment, error) {
+	return p.q.UpdateRecommendationCommitmentStatus(ctx, arg)
+}
+
+func (p *Postgres) SetRecommendationCommitmentOutcome(ctx context.Context, arg db.SetRecommendationCommitmentOutcomeParams) (db.RecommendationCommitment, error) {
+	return p.q.SetRecommendationCommitmentOutcome(ctx, arg)
+}
+
+func (p *Postgres) ExpireRecommendationCommitment(ctx context.Context, arg db.ExpireRecommendationCommitmentParams) (db.RecommendationCommitment, error) {
+	return p.q.ExpireRecommendationCommitment(ctx, arg)
+}
