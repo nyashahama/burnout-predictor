@@ -287,7 +287,8 @@ func matchAction(action actionDefinition, input BriefingRecommendationInput) *ma
 		}
 
 	case "take_recovery_block":
-		for _, r := range input.RecoveryFeedback {
+		if len(input.RecoveryFeedback) > 0 {
+			r := input.RecoveryFeedback[0]
 			state := RecommendationStateObserved
 			if r.Confidence == score.ConfidenceMedium {
 				state = RecommendationStateEmerging
