@@ -30,7 +30,21 @@ function forecastCopy(delta: number) {
 }
 
 export default function DashboardPage() {
-  const { scoreCard, checkins, insightBundle, loadingData, loadingMessage, loadError, reload, handleCheckInComplete, followUp, dismissFollowUp } = useDashboardData();
+  const {
+    scoreCard,
+    checkins,
+    insightBundle,
+    loadingData,
+    loadingMessage,
+    loadError,
+    reload,
+    handleCheckInComplete,
+    followUp,
+    dismissFollowUp,
+    commitRecommendation,
+    completeCommitment,
+    skipCommitment,
+  } = useDashboardData();
 
   if (loadingData) {
     return (
@@ -186,6 +200,10 @@ export default function DashboardPage() {
             whatWorkedToday={whatWorkedToday}
             feedbackSubmittedForToday={scoreCard.feedback_submitted_for_today}
             briefingRecommendation={insightBundle?.briefing_recommendation ?? null}
+            activeCommitment={insightBundle?.active_commitment ?? null}
+            onCommitRecommendation={commitRecommendation}
+            onCompleteCommitment={completeCommitment}
+            onSkipCommitment={skipCommitment}
           />
 
           <PersonalizationProgress
