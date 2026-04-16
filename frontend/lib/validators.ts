@@ -110,29 +110,30 @@ export const parseInsightBundle = (value: unknown): InsightBundle => {
   if (!Array.isArray(value.pattern_insights)) throw new Error("Invalid API response: pattern_insights must be an array.");
   if (!Array.isArray(value.recovery_feedback)) throw new Error("Invalid API response: recovery_feedback must be an array.");
   if (!Array.isArray(value.dismissed_components)) throw new Error("Invalid API response: dismissed_components must be an array.");
+  const bundle = value as Partial<InsightBundle> & Record<string, unknown>;
 
   return {
-    ...(value as InsightBundle),
-    personalization_progress: isRecord(value.personalization_progress)
-      ? (value.personalization_progress as InsightBundle["personalization_progress"])
+    ...bundle,
+    personalization_progress: isRecord(bundle.personalization_progress)
+      ? (bundle.personalization_progress as InsightBundle["personalization_progress"])
       : {
           confirmed_triggers: 0,
           confirmed_recovery_levers: 0,
           experiments: 0,
           confidence_trend: "flat",
         },
-    playbook: isRecord(value.playbook)
-      ? (value.playbook as InsightBundle["playbook"])
+    playbook: isRecord(bundle.playbook)
+      ? (bundle.playbook as InsightBundle["playbook"])
       : {
           confirmed_triggers: [],
           confirmed_recovery_levers: [],
           experiments: [],
         },
-    recommendation_basis: isRecord(value.recommendation_basis)
-      ? (value.recommendation_basis as InsightBundle["recommendation_basis"])
+    recommendation_basis: isRecord(bundle.recommendation_basis)
+      ? (bundle.recommendation_basis as InsightBundle["recommendation_basis"])
       : null,
-    briefing_change: isRecord(value.briefing_change)
-      ? (value.briefing_change as InsightBundle["briefing_change"])
+    briefing_change: isRecord(bundle.briefing_change)
+      ? (bundle.briefing_change as InsightBundle["briefing_change"])
       : null,
-  };
+  } as InsightBundle;
 };
