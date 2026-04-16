@@ -63,6 +63,38 @@ func TestInsightHandler_Get_Success(t *testing.T) {
 	}
 }
 
+func TestInsightHandler_Get_SerializesActiveCommitmentAndOutcomePrompt(t *testing.T) {
+	h := handler.NewInsightHandler(&mockInsightService{
+		GetFn: func(_ context.Context, _ db.User) (insightsvc.InsightBundle, error) {
+			return insightsvc.InsightBundle{
+				ActiveCommitment: &insightsvc.RecommendationCommitment{
+					ID:                  uuid.MustParse("44444444-4444-4444-4444-444444444444"),
+					RecommendationTitle: "Protect a 90-minute focus block tomorrow morning",
+					Status:              insightsvc.CommitmentStatusCommitted,
+				},
+				PendingOutcomePrompt: &insightsvc.PendingOutcomePrompt{
+					CommitmentID:        uuid.MustParse("55555555-5555-5555-5555-555555555555"),
+					RecommendationTitle: "End work by 6 PM tonight",
+					Prompt:              "Did this help?",
+				},
+			}, nil
+		},
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req = withUser(req, testUser)
+
+	h.Get(rec, req)
+
+	if !strings.Contains(rec.Body.String(), `"active_commitment"`) {
+		t.Fatalf("body = %s, want active_commitment", rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"pending_outcome_prompt"`) {
+		t.Fatalf("body = %s, want pending_outcome_prompt", rec.Body.String())
+	}
+}
+
 func TestInsightHandler_Get_SerializesBriefingRecommendation(t *testing.T) {
 	h := handler.NewInsightHandler(&mockInsightService{
 		GetFn: func(_ context.Context, _ db.User) (insightsvc.InsightBundle, error) {

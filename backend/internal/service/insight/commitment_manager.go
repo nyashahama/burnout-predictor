@@ -98,3 +98,62 @@ func mapCommitmentRow(row db.RecommendationCommitment) *RecommendationCommitment
 	}
 	return commitment
 }
+
+func (m *CommitmentManager) CompleteCommitment(ctx context.Context, userID uuid.UUID, commitmentID uuid.UUID) (*RecommendationCommitment, error) {
+	completedAt := time.Now().UTC()
+	row, err := m.store.UpdateRecommendationCommitmentStatus(ctx, db.UpdateRecommendationCommitmentStatusParams{
+		Status:      string(CommitmentStatusCompleted),
+		CompletedAt: pgtype.Timestamptz{Time: completedAt, Valid: true},
+		ID:          commitmentID,
+		UserID:      userID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return mapCommitmentRow(row), nil
+}
+
+func (m *CommitmentManager) SkipCommitment(ctx context.Context, userID uuid.UUID, commitmentID uuid.UUID) (*RecommendationCommitment, error) {
+	row, err := m.store.UpdateRecommendationCommitmentStatus(ctx, db.UpdateRecommendationCommitmentStatusParams{
+		Status: string(CommitmentStatusSkipped),
+		ID:     commitmentID,
+		UserID: userID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return mapCommitmentRow(row), nil
+}
+
+func (m *CommitmentManager) RecordOutcome(ctx context.Context, userID uuid.UUID, commitmentID uuid.UUID, helpfulness OutcomeHelpfulness) (*RecommendationCommitment, error) {
+	row, err := m.store.SetRecommendationCommitmentOutcome(ctx, db.SetRecommendationCommitmentOutcomeParams{
+		OutcomeHelpfulness: pgtype.Text{String: string(helpfulness), Valid: true},
+		ID:                 commitmentID,
+		UserID:             userID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return mapCommitmentRow(row), nil
+}
+
+func (m *CommitmentManager) GetActiveView(ctx context.Context, userID uuid.UUID, now time.Time) (*RecommendationCommitment, *PendingOutcomePrompt, error) {
+	row, err := m.store.GetActiveRecommendationCommitment(ctx, userID)
+	if err != nil {
+		if errors.Is(err, errNoActiveCommitment) {
+			return nil, nil, nil
+		}
+		return nil, nil, err
+	}
+
+	commitment := mapCommitmentRow(row)
+
+	var pendingPrompt *PendingOutcomePrompt
+	if commitment.Status == CommitmentStatusCompleted && commitment.CompletedAt != nil {
+		if commitment.CompletedAt.Before(now) && commitment.OutcomeHelpfulness == nil {
+			pendingPrompt = BuildPendingOutcomePrompt(*commitment)
+		}
+	}
+
+	return commitment, pendingPrompt, nil
+}
