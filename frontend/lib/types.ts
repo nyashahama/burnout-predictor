@@ -149,7 +149,7 @@ export interface ScoreCardResult {
   follow_up: FollowUpInfo | null;
   streak_forgiven: boolean;
   streak_milestones: StreakMilestone[];
-  feedback_submitted_for_today: boolean;
+  feedback_submitted_for_today: string | null;
 }
 
 export interface CheckIn {
