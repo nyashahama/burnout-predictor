@@ -29,7 +29,8 @@ const mockDashboardData = {
     follow_up: null,
     streak_forgiven: false,
     streak_milestones: [],
-  } as ScoreCardResult,
+    feedback_submitted_for_today: false,
+  } as unknown as ScoreCardResult,
   checkins: [
     {
       id: "c1",
@@ -82,6 +83,60 @@ const mockDashboardData = {
     },
     streak_milestones: [],
     streak_forgiven: false,
+    personalization_progress: {
+      confirmed_triggers: 1,
+      confirmed_recovery_levers: 1,
+      experiments: 2,
+      confidence_trend: "up",
+    },
+    recommendation_basis: {
+      kind: "trigger",
+      state: "confirmed",
+      summary: "Back-to-back meeting mornings are your strongest trigger.",
+      evidence_count: 4,
+    },
+    briefing_change: {
+      title: "New today",
+      body: "Meetings replaced sleep loss as your strongest trigger.",
+    },
+    playbook: {
+      confirmed_triggers: [
+        {
+          key: "meetings",
+          title: "Back-to-back meeting mornings",
+          detail: "Your next-day score rises after stacked morning meetings.",
+          kind: "trigger",
+          state: "confirmed",
+          evidence_count: 4,
+          last_seen_date: "2026-04-15",
+          trend: "rising",
+        },
+      ],
+      confirmed_recovery_levers: [
+        {
+          key: "shutdown",
+          title: "Early shutdown",
+          detail: "Leaving work on time lowers your next-day strain.",
+          kind: "recovery",
+          state: "confirmed",
+          evidence_count: 3,
+          last_seen_date: "2026-04-14",
+          trend: "stable",
+        },
+      ],
+      experiments: [
+        {
+          key: "deadline",
+          title: "Deadline-heavy Tuesdays",
+          detail: "Still testing whether this is a stable trigger.",
+          kind: "experiment",
+          state: "observed",
+          evidence_count: 1,
+          last_seen_date: "2026-04-09",
+          trend: "new",
+        },
+      ],
+    },
   } as unknown as InsightBundle,
   loadingData: false,
   loadingMessage: "",
@@ -105,6 +160,20 @@ vi.mock("@/contexts/AuthContext", () => ({
   }),
 }));
 
+vi.mock("@/components/dashboard/PersonalizationProgress", () => ({
+  default: () => <div>Personalization Progress</div>,
+}));
+
+vi.mock("@/components/dashboard/PlaybookPanel", () => ({
+  default: ({ title, subtitle }: { title: string; subtitle: string; playbook: unknown }) => (
+    <div>
+      <div>{title}</div>
+      <div>{subtitle}</div>
+      <div>Your Playbook</div>
+    </div>
+  ),
+}));
+
 describe("DashboardPage", () => {
   it("leads with a single briefing surface before the supporting evidence cards", async () => {
     const { default: DashboardPage } = await import("@/app/dashboard/page");
@@ -116,5 +185,7 @@ describe("DashboardPage", () => {
     expect(screen.getByText(/protect tomorrow morning from meetings/i)).toBeInTheDocument();
     expect(screen.getByText(/why this is showing up/i)).toBeInTheDocument();
     expect(screen.getByText(/tomorrow forecast/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/personalization progress/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/your playbook/i).length).toBeGreaterThanOrEqual(1);
   });
 });

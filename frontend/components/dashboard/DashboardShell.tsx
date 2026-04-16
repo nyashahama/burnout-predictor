@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3, CalendarDays, LayoutDashboard, LogOut, Settings } from "lucide-react";
+import { BarChart3, BookOpen, CalendarDays, LayoutDashboard, LogOut, Settings } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { DashboardDataProvider, useDashboardData } from "@/contexts/DashboardDataContext";
 import { AppLogo } from "@/components/AppLogo";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard/playbook", label: "Playbook", icon: BookOpen },
   { href: "/dashboard/history", label: "History", icon: BarChart3 },
   { href: "/dashboard/weekly", label: "Weekly", icon: CalendarDays },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
@@ -80,7 +81,7 @@ function DashboardShellFrame({ children }: { children: React.ReactNode }) {
 
           <main className="flex-1 px-4 py-6 sm:px-6">{children}</main>
 
-          <nav className="sticky bottom-0 grid grid-cols-4 border-t border-border bg-background p-2 lg:hidden">
+          <nav className="sticky bottom-0 grid grid-cols-5 border-t border-border bg-background p-2 lg:hidden">
             {navItems.map((item) => (
               <Link
                 key={item.href}
