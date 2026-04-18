@@ -36,6 +36,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
+let refreshInFlight: Promise<boolean> | null = null;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,10 +51,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("overload-sleep", String(nextUser.sleep_baseline));
   }, []);
 
-  const handleUnauthenticated = useCallback(() => {
+  const handleUnauthenticated = useCallback(async () => {
     clearTokens();
-    void clearSessionCookie();
     setUser(null);
+    await clearSessionCookie();
     if (typeof window !== "undefined") {
       window.location.href = "/login";
     }
@@ -66,22 +68,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [syncUserCache]);
 
   const refreshSession = useCallback(async (): Promise<boolean> => {
+    if (refreshInFlight) return refreshInFlight;
+
     const rt = getRefreshToken();
     if (!rt) return false;
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: rt }),
-      });
-      if (!res.ok) return false;
-      const data = parseRefreshResult((await res.json()) as RefreshResult);
-      // Rotate both tokens — new refresh token replaces old one in localStorage.
-      storeTokens(data.access_token, data.refresh_token);
-      return true;
-    } catch {
-      return false;
-    }
+
+    refreshInFlight = (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: rt }),
+        });
+        if (!res.ok) return false;
+        const data = parseRefreshResult((await res.json()) as RefreshResult);
+        storeTokens(data.access_token, data.refresh_token);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+
+    return refreshInFlight;
   }, []);
 
   // Build the ApiClient once, injecting a live token getter closure.
