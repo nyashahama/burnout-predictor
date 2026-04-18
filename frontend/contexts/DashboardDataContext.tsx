@@ -8,8 +8,18 @@ import {
   useState,
 } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { parseCheckIns, parseInsightBundle, parseScoreCardResult } from "@/lib/validators";
-import type { ScoreCardResult, CheckIn, InsightBundle, UpsertCheckInResult, FollowUpInfo } from "@/lib/types";
+import {
+  parseCheckIns,
+  parseInsightBundle,
+  parseScoreCardResult,
+} from "@/lib/validators";
+import type {
+  ScoreCardResult,
+  CheckIn,
+  InsightBundle,
+  UpsertCheckInResult,
+  FollowUpInfo,
+} from "@/lib/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
@@ -28,31 +38,51 @@ interface DashboardDataContextValue {
   commitRecommendation: () => Promise<void>;
   completeCommitment: (id: string) => Promise<void>;
   skipCommitment: (id: string) => Promise<void>;
-  submitCommitmentOutcome: (id: string, helpfulness: "helped" | "a_bit" | "did_not_help") => Promise<void>;
+  submitCommitmentOutcome: (
+    id: string,
+    helpfulness: "helped" | "a_bit" | "did_not_help",
+  ) => Promise<void>;
 }
 
-const DashboardDataContext = createContext<DashboardDataContextValue | null>(null);
+const DashboardDataContext = createContext<DashboardDataContextValue | null>(
+  null,
+);
 
-export function DashboardDataProvider({ children }: { children: React.ReactNode }) {
+export function DashboardDataProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { api, isLoading: authLoading } = useAuth();
 
-  const [scoreCard, setScoreCard]         = useState<ScoreCardResult | null>(null);
-  const [checkins, setCheckins]           = useState<CheckIn[]>([]);
-  const [insightBundle, setInsightBundle] = useState<InsightBundle | null>(null);
-  const [followUp, setFollowUp]         = useState<FollowUpInfo | null>(null);
-  const [loadingData, setLoadingData]     = useState(true);
-  const [loadingMessage, setLoadingMessage] = useState("Connecting to the API…");
-  const [loadError, setLoadError]         = useState("");
-  const [ready, setReady]                 = useState(false);
+  const [scoreCard, setScoreCard] = useState<ScoreCardResult | null>(null);
+  const [checkins, setCheckins] = useState<CheckIn[]>([]);
+  const [insightBundle, setInsightBundle] = useState<InsightBundle | null>(
+    null,
+  );
+  const [followUp, setFollowUp] = useState<FollowUpInfo | null>(null);
+  const [loadingData, setLoadingData] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState(
+    "Connecting to the API…",
+  );
+  const [loadError, setLoadError] = useState("");
+  const [ready, setReady] = useState(false);
 
-  const withTimeout = useCallback(async <T,>(promise: Promise<T>, message: string, timeoutMs: number): Promise<T> => {
-    return Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        setTimeout(() => reject(new Error(message)), timeoutMs);
-      }),
-    ]);
-  }, []);
+  const withTimeout = useCallback(
+    async <T,>(
+      promise: Promise<T>,
+      message: string,
+      timeoutMs: number,
+    ): Promise<T> => {
+      return Promise.race([
+        promise,
+        new Promise<T>((_, reject) => {
+          setTimeout(() => reject(new Error(message)), timeoutMs);
+        }),
+      ]);
+    },
+    [],
+  );
 
   const warmBackend = useCallback(async () => {
     const deadline = Date.now() + 45_000;
@@ -68,7 +98,9 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
       await new Promise((resolve) => setTimeout(resolve, 3000));
     }
 
-    throw new Error("The backend is still waking up on Render. Please try again in a moment.");
+    throw new Error(
+      "The backend is still waking up... Please try again in a moment.",
+    );
   }, []);
 
   const reload = useCallback(async () => {
@@ -81,7 +113,9 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
       setLoadingMessage("Waking up the Render backend…");
     }, 1500);
     const deepseekTimer = setTimeout(() => {
-      setLoadingMessage("Still loading your dashboard. The API and DeepSeek response are taking longer than usual.");
+      setLoadingMessage(
+        "Still loading your dashboard. The API response are taking longer than usual.",
+      );
     }, 12000);
 
     try {
@@ -101,7 +135,11 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
       setCheckins(ci);
       setReady(true);
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : "Failed to load dashboard data.");
+      setLoadError(
+        error instanceof Error
+          ? error.message
+          : "Failed to load dashboard data.",
+      );
       setReady(false);
     } finally {
       clearTimeout(renderTimer);
@@ -118,12 +156,23 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
     }
 
     try {
-      const fuResponse = await api.get<FollowUpInfo | null>("/api/follow-ups", (data: unknown) => {
-        if (typeof data === "object" && data !== null && "follow_up" in (data as Record<string, unknown>)) {
-          return (data as { follow_up: { question: string; source_date: string } | null }).follow_up;
-        }
-        return null;
-      });
+      const fuResponse = await api.get<FollowUpInfo | null>(
+        "/api/follow-ups",
+        (data: unknown) => {
+          if (
+            typeof data === "object" &&
+            data !== null &&
+            "follow_up" in (data as Record<string, unknown>)
+          ) {
+            return (
+              data as {
+                follow_up: { question: string; source_date: string } | null;
+              }
+            ).follow_up;
+          }
+          return null;
+        },
+      );
       setFollowUp(fuResponse);
     } catch {
       setFollowUp(null);
@@ -141,42 +190,60 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
     } catch {}
   }, [api]);
 
-  const handleCheckInComplete = useCallback((result: UpsertCheckInResult) => {
-    setScoreCard(prev => prev ? {
-      ...prev,
-      score: result.score,
-      explanation: result.explanation,
-      suggestion: result.suggestion,
-      daily_forecast: result.daily_forecast,
-      recommended_action: result.recommended_action,
-      has_checkin: true,
-    } : null);
-    setCheckins(prev => [
-      result.check_in,
-      ...prev.filter(c => c.checked_in_date !== result.check_in.checked_in_date),
-    ]);
-    void reload();
-  }, [reload]);
+  const handleCheckInComplete = useCallback(
+    (result: UpsertCheckInResult) => {
+      setScoreCard((prev) =>
+        prev
+          ? {
+              ...prev,
+              score: result.score,
+              explanation: result.explanation,
+              suggestion: result.suggestion,
+              daily_forecast: result.daily_forecast,
+              recommended_action: result.recommended_action,
+              has_checkin: true,
+            }
+          : null,
+      );
+      setCheckins((prev) => [
+        result.check_in,
+        ...prev.filter(
+          (c) => c.checked_in_date !== result.check_in.checked_in_date,
+        ),
+      ]);
+      void reload();
+    },
+    [reload],
+  );
 
   const commitRecommendation = useCallback(async () => {
     await api.post("/api/recommendations/commit", {});
     await reload();
   }, [api, reload]);
 
-  const completeCommitment = useCallback(async (id: string) => {
-    await api.post(`/api/recommendations/${id}/complete`, {});
-    await reload();
-  }, [api, reload]);
+  const completeCommitment = useCallback(
+    async (id: string) => {
+      await api.post(`/api/recommendations/${id}/complete`, {});
+      await reload();
+    },
+    [api, reload],
+  );
 
-  const skipCommitment = useCallback(async (id: string) => {
-    await api.post(`/api/recommendations/${id}/skip`, {});
-    await reload();
-  }, [api, reload]);
+  const skipCommitment = useCallback(
+    async (id: string) => {
+      await api.post(`/api/recommendations/${id}/skip`, {});
+      await reload();
+    },
+    [api, reload],
+  );
 
-  const submitCommitmentOutcome = useCallback(async (id: string, helpfulness: "helped" | "a_bit" | "did_not_help") => {
-    await api.post(`/api/recommendations/${id}/outcome`, { helpfulness });
-    await reload();
-  }, [api, reload]);
+  const submitCommitmentOutcome = useCallback(
+    async (id: string, helpfulness: "helped" | "a_bit" | "did_not_help") => {
+      await api.post(`/api/recommendations/${id}/outcome`, { helpfulness });
+      await reload();
+    },
+    [api, reload],
+  );
 
   return (
     <DashboardDataContext.Provider
@@ -205,6 +272,9 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
 
 export function useDashboardData(): DashboardDataContextValue {
   const ctx = useContext(DashboardDataContext);
-  if (!ctx) throw new Error("useDashboardData must be used inside <DashboardDataProvider>");
+  if (!ctx)
+    throw new Error(
+      "useDashboardData must be used inside <DashboardDataProvider>",
+    );
   return ctx;
 }
