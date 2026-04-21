@@ -6,11 +6,9 @@ import { AuthShell } from "@/components/AuthShell";
 import { Button } from "@/components/ui/button";
 import { CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { safeParseJson } from "@/lib/storage";
 import { setOnboardedCookie } from "@/lib/auth";
 import { useAuth } from "@/contexts/AuthContext";
-import type { AuthResult } from "@/lib/types";
-import { parseAuthResult } from "@/lib/validators";
+import { parseUserResponse } from "@/lib/validators";
 
 const roles = [
   { value: "engineer", label: "Software Engineer", icon: "💻" },
@@ -51,7 +49,7 @@ function scoreLabel(score: number) {
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { login, api } = useAuth();
+  const { updateUser } = useAuth();
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [lastFelt, setLastFelt] = useState("");
@@ -70,34 +68,31 @@ export default function OnboardingPage() {
     setLoading(true);
     setError("");
     try {
-      const pending = safeParseJson<{ email?: string; password?: string; name?: string }>(
-        sessionStorage.getItem("overload-pending-register"),
-        {},
-      );
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-      const result = await api.post<AuthResult>(
-        "/api/auth/register",
-        {
-          email: pending.email ?? "",
-          password: pending.password ?? "",
-          name: name.trim() || pending.name || "there",
+      const res = await fetch("/api/user/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           role,
           sleep_baseline: parseInt(sleep, 10),
           estimated_score: score,
           timezone: tz,
-        },
-        parseAuthResult,
-      );
-      sessionStorage.removeItem("overload-pending-register");
-      await login(result);
-      localStorage.setItem("overload-name", result.user.name);
-      localStorage.setItem("overload-role", result.user.role);
-      localStorage.setItem("overload-sleep", String(result.user.sleep_baseline));
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error((data as { error?: string }).error ?? "Onboarding failed. Please try again.");
+      }
+      const result = parseUserResponse(data);
+      updateUser(result);
+      localStorage.setItem("overload-name", result.name);
+      localStorage.setItem("overload-role", result.role);
+      localStorage.setItem("overload-sleep", String(result.sleep_baseline));
       localStorage.setItem("overload-last-felt", lastFelt);
       await setOnboardedCookie();
       router.push("/dashboard");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Registration failed. Please try again.");
+      setError(err instanceof Error ? err.message : "Onboarding failed. Please try again.");
     } finally {
       setLoading(false);
     }
