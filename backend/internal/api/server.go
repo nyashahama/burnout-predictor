@@ -20,6 +20,7 @@ import (
 	authsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/auth"
 	billingsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/billing"
 	checkinsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/checkin"
+	dashboardsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/dashboard"
 	insightsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/insight"
 	paymentsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/payment"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/store"
@@ -54,6 +55,8 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 	insightService := insightsvc.New(pg)
 	billingService := billingsvc.New(pg, cfg.Pool, log)
 	paymentService := paymentsvc.New(pg, log)
+	dashboardService := dashboardsvc.New(authService, checkinService, insightService)
+	dashboardH := handler.NewDashboardHandler(dashboardService)
 
 	authH := handler.NewAuthHandler(authService)
 	checkinH := handler.NewCheckinHandler(checkinService)
@@ -105,7 +108,7 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 
 		r.Get("/api/user", userH.GetProfile)
 		r.Patch("/api/user", userH.UpdateProfile)
-		r.Post("/api/user/onboarding/complete", userH.CompleteOnboarding)
+		r.Post("/api/user/onboarding", userH.CompleteOnboarding)
 		r.Patch("/api/user/password", authH.ChangePassword)
 		r.Patch("/api/user/email", authH.ChangeEmail)
 		r.Delete("/api/user", authH.DeleteAccount)
@@ -118,6 +121,7 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 		r.Get("/api/score", checkinH.GetScoreCard)
 		r.Post("/api/checkins", checkinH.Upsert)
 		r.Get("/api/checkins", checkinH.List)
+		r.Get("/api/dashboard/bootstrap", dashboardH.GetBootstrap)
 
 		r.Get("/api/insights", insightH.Get)
 		r.Post("/api/insights/dismiss", insightH.DismissComponent)

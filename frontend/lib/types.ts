@@ -375,3 +375,11 @@ export interface PendingPayment {
 export interface PendingPaymentsResponse {
   payments: PendingPayment[];
 }
+
+export interface DashboardBootstrap {
+  user: UserResponse;
+  score_card: ScoreCardResult;
+  checkins: CheckIn[];
+  insight_bundle: InsightBundle;
+  follow_up: FollowUpInfo | null;
+}
