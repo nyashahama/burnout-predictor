@@ -39,6 +39,8 @@ export async function GET(req: NextRequest) {
 
   const tokens = parseRefreshResult(data);
   const response = NextResponse.json({ access_token: tokens.access_token });
-  setRefreshCookie(response, tokens.refresh_token);
+  if (tokens.refresh_token) {
+    setRefreshCookie(response, tokens.refresh_token);
+  }
   return response;
 }

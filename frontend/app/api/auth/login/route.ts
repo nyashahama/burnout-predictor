@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
 
   const auth = parseAuthResult(data);
   const response = NextResponse.json({ user: auth.user, access_token: auth.access_token });
-  setRefreshCookie(response, auth.refresh_token);
+  if (auth.refresh_token) {
+    setRefreshCookie(response, auth.refresh_token);
+  }
   return response;
 }

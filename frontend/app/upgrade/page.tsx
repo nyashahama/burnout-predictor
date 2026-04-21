@@ -188,7 +188,7 @@ export default function UpgradePage() {
                 <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm">
                   <p className="font-medium text-amber-800">After making payment:</p>
                   <p className="mt-1 text-amber-700">
-                    Email your proof of payment to {billingConfig.billingEmail || "the billing inbox"} with subject "Overload Payment - {user?.email}".
+                    Email your proof of payment to {billingConfig.billingEmail || "the billing inbox"} with subject &quot;Overload Payment - {user?.email}&quot;.
                   </p>
                 </div>
               </CardContent>
