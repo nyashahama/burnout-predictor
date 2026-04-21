@@ -45,6 +45,7 @@ type authStore interface {
 	GetPasswordReset(ctx context.Context, tokenHash string) (db.PasswordReset, error)
 	MarkPasswordResetUsed(ctx context.Context, tokenHash string) error
 	CreateDefaultNotificationPrefs(ctx context.Context, userID uuid.UUID) (db.UserNotificationPref, error)
+	CompleteUserOnboarding(ctx context.Context, params db.CompleteUserOnboardingParams) (db.User, error)
 }
 
 // Service owns all auth and user-profile business logic.
@@ -110,6 +111,13 @@ type ChangePasswordRequest struct {
 type ChangeEmailRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+}
+
+type CompleteOnboardingRequest struct {
+	Role           string `json:"role"`
+	SleepBaseline  int16  `json:"sleep_baseline"`
+	Timezone       string `json:"timezone"`
+	EstimatedScore int16  `json:"estimated_score"`
 }
 
 // UserResponse is the safe user shape sent to clients — no password hash.
@@ -409,6 +417,20 @@ func (s *Service) DeleteAccount(ctx context.Context, userID uuid.UUID) error {
 		s.log.WarnContext(ctx, "delete account: revoke tokens failed", "user_id", userID, "err", err)
 	}
 	return s.store.SoftDeleteUser(ctx, userID)
+}
+
+func (s *Service) CompleteOnboarding(ctx context.Context, userID uuid.UUID, req CompleteOnboardingRequest) (UserResponse, error) {
+	updated, err := s.store.CompleteUserOnboarding(ctx, db.CompleteUserOnboardingParams{
+		ID:             userID,
+		Role:           req.Role,
+		SleepBaseline:  req.SleepBaseline,
+		Timezone:       req.Timezone,
+		EstimatedScore: pgtype.Int2{Int16: req.EstimatedScore, Valid: req.EstimatedScore != 0},
+	})
+	if err != nil {
+		return UserResponse{}, fmt.Errorf("complete onboarding: %w", err)
+	}
+	return s.safeUser(updated), nil
 }
 
 // GetUserByID exposes a single-user lookup for the auth middleware.

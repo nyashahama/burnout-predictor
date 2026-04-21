@@ -39,6 +39,7 @@ type mockAuthStore struct {
 	getPasswordReset            func(ctx context.Context, tokenHash string) (db.PasswordReset, error)
 	markPasswordResetUsed       func(ctx context.Context, tokenHash string) error
 	createDefaultNotifPrefs     func(ctx context.Context, userID uuid.UUID) (db.UserNotificationPref, error)
+	completeUserOnboarding      func(ctx context.Context, params db.CompleteUserOnboardingParams) (db.User, error)
 }
 
 func (m *mockAuthStore) CreateUser(ctx context.Context, p db.CreateUserParams) (db.User, error) {
@@ -118,6 +119,12 @@ func (m *mockAuthStore) CreateDefaultNotificationPrefs(ctx context.Context, id u
 		return m.createDefaultNotifPrefs(ctx, id)
 	}
 	return db.UserNotificationPref{}, nil
+}
+func (m *mockAuthStore) CompleteUserOnboarding(ctx context.Context, p db.CompleteUserOnboardingParams) (db.User, error) {
+	if m.completeUserOnboarding != nil {
+		return m.completeUserOnboarding(ctx, p)
+	}
+	return db.User{}, nil
 }
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
@@ -291,17 +298,99 @@ func TestSafeUserIncludesOnboardedState(t *testing.T) {
 	svc := &auth.Service{}
 	now := time.Now()
 
-	got := svc.SafeUser(db.User{
-		ID:            uuid.New(),
-		Email:         "user@example.com",
-		Name:          "Nyasha",
-		Role:          "engineer",
-		SleepBaseline: 8,
-		Timezone:      "Africa/Johannesburg",
-		OnboardedAt:   pgtype.Timestamptz{Time: now, Valid: true},
+	t.Run("onboarded=true", func(t *testing.T) {
+		got := svc.SafeUser(db.User{
+			ID:            uuid.New(),
+			Email:         "user@example.com",
+			Name:          "Nyasha",
+			Role:          "engineer",
+			SleepBaseline: 8,
+			Timezone:      "Africa/Johannesburg",
+			OnboardedAt:   pgtype.Timestamptz{Time: now, Valid: true},
+		})
+		if !got.Onboarded {
+			t.Fatalf("expected onboarded=true")
+		}
 	})
 
-	if !got.Onboarded {
-		t.Fatalf("expected onboarded=true")
+	t.Run("onboarded=false", func(t *testing.T) {
+		got := svc.SafeUser(db.User{
+			ID:            uuid.New(),
+			Email:         "new@example.com",
+			Name:          "New User",
+			Role:          "engineer",
+			SleepBaseline: 8,
+			Timezone:      "UTC",
+			OnboardedAt:   pgtype.Timestamptz{Valid: false},
+		})
+		if got.Onboarded {
+			t.Fatalf("expected onboarded=false")
+		}
+	})
+}
+
+func TestCompleteOnboarding_Success(t *testing.T) {
+	userID := uuid.New()
+	var captured db.CompleteUserOnboardingParams
+	store := &mockAuthStore{
+		completeUserOnboarding: func(_ context.Context, p db.CompleteUserOnboardingParams) (db.User, error) {
+			captured = p
+			return db.User{
+				ID:            p.ID,
+				Email:         "user@example.com",
+				Name:          "Alice",
+				Role:          p.Role,
+				SleepBaseline: p.SleepBaseline,
+				Timezone:      p.Timezone,
+				Tier:         "free",
+				OnboardedAt:   pgtype.Timestamptz{Time: time.Now(), Valid: true},
+			}, nil
+		},
+	}
+	svc := newService(store)
+
+	result, err := svc.CompleteOnboarding(context.Background(), userID, auth.CompleteOnboardingRequest{
+		Role:           "engineer",
+		SleepBaseline:  8,
+		Timezone:       "Africa/Johannesburg",
+		EstimatedScore: 30,
+	})
+
+	if err != nil {
+		t.Fatalf("CompleteOnboarding() error = %v, want nil", err)
+	}
+	if captured.Role != "engineer" {
+		t.Errorf("Role = %q, want engineer", captured.Role)
+	}
+	if captured.SleepBaseline != 8 {
+		t.Errorf("SleepBaseline = %d, want 8", captured.SleepBaseline)
+	}
+	if captured.Timezone != "Africa/Johannesburg" {
+		t.Errorf("Timezone = %q, want Africa/Johannesburg", captured.Timezone)
+	}
+	if !captured.EstimatedScore.Valid || captured.EstimatedScore.Int16 != 30 {
+		t.Errorf("EstimatedScore = %+v, want valid 30", captured.EstimatedScore)
+	}
+	if !result.Onboarded {
+		t.Error("result.Onboarded = false, want true")
+	}
+}
+
+func TestCompleteOnboarding_ServiceError(t *testing.T) {
+	store := &mockAuthStore{
+		completeUserOnboarding: func(_ context.Context, _ db.CompleteUserOnboardingParams) (db.User, error) {
+			return db.User{}, errors.New("db error")
+		},
+	}
+	svc := newService(store)
+
+	_, err := svc.CompleteOnboarding(context.Background(), uuid.New(), auth.CompleteOnboardingRequest{
+		Role:          "engineer",
+		SleepBaseline: 8,
+		Timezone:      "UTC",
+	})
+
+	if err == nil {
+		t.Fatal("CompleteOnboarding() error = nil, want error")
 	}
 }

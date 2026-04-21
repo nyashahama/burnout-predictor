@@ -105,6 +105,7 @@ func NewServer(ctx context.Context, cfg ServerConfig) http.Handler {
 
 		r.Get("/api/user", userH.GetProfile)
 		r.Patch("/api/user", userH.UpdateProfile)
+		r.Post("/api/user/onboarding/complete", userH.CompleteOnboarding)
 		r.Patch("/api/user/password", authH.ChangePassword)
 		r.Patch("/api/user/email", authH.ChangeEmail)
 		r.Delete("/api/user", authH.DeleteAccount)
