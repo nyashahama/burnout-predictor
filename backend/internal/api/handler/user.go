@@ -7,10 +7,10 @@ import (
 
 	"github.com/google/uuid"
 
-	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/middleware"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/respond"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/api/validate"
+	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
 	authsvc "github.com/nyasha-hama/burnout-predictor-api/internal/service/auth"
 )
 
@@ -85,12 +85,6 @@ func (h *UserHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Request)
 	if err := validate.Timezone(req.Timezone); err != nil {
 		respond.Error(w, http.StatusBadRequest, err.Error())
 		return
-	}
-	if req.EstimatedScore != 0 {
-		if err := validate.EstimatedScore(req.EstimatedScore); err != nil {
-			respond.Error(w, http.StatusBadRequest, err.Error())
-			return
-		}
 	}
 	result, err := h.svc.CompleteOnboarding(r.Context(), user.ID, req)
 	if err != nil {

@@ -26,6 +26,7 @@ function _makeUser(overrides = {}) {
     email_verified: true,
     tier: "free",
     calendar_connected: false,
+    onboarded: true,
     ...overrides,
   };
 }
@@ -33,7 +34,6 @@ function _makeUser(overrides = {}) {
 function makeAuthResult(overrides: Record<string, unknown> = {}) {
   return {
     access_token: "at-abc",
-    refresh_token: "rt-xyz",
     user: makeUser(),
     ...overrides,
   };
@@ -88,13 +88,30 @@ describe("useAuth", () => {
 });
 
 describe("AuthProvider", () => {
+  let originalFetch: typeof fetch;
+
   beforeEach(() => {
     localStorage.clear();
     document.cookie = "overload-session=; max-age=0; path=/";
     document.cookie = "overload-onboarded=; max-age=0; path=/";
+    originalFetch = global.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === "/api/auth/refresh") {
+        return new Response(JSON.stringify({ error: "missing refresh token" }), { status: 401 });
+      }
+      if (url === "/api/auth/logout" || url === "/api/session") {
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }
+      return originalFetch(input, init);
+    }));
   });
 
-  it("resolves to no-user when no refresh token exists", async () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("resolves to no-user when refresh cookie restore fails", async () => {
     function ConsumerLocal() {
       const { user, isLoading } = useAuth();
       if (isLoading) return <div>loading</div>;
@@ -134,7 +151,7 @@ describe("AuthProvider", () => {
 
     expect(harness!.user).not.toBeNull();
     expect(harness!.user!.name).toBe("Test User");
-    expect(localStorage.getItem("overload-refresh-token")).toBe("rt-xyz");
+    expect(localStorage.getItem("overload-refresh-token")).toBeNull();
   });
 
   it("logout clears user and tokens", async () => {
@@ -168,10 +185,10 @@ describe("AuthProvider", () => {
     });
 
     expect(harness!.user).toBeNull();
-    expect(localStorage.getItem("overload-refresh-token")).toBeNull();
+    expect(localStorage.getItem("overload-name")).toBeNull();
   });
 
-  it("refreshSession returns false when no refresh token stored", async () => {
+  it("refreshSession returns false when cookie refresh endpoint rejects", async () => {
     let harness: AuthHarness | null = null;
 
     render(
@@ -189,16 +206,18 @@ describe("AuthProvider", () => {
   });
 
   it("refreshSession returns true on valid server response", async () => {
-    localStorage.setItem("overload-refresh-token", "rt-old");
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === "/api/auth/refresh") {
+        return new Response(JSON.stringify({ access_token: "at-new" }), { status: 200 });
+      }
+      if (url === "/api/session") {
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }
+      return originalFetch(input, init);
+    }));
 
-    // The on-mount restore will also fire — handle its requests
     server.use(
-      http.post("http://localhost:8080/api/auth/refresh", () =>
-        HttpResponse.json({
-          access_token: "at-new",
-          refresh_token: "rt-new",
-        })
-      ),
       http.get("http://localhost:8080/api/user", () =>
         HttpResponse.json(makeUser())
       )
@@ -221,15 +240,23 @@ describe("AuthProvider", () => {
   });
 
   it("restores session on mount when refresh token and user endpoint succeed", async () => {
-    localStorage.setItem("overload-refresh-token", "rt-stored");
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === "/api/auth/refresh") {
+        return new Response(JSON.stringify({ access_token: "at-restored" }), { status: 200 });
+      }
+      if (url === "/api/session") {
+        const onboarded = init?.body ? JSON.parse(String(init.body)).onboarded : false;
+        document.cookie = "overload-session=1; path=/; max-age=2592000; SameSite=Lax";
+        if (onboarded) {
+          document.cookie = "overload-onboarded=1; path=/; max-age=2592000; SameSite=Lax";
+        }
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }
+      return originalFetch(input, init);
+    }));
 
     server.use(
-      http.post("http://localhost:8080/api/auth/refresh", () =>
-        HttpResponse.json({
-          access_token: "at-restored",
-          refresh_token: "rt-stored",
-        })
-      ),
       http.get("http://localhost:8080/api/user", () =>
         HttpResponse.json(makeUser({ name: "Restored User" }))
       )

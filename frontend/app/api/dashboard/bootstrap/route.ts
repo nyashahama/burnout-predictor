@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 const API_BASE = process.env.API_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 const REFRESH_COOKIE = "overload-refresh";
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 
 export async function GET() {
   const refreshToken = (await cookies()).get(REFRESH_COOKIE)?.value;
@@ -17,7 +18,7 @@ export async function GET() {
     cache: "no-store",
   });
   const refreshPayload = await refresh.json();
-  if (!refresh.ok || !refreshPayload.access_token) {
+  if (!refresh.ok || typeof refreshPayload.access_token !== "string") {
     const response = NextResponse.json({ error: "unauthorized" }, { status: 401 });
     response.cookies.delete(REFRESH_COOKIE);
     return response;
@@ -27,17 +28,18 @@ export async function GET() {
     headers: { authorization: `Bearer ${refreshPayload.access_token}` },
     cache: "no-store",
   });
-
   const payload = await upstream.json();
   const response = NextResponse.json(payload, { status: upstream.status });
-  if (refreshPayload.refresh_token) {
+
+  if (typeof refreshPayload.refresh_token === "string") {
     response.cookies.set(REFRESH_COOKIE, refreshPayload.refresh_token, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       path: "/",
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: COOKIE_MAX_AGE,
     });
   }
+
   return response;
 }

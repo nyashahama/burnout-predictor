@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { AuthShell } from "@/components/AuthShell";
 import { Button } from "@/components/ui/button";
 import { CardDescription, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { setOnboardedCookie } from "@/lib/auth";
 import { useAuth } from "@/contexts/AuthContext";
+import type { UserResponse } from "@/lib/types";
 import { parseUserResponse } from "@/lib/validators";
 
 const roles = [
@@ -49,9 +49,8 @@ function scoreLabel(score: number) {
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { updateUser } = useAuth();
+  const { api, updateUser } = useAuth();
   const [step, setStep] = useState(0);
-  const [name, setName] = useState("");
   const [lastFelt, setLastFelt] = useState("");
   const [role, setRole] = useState("");
   const [sleep, setSleep] = useState("");
@@ -61,7 +60,7 @@ export default function OnboardingPage() {
 
   function handleCalculate() {
     setScore(estimateScore(lastFelt, role, sleep));
-    setStep(4);
+    setStep(3);
   }
 
   async function handleFinish() {
@@ -69,25 +68,17 @@ export default function OnboardingPage() {
     setError("");
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-      const res = await fetch("/api/user/onboarding", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const result = await api.post<UserResponse>(
+        "/api/user/onboarding",
+        {
           role,
           sleep_baseline: parseInt(sleep, 10),
           estimated_score: score,
           timezone: tz,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error((data as { error?: string }).error ?? "Onboarding failed. Please try again.");
-      }
-      const result = parseUserResponse(data);
+        },
+        parseUserResponse,
+      );
       updateUser(result);
-      localStorage.setItem("overload-name", result.name);
-      localStorage.setItem("overload-role", result.role);
-      localStorage.setItem("overload-sleep", String(result.sleep_baseline));
       localStorage.setItem("overload-last-felt", lastFelt);
       await setOnboardedCookie();
       router.push("/dashboard");
@@ -99,45 +90,26 @@ export default function OnboardingPage() {
   }
 
   const canContinue =
-    (step === 0 && name.trim()) ||
-    (step === 1 && lastFelt) ||
-    (step === 2 && role) ||
-    (step === 3 && sleep);
+    (step === 0 && lastFelt) ||
+    (step === 1 && role) ||
+    (step === 2 && sleep);
 
   return (
     <AuthShell>
       <div className="space-y-2">
         <CardTitle className="text-3xl">Let&apos;s calibrate your baseline</CardTitle>
         <CardDescription className="text-base">
-          Four quick steps, then we estimate where your load is starting from.
+          Three quick steps, then we estimate where your load is starting from.
         </CardDescription>
       </div>
 
       <div className="flex gap-2">
-        {[0, 1, 2, 3].map((n) => (
+        {[0, 1, 2].map((n) => (
           <div key={n} className={`h-2 flex-1 rounded-full ${step >= n ? "bg-primary" : "bg-muted"}`} />
         ))}
       </div>
 
       {step === 0 && (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <CardTitle className="text-2xl">What should we call you?</CardTitle>
-            <CardDescription>We use your name in the dashboard and check-in flow.</CardDescription>
-          </div>
-          <Input
-            placeholder="Your first name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus
-          />
-          <Button disabled={!canContinue} onClick={() => setStep(1)} className="w-full">
-            Continue →
-          </Button>
-        </div>
-      )}
-
-      {step === 1 && (
         <div className="space-y-4">
           <div className="space-y-2">
             <CardTitle className="text-2xl">When did you last feel like yourself?</CardTitle>
@@ -156,13 +128,13 @@ export default function OnboardingPage() {
               </button>
             ))}
           </div>
-          <Button disabled={!canContinue} onClick={() => setStep(2)} className="w-full">
+          <Button disabled={!canContinue} onClick={() => setStep(1)} className="w-full">
             Continue →
           </Button>
         </div>
       )}
 
-      {step === 2 && (
+      {step === 1 && (
         <div className="space-y-4">
           <div className="space-y-2">
             <CardTitle className="text-2xl">What&apos;s your role?</CardTitle>
@@ -181,13 +153,13 @@ export default function OnboardingPage() {
               </button>
             ))}
           </div>
-          <Button disabled={!canContinue} onClick={() => setStep(3)} className="w-full">
+          <Button disabled={!canContinue} onClick={() => setStep(2)} className="w-full">
             Continue →
           </Button>
         </div>
       )}
 
-      {step === 3 && (
+      {step === 2 && (
         <div className="space-y-4">
           <div className="space-y-2">
             <CardTitle className="text-2xl">How much sleep do you usually get?</CardTitle>
@@ -212,7 +184,7 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {step === 4 && (
+      {step === 3 && (
         <div className="space-y-6">
           <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6 text-center">
             <div className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Starting estimate</div>

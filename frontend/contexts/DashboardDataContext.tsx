@@ -59,7 +59,7 @@ export function DashboardDataProvider({
   const [followUp, setFollowUp] = useState<FollowUpInfo | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState(
-    "Loading…",
+    "Connecting to the API…",
   );
   const [loadError, setLoadError] = useState("");
   const [ready, setReady] = useState(false);
@@ -90,20 +90,23 @@ export function DashboardDataProvider({
       const response = await withTimeout(
         fetch("/api/dashboard/bootstrap", { cache: "no-store" }),
         "The dashboard took too long to load.",
-        15000,
+        15_000,
       );
       if (!response.ok) {
         throw new Error("Failed to load dashboard data.");
       }
       const bootstrap = parseDashboardBootstrap(await response.json());
-
       setScoreCard(bootstrap.score_card);
       setCheckins(bootstrap.checkins);
       setInsightBundle(bootstrap.insight_bundle);
       setFollowUp(bootstrap.follow_up);
       setReady(true);
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : "Failed to load dashboard data.");
+      setLoadError(
+        error instanceof Error
+          ? error.message
+          : "Failed to load dashboard data.",
+      );
       setReady(false);
     } finally {
       setLoadingData(false);

@@ -1,8 +1,7 @@
 import type {
   AuthResult,
-  CheckIn,
   DashboardBootstrap,
-  FollowUpInfo,
+  CheckIn,
   InsightBundle,
   NotificationPrefs,
   RefreshResult,
@@ -14,13 +13,6 @@ type Validator<T> = (value: unknown, field?: string) => T;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
-}
-
-function expectObject(value: unknown, field = "value"): Record<string, unknown> {
-  if (!isRecord(value)) {
-    throw new Error(`Invalid API response: ${field} must be an object.`);
-  }
-  return value;
 }
 
 function expectString(value: unknown, field: string): string {
@@ -81,6 +73,22 @@ export const parseAuthResult = (value: unknown): AuthResult => {
   return {
     access_token: expectString(value.access_token, "access_token"),
     user: parseUser(value.user),
+  };
+};
+
+export const parseDashboardBootstrap = (value: unknown): DashboardBootstrap => {
+  if (!isRecord(value)) throw new Error("Invalid API response: bootstrap payload must be an object.");
+  return {
+    user: parseUser(value.user),
+    score_card: parseScoreCardResult(value.score_card),
+    checkins: parseCheckIns(value.checkins),
+    insight_bundle: parseInsightBundle(value.insight_bundle),
+    follow_up: isRecord(value.follow_up)
+      ? {
+          question: expectString(value.follow_up.question, "follow_up.question"),
+          source_date: expectString(value.follow_up.source_date, "follow_up.source_date"),
+        }
+      : null,
   };
 };
 
@@ -153,23 +161,4 @@ export const parseInsightBundle = (value: unknown): InsightBundle => {
       ? (bundle.pending_outcome_prompt as InsightBundle["pending_outcome_prompt"])
       : null,
   } as InsightBundle;
-};
-
-export const parseFollowUpInfo = (value: unknown): FollowUpInfo => {
-  if (!isRecord(value)) throw new Error("Invalid API response: follow_up must be an object.");
-  return {
-    question: expectString(value.question, "follow_up.question"),
-    source_date: expectString(value.source_date, "follow_up.source_date"),
-  };
-};
-
-export const parseDashboardBootstrap = (value: unknown): DashboardBootstrap => {
-  const obj = expectObject(value);
-  return {
-    user: parseUserResponse(obj.user),
-    score_card: parseScoreCardResult(obj.score_card),
-    checkins: parseCheckIns(obj.checkins),
-    insight_bundle: parseInsightBundle(obj.insight_bundle),
-    follow_up: obj.follow_up ? parseFollowUpInfo(obj.follow_up) : null,
-  };
 };

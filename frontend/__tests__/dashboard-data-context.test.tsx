@@ -1,4 +1,4 @@
-import { render, waitFor } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 import { DashboardDataProvider, useDashboardData } from "@/contexts/DashboardDataContext";
 
 const post = vi.fn();
@@ -18,11 +18,22 @@ function Harness({ onReady }: { onReady: (value: ReturnType<typeof useDashboardD
 }
 
 it("posts recommendation commits and reloads dashboard data", async () => {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+  const fetchMock = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => ({
-      user: { id: "1", email: "test@test.com", name: "Test", role: "engineer", sleep_baseline: 7, timezone: "UTC", email_verified: true, tier: "free", calendar_connected: false, onboarded: true },
-      score_card: { score: { score: 50, level: "warning", label: "Watch this", signals: [] }, daily_forecast: {}, recommended_action: {}, has_checkin: false, streak: 0, consistency_pct: 0 },
+      user: {
+        id: "u1",
+        email: "user@example.com",
+        name: "Alice",
+        role: "engineer",
+        sleep_baseline: 8,
+        timezone: "UTC",
+        email_verified: true,
+        tier: "free",
+        calendar_connected: false,
+        onboarded: true,
+      },
+      score_card: { score: { score: 50, level: "warning", label: "Watch this", signals: [] }, daily_forecast: {}, recommended_action: {}, has_checkin: false },
       checkins: [],
       insight_bundle: {
         session_context: null,
@@ -38,7 +49,8 @@ it("posts recommendation commits and reloads dashboard data", async () => {
       },
       follow_up: null,
     }),
-  }));
+  });
+  vi.stubGlobal("fetch", fetchMock);
   post.mockResolvedValue({ id: "33333333-3333-3333-3333-333333333333", status: "committed" });
 
   let latest: ReturnType<typeof useDashboardData> | null = null;
@@ -50,7 +62,10 @@ it("posts recommendation commits and reloads dashboard data", async () => {
   );
 
   await waitFor(() => expect(latest?.ready).toBe(true));
-  await latest!.commitRecommendation();
+  await act(async () => {
+    await latest!.commitRecommendation();
+  });
 
   expect(post).toHaveBeenCalledWith("/api/recommendations/commit", {});
+  expect(fetchMock).toHaveBeenCalledWith("/api/dashboard/bootstrap", { cache: "no-store" });
 });

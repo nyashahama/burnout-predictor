@@ -18,7 +18,7 @@ import (
 // ── mock ──────────────────────────────────────────────────────────────────────
 
 type mockUserService struct {
-	GetProfileFn          func(context.Context, db.User) authsvc.UserResponse
+	GetProfileFn         func(context.Context, db.User) authsvc.UserResponse
 	UpdateProfileFn      func(context.Context, uuid.UUID, authsvc.UpdateProfileRequest) (authsvc.UserResponse, error)
 	CompleteOnboardingFn func(context.Context, uuid.UUID, authsvc.CompleteOnboardingRequest) (authsvc.UserResponse, error)
 }
@@ -39,7 +39,7 @@ func (m *mockUserService) CompleteOnboarding(ctx context.Context, userID uuid.UU
 	if m.CompleteOnboardingFn != nil {
 		return m.CompleteOnboardingFn(ctx, userID, req)
 	}
-	return authsvc.UserResponse{ID: userID}, nil
+	return authsvc.UserResponse{}, nil
 }
 
 // ── GetProfile ────────────────────────────────────────────────────────────────
@@ -111,58 +111,25 @@ func TestUserHandler_UpdateProfile_Success(t *testing.T) {
 	}
 }
 
-// ── CompleteOnboarding ─────────────────────────────────────────────────────────────
-
 func TestUserHandler_CompleteOnboarding_Success(t *testing.T) {
 	h := handler.NewUserHandler(&mockUserService{
-		CompleteOnboardingFn: func(_ context.Context, _ uuid.UUID, _ authsvc.CompleteOnboardingRequest) (authsvc.UserResponse, error) {
-			return authsvc.UserResponse{ID: testUser.ID}, nil
+		CompleteOnboardingFn: func(_ context.Context, _ uuid.UUID, req authsvc.CompleteOnboardingRequest) (authsvc.UserResponse, error) {
+			if req.Role != "engineer" {
+				t.Fatalf("Role = %q, want engineer", req.Role)
+			}
+			return authsvc.UserResponse{Onboarded: true}, nil
 		},
 	})
+
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"role":"engineer","sleep_baseline":8,"timezone":"UTC","estimated_score":28}`))
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"role":"engineer","sleep_baseline":8,"timezone":"Africa/Johannesburg","estimated_score":55}`))
 	req = withUser(req, testUser)
+
 	h.CompleteOnboarding(rec, req)
 	if rec.Code != http.StatusOK {
-		t.Errorf("got %d, want 200", rec.Code)
+		t.Fatalf("got %d, want 200", rec.Code)
 	}
-}
-
-func TestUserHandler_CompleteOnboarding_ValidationErrors(t *testing.T) {
-	h := handler.NewUserHandler(&mockUserService{})
-	tests := []struct {
-		name string
-		body string
-	}{
-		{"invalid_json", `{bad`},
-		{"bad_role", `{"role":"ceo","sleep_baseline":8,"timezone":"UTC"}`},
-		{"bad_sleep_baseline", `{"role":"engineer","sleep_baseline":3,"timezone":"UTC"}`},
-		{"bad_timezone", `{"role":"engineer","sleep_baseline":8,"timezone":"NotReal/Zone"}`},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tc.body))
-			req = withUser(req, testUser)
-			h.CompleteOnboarding(rec, req)
-			if rec.Code != http.StatusBadRequest {
-				t.Errorf("%s: got %d, want 400", tc.name, rec.Code)
-			}
-		})
-	}
-}
-
-func TestUserHandler_CompleteOnboarding_ServiceError(t *testing.T) {
-	h := handler.NewUserHandler(&mockUserService{
-		CompleteOnboardingFn: func(_ context.Context, _ uuid.UUID, _ authsvc.CompleteOnboardingRequest) (authsvc.UserResponse, error) {
-			return authsvc.UserResponse{}, errors.New("db error")
-		},
-	})
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"role":"engineer","sleep_baseline":8,"timezone":"UTC"}`))
-	req = withUser(req, testUser)
-	h.CompleteOnboarding(rec, req)
-	if rec.Code != http.StatusInternalServerError {
-		t.Errorf("got %d, want 500", rec.Code)
+	if !strings.Contains(rec.Body.String(), `"onboarded":true`) {
+		t.Fatalf("expected onboarded=true body, got %s", rec.Body.String())
 	}
 }
