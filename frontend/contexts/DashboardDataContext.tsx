@@ -9,9 +9,7 @@ import {
 } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  parseCheckIns,
-  parseInsightBundle,
-  parseScoreCardResult,
+  parseDashboardBootstrap,
 } from "@/lib/validators";
 import type {
   ScoreCardResult,
@@ -20,8 +18,6 @@ import type {
   UpsertCheckInResult,
   FollowUpInfo,
 } from "@/lib/types";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 interface DashboardDataContextValue {
   scoreCard: ScoreCardResult | null;
@@ -63,7 +59,7 @@ export function DashboardDataProvider({
   const [followUp, setFollowUp] = useState<FollowUpInfo | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState(
-    "Connecting to the API…",
+    "Loading…",
   );
   const [loadError, setLoadError] = useState("");
   const [ready, setReady] = useState(false);
@@ -84,100 +80,35 @@ export function DashboardDataProvider({
     [],
   );
 
-  const warmBackend = useCallback(async () => {
-    const deadline = Date.now() + 45_000;
-
-    while (Date.now() < deadline) {
-      try {
-        const res = await fetch(`${API_BASE}/health`, { cache: "no-store" });
-        if (res.ok) return;
-      } catch {
-        // Keep polling while Render spins the service back up.
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-    }
-
-    throw new Error(
-      "The backend is still waking up... Please try again in a moment.",
-    );
-  }, []);
-
   const reload = useCallback(async () => {
-    if (authLoading || !api) return;
+    if (authLoading) return;
     setLoadingData(true);
     setLoadError("");
-    setLoadingMessage("Connecting to the API…");
-
-    const renderTimer = setTimeout(() => {
-      setLoadingMessage("Waking up the Render backend…");
-    }, 1500);
-    const deepseekTimer = setTimeout(() => {
-      setLoadingMessage(
-        "Still loading your dashboard. The API response are taking longer than usual.",
-      );
-    }, 12000);
+    setLoadingMessage("Loading your dashboard…");
 
     try {
-      await warmBackend();
-      setLoadingMessage("Loading your dashboard data…");
-
-      const [sc, ci] = await withTimeout(
-        Promise.all([
-          api.get("/api/score", parseScoreCardResult),
-          api.get("/api/checkins", parseCheckIns),
-        ]),
-        "The dashboard took too long to load after the backend woke up.",
-        60_000,
+      const response = await withTimeout(
+        fetch("/api/dashboard/bootstrap", { cache: "no-store" }),
+        "The dashboard took too long to load.",
+        15000,
       );
+      if (!response.ok) {
+        throw new Error("Failed to load dashboard data.");
+      }
+      const bootstrap = parseDashboardBootstrap(await response.json());
 
-      setScoreCard(sc);
-      setCheckins(ci);
+      setScoreCard(bootstrap.score_card);
+      setCheckins(bootstrap.checkins);
+      setInsightBundle(bootstrap.insight_bundle);
+      setFollowUp(bootstrap.follow_up);
       setReady(true);
     } catch (error) {
-      setLoadError(
-        error instanceof Error
-          ? error.message
-          : "Failed to load dashboard data.",
-      );
+      setLoadError(error instanceof Error ? error.message : "Failed to load dashboard data.");
       setReady(false);
     } finally {
-      clearTimeout(renderTimer);
-      clearTimeout(deepseekTimer);
       setLoadingData(false);
     }
-
-    try {
-      setLoadingMessage("Loading your dashboard insights…");
-      const bundle = await api.get("/api/insights", parseInsightBundle);
-      setInsightBundle(bundle);
-    } catch {
-      setInsightBundle(null);
-    }
-
-    try {
-      const fuResponse = await api.get<FollowUpInfo | null>(
-        "/api/follow-ups",
-        (data: unknown) => {
-          if (
-            typeof data === "object" &&
-            data !== null &&
-            "follow_up" in (data as Record<string, unknown>)
-          ) {
-            return (
-              data as {
-                follow_up: { question: string; source_date: string } | null;
-              }
-            ).follow_up;
-          }
-          return null;
-        },
-      );
-      setFollowUp(fuResponse);
-    } catch {
-      setFollowUp(null);
-    }
-  }, [api, authLoading, warmBackend, withTimeout]);
+  }, [authLoading, withTimeout]);
 
   useEffect(() => {
     void reload();
