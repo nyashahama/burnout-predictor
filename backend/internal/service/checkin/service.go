@@ -32,14 +32,18 @@ type checkinStore interface {
 	CountCheckInsInRange(ctx context.Context, params db.CountCheckInsInRangeParams) (int64, error)
 }
 
+type scoreCardAI interface {
+	GenerateScoreCard(ctx context.Context, in ai.ScoreCardInput, history []db.ListRecentCheckInsRow) (ai.ScoreCardNarrative, error)
+}
+
 // Service owns check-in persistence, score computation, and follow-up scheduling.
 type Service struct {
 	store checkinStore
-	ai    *ai.Client // nil = AI disabled
+	ai    scoreCardAI
 	log   *slog.Logger
 }
 
-func New(store checkinStore, aiClient *ai.Client, log *slog.Logger) *Service {
+func New(store checkinStore, aiClient scoreCardAI, log *slog.Logger) *Service {
 	return &Service{store: store, ai: aiClient, log: log}
 }
 
@@ -230,7 +234,7 @@ func (s *Service) Upsert(ctx context.Context, user db.User, req UpsertRequest) (
 		})
 	}
 
-	// Build narrative — AI if available, silent rule-based fallback on any error.
+	// Build deterministic narrative.
 	explanation := score.BuildScoreExplanation(score.ExplanationInput{
 		Score:                 out.Score,
 		TodayStress:           &req.Stress,
@@ -238,44 +242,6 @@ func (s *Service) Upsert(ctx context.Context, user db.User, req UpsertRequest) (
 		RecentStresses:        in.RecentStresses,
 	})
 	suggestion := score.BuildSuggestion(out.Score, true, int(danger))
-
-	if s.ai != nil {
-		history30, _ := s.store.ListRecentCheckIns(ctx, db.ListRecentCheckInsParams{
-			UserID:  user.ID,
-			Column2: 30,
-		})
-		count, countErr := s.store.CountCheckIns(ctx, user.ID)
-		if countErr != nil {
-			s.log.WarnContext(ctx, "count check-ins failed", "err", countErr)
-		}
-
-		scIn := ai.ScoreCardInput{
-			Role:          user.Role,
-			SleepBaseline: int(user.SleepBaseline),
-			CheckInCount:  count,
-			TodayStress:   req.Stress,
-			TodayEnergy:   req.EnergyLevel,
-			TodayFocus:    req.FocusQuality,
-			TodayHours:    req.HoursWorked,
-			TodaySymptoms: req.PhysicalSymptoms,
-			TodayNote:     req.Note,
-			TodayScore:    out.Score,
-		}
-
-		aiCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		narrative, aiErr := s.ai.GenerateScoreCard(aiCtx, scIn, history30)
-		cancel()
-		if aiErr == nil {
-			explanation = narrative.Explanation
-			suggestion = narrative.Suggestion
-			out.Signals = narrative.Signals
-			if len(narrative.RecoveryPlan) > 0 {
-				recoveryPlan = narrative.RecoveryPlan
-			}
-		} else {
-			s.log.WarnContext(ctx, "ai score card failed, using fallback", "err", aiErr)
-		}
-	}
 
 	analysisEntries := analysisEntriesFromRecentRows(recent)
 	analysisEntries = append([]score.AnalysisEntry{{
@@ -393,55 +359,6 @@ func (s *Service) GetScoreCard(ctx context.Context, user db.User) (ScoreCardResu
 	})
 	suggestion := score.BuildSuggestion(out.Score, hasTodayCI, int(danger))
 	analysisEntries := analysisEntriesFromRecentRows(recent)
-
-	if s.ai != nil && hasTodayCI {
-		history30, _ := s.store.ListRecentCheckIns(ctx, db.ListRecentCheckInsParams{
-			UserID:  user.ID,
-			Column2: 30,
-		})
-
-		var todayEnergy, todayFocus *int
-		if todayCI.EnergyLevel.Valid {
-			v := int(todayCI.EnergyLevel.Int16)
-			todayEnergy = &v
-		}
-		if todayCI.FocusQuality.Valid {
-			v := int(todayCI.FocusQuality.Int16)
-			todayFocus = &v
-		}
-		var todayHours *float64
-		if todayCI.HoursWorked.Valid {
-			f, err := todayCI.HoursWorked.Float64Value()
-			if err == nil && f.Valid {
-				todayHours = &f.Float64
-			}
-		}
-
-		scIn := ai.ScoreCardInput{
-			Role:          user.Role,
-			SleepBaseline: int(user.SleepBaseline),
-			CheckInCount:  count,
-			TodayStress:   int(todayCI.Stress),
-			TodayEnergy:   todayEnergy,
-			TodayFocus:    todayFocus,
-			TodayHours:    todayHours,
-			TodaySymptoms: todayCI.PhysicalSymptoms,
-			TodayNote:     todayCI.Note.String,
-			TodayScore:    out.Score,
-		}
-
-		aiCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		narrative, aiErr := s.ai.GenerateScoreCard(aiCtx, scIn, history30)
-		cancel()
-		if aiErr == nil {
-			explanation = narrative.Explanation
-			suggestion = narrative.Suggestion
-			out.Signals = narrative.Signals
-			// recovery_plan intentionally discarded — only surfaced post-check-in via UpsertResult
-		} else {
-			s.log.WarnContext(ctx, "ai score card failed, using fallback", "err", aiErr)
-		}
-	}
 
 	if hasTodayCI {
 		var todayEnergy, todayFocus *int

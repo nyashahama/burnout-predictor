@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/nyasha-hama/burnout-predictor-api/internal/ai"
 	db "github.com/nyasha-hama/burnout-predictor-api/internal/db/sqlc"
 	"github.com/nyasha-hama/burnout-predictor-api/internal/service/checkin"
 )
@@ -227,4 +228,34 @@ func TestGetScoreCard_WithCheckIn(t *testing.T) {
 	if res.RecommendedAction.Title == "" {
 		t.Error("RecommendedAction title = empty, want populated")
 	}
+}
+
+type stubScoreCardAI struct {
+	generateScoreCardFn func(ctx context.Context, in ai.ScoreCardInput, history []db.ListRecentCheckInsRow) (ai.ScoreCardNarrative, error)
+}
+
+func (s *stubScoreCardAI) GenerateScoreCard(ctx context.Context, in ai.ScoreCardInput, history []db.ListRecentCheckInsRow) (ai.ScoreCardNarrative, error) {
+	return s.generateScoreCardFn(ctx, in, history)
+}
+
+func TestGetScoreCardDoesNotCallAI(t *testing.T) {
+	user := defaultUser()
+	aiStub := &stubScoreCardAI{
+		generateScoreCardFn: func(ctx context.Context, in ai.ScoreCardInput, history []db.ListRecentCheckInsRow) (ai.ScoreCardNarrative, error) {
+			t.Fatalf("GenerateScoreCard should not be called from GetScoreCard")
+			return ai.ScoreCardNarrative{}, nil
+		},
+	}
+	store := &mockCheckinStore{
+		getTodayCheckIn: func(_ context.Context, _ db.GetTodayCheckInParams) (db.CheckIn, error) {
+			return db.CheckIn{
+				Stress:        3,
+				Score:         50,
+				CheckedInDate: pgtype.Date{Time: time.Now().UTC(), Valid: true},
+			}, nil
+		},
+	}
+
+	svc := checkin.New(store, aiStub, slog.Default())
+	_, _ = svc.GetScoreCard(context.Background(), user)
 }
