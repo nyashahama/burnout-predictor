@@ -35,7 +35,6 @@ export default function DashboardPage() {
     checkins,
     insightBundle,
     loadingData,
-    loadingMessage,
     loadError,
     reload,
     handleCheckInComplete,
@@ -50,9 +49,9 @@ export default function DashboardPage() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Preparing your dashboard</CardTitle>
+          <CardTitle>Loading your dashboard</CardTitle>
           <CardDescription>
-            {loadingMessage} Render cold starts and DeepSeek-backed responses can take a bit longer on the free tier.
+            Please wait while we fetch your data.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -75,7 +74,7 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            This usually means the free Render instance or a slower AI-backed score call did not finish in time.
+            Please try again.
           </p>
           <Button onClick={() => void reload()}>
             <RefreshCcw className="h-4 w-4" />
