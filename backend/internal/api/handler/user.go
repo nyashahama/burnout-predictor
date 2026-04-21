@@ -86,6 +86,12 @@ func (h *UserHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Request)
 		respond.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if req.EstimatedScore != 0 {
+		if err := validate.EstimatedScore(req.EstimatedScore); err != nil {
+			respond.Error(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
 	result, err := h.svc.CompleteOnboarding(r.Context(), user.ID, req)
 	if err != nil {
 		respond.ServiceError(w, err)
