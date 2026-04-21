@@ -52,7 +52,7 @@ export default function DashboardPage() {
         <CardHeader>
           <CardTitle>Preparing your dashboard</CardTitle>
           <CardDescription>
-            {loadingMessage} Render cold starts and DeepSeek-backed responses can take a bit longer on the free tier.
+            {loadingMessage}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -75,7 +75,7 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            This usually means the free Render instance or a slower AI-backed score call did not finish in time.
+            We could not load your dashboard right now. Retry once, and if it keeps failing check the backend logs.
           </p>
           <Button onClick={() => void reload()}>
             <RefreshCcw className="h-4 w-4" />

@@ -1,5 +1,6 @@
 import type {
   AuthResult,
+  DashboardBootstrap,
   CheckIn,
   InsightBundle,
   NotificationPrefs,
@@ -54,6 +55,7 @@ function parseUser(value: unknown, field = "user"): UserResponse {
     email_verified: expectBoolean(value.email_verified, `${field}.email_verified`),
     tier: expectString(value.tier, `${field}.tier`),
     calendar_connected: expectBoolean(value.calendar_connected, `${field}.calendar_connected`),
+    onboarded: expectBoolean(value.onboarded, `${field}.onboarded`),
   };
 }
 
@@ -63,7 +65,6 @@ export const parseRefreshResult = (value: unknown): RefreshResult => {
   if (!isRecord(value)) throw new Error("Invalid API response: refresh payload must be an object.");
   return {
     access_token: expectString(value.access_token, "access_token"),
-    refresh_token: expectString(value.refresh_token, "refresh_token"),
   };
 };
 
@@ -71,8 +72,23 @@ export const parseAuthResult = (value: unknown): AuthResult => {
   if (!isRecord(value)) throw new Error("Invalid API response: auth payload must be an object.");
   return {
     access_token: expectString(value.access_token, "access_token"),
-    refresh_token: expectString(value.refresh_token, "refresh_token"),
     user: parseUser(value.user),
+  };
+};
+
+export const parseDashboardBootstrap = (value: unknown): DashboardBootstrap => {
+  if (!isRecord(value)) throw new Error("Invalid API response: bootstrap payload must be an object.");
+  return {
+    user: parseUser(value.user),
+    score_card: parseScoreCardResult(value.score_card),
+    checkins: parseCheckIns(value.checkins),
+    insight_bundle: parseInsightBundle(value.insight_bundle),
+    follow_up: isRecord(value.follow_up)
+      ? {
+          question: expectString(value.follow_up.question, "follow_up.question"),
+          source_date: expectString(value.follow_up.source_date, "follow_up.source_date"),
+        }
+      : null,
   };
 };
 

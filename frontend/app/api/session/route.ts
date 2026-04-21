@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSignedValue } from "@/lib/session";
 import { getSessionSecret } from "@/lib/session-secret";
 
-const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
+const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
 const SESSION_COOKIE = "overload-session";
 const ONBOARDED_COOKIE = "overload-onboarded";
 

@@ -29,6 +29,7 @@ type authStore interface {
 	GetUserByEmail(ctx context.Context, email string) (db.User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (db.User, error)
 	UpdateUserProfile(ctx context.Context, params db.UpdateUserProfileParams) (db.User, error)
+	CompleteUserOnboarding(ctx context.Context, params db.CompleteUserOnboardingParams) (db.User, error)
 	UpdateUserPassword(ctx context.Context, params db.UpdateUserPasswordParams) error
 	UpdateUserEmail(ctx context.Context, params db.UpdateUserEmailParams) (db.User, error)
 	SetEstimatedScore(ctx context.Context, params db.SetEstimatedScoreParams) error
@@ -102,6 +103,13 @@ type UpdateProfileRequest struct {
 	EstimatedScore *int16  `json:"estimated_score"`
 }
 
+type CompleteOnboardingRequest struct {
+	Role           string `json:"role"`
+	SleepBaseline  int16  `json:"sleep_baseline"`
+	Timezone       string `json:"timezone"`
+	EstimatedScore int16  `json:"estimated_score"`
+}
+
 type ChangePasswordRequest struct {
 	CurrentPassword string `json:"current_password"`
 	NewPassword     string `json:"new_password"`
@@ -123,6 +131,7 @@ type UserResponse struct {
 	EmailVerified     bool      `json:"email_verified"`
 	Tier              string    `json:"tier"`
 	CalendarConnected bool      `json:"calendar_connected"`
+	Onboarded         bool      `json:"onboarded"`
 }
 
 // RegisterResult is returned by Register and Login.
@@ -360,6 +369,20 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, req Updat
 	return s.safeUser(updated), nil
 }
 
+func (s *Service) CompleteOnboarding(ctx context.Context, userID uuid.UUID, req CompleteOnboardingRequest) (UserResponse, error) {
+	updated, err := s.store.CompleteUserOnboarding(ctx, db.CompleteUserOnboardingParams{
+		ID:             userID,
+		Role:           req.Role,
+		SleepBaseline:  req.SleepBaseline,
+		Timezone:       req.Timezone,
+		EstimatedScore: pgtype.Int2{Int16: req.EstimatedScore, Valid: req.EstimatedScore != 0},
+	})
+	if err != nil {
+		return UserResponse{}, fmt.Errorf("complete onboarding: %w", err)
+	}
+	return s.safeUser(updated), nil
+}
+
 func (s *Service) ChangePassword(ctx context.Context, user db.User, req ChangePasswordRequest) error {
 	if !user.PasswordHash.Valid {
 		return ErrInvalidCredentials
@@ -533,5 +556,6 @@ func (s *Service) safeUser(u db.User) UserResponse {
 		EmailVerified:     u.EmailVerified,
 		Tier:              u.Tier,
 		CalendarConnected: u.CalendarConnected,
+		Onboarded:         u.OnboardedAt.Valid,
 	}
 }

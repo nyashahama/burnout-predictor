@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
 import { Activity, ArrowRight, CalendarRange, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
 import { AppLogo } from "@/components/AppLogo";
 import { buttonVariants } from "@/components/ui/button";
@@ -10,13 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { billingConfig } from "@/lib/billing";
 import { cn } from "@/lib/utils";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-
 export default function Home() {
-  useEffect(() => {
-    fetch(`${API_BASE}/health`).catch(() => {});
-  }, []);
-
   const pillars = [
     {
       icon: CalendarRange,

@@ -30,7 +30,7 @@ export default function RecommendationCommitmentPanel({
                 Mark done
               </Button>
               <Button onClick={() => onSkip(activeCommitment.id)} variant="outline" size="sm">
-                Couldn't do it
+                Couldn&apos;t do it
               </Button>
             </div>
           )}

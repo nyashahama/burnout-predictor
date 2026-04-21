@@ -12,7 +12,6 @@ import {
 import { ApiClient, createApiClient } from "@/lib/api";
 import {
   storeTokens,
-  getRefreshToken,
   getAccessToken,
   clearTokens,
   setSessionCookie,
@@ -34,7 +33,8 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+const AUTH_BASE = "/api/auth";
+let refreshInFlight: Promise<boolean> | null = null;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserResponse | null>(null);
@@ -59,29 +59,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (result: AuthResult) => {
-    storeTokens(result.access_token, result.refresh_token);
-    await setSessionCookie();
+    storeTokens(result.access_token);
+    if (result.user.onboarded) {
+      await setOnboardedCookie();
+    } else {
+      await setSessionCookie();
+    }
     setUser(result.user);
     syncUserCache(result.user);
   }, [syncUserCache]);
 
   const refreshSession = useCallback(async (): Promise<boolean> => {
-    const rt = getRefreshToken();
-    if (!rt) return false;
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: rt }),
-      });
-      if (!res.ok) return false;
-      const data = parseRefreshResult((await res.json()) as RefreshResult);
-      // Rotate both tokens — new refresh token replaces old one in localStorage.
-      storeTokens(data.access_token, data.refresh_token);
-      return true;
-    } catch {
-      return false;
-    }
+    if (refreshInFlight) return refreshInFlight;
+    refreshInFlight = (async () => {
+      try {
+        const res = await fetch(`${AUTH_BASE}/refresh`, { method: "POST" });
+        if (!res.ok) return false;
+        const data = parseRefreshResult((await res.json()) as RefreshResult);
+        storeTokens(data.access_token);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+    return refreshInFlight;
   }, []);
 
   // Build the ApiClient once, injecting a live token getter closure.
@@ -96,6 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Ignore — clear client-side state regardless.
     }
+    await fetch(`${AUTH_BASE}/logout`, { method: "POST" });
     clearTokens();
     await clearSessionCookie();
     setUser(null);
@@ -111,12 +115,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     async function restore() {
-      const rt = getRefreshToken();
-      if (!rt) {
-        if (!cancelled) setIsLoading(false);
-        return;
-      }
-
       const ok = await refreshSession();
       if (cancelled) return;
 
@@ -125,7 +123,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const profile = await api.get("/api/user", parseUserResponse);
           if (!cancelled) {
             updateUser(profile);
-            await setOnboardedCookie();
+            if (profile.onboarded) {
+              await setOnboardedCookie();
+            } else {
+              await setSessionCookie();
+            }
           }
         } catch {
           clearTokens();

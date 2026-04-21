@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { verifySignedValue } from "@/lib/session";
 import { getSessionSecret } from "@/lib/session-secret";
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const secret = getSessionSecret();
   const session = await verifySignedValue(
     request.cookies.get("overload-session")?.value,

@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   storeTokens,
-  getRefreshToken,
   getAccessToken,
   setAccessToken,
   clearTokens,
@@ -18,17 +17,12 @@ describe("auth storage helpers", () => {
     document.cookie = "overload-onboarded=; max-age=0; path=/";
   });
 
-  it("stores and retrieves refresh token from localStorage", () => {
-    storeTokens("acc123", "ref456");
-    expect(getRefreshToken()).toBe("ref456");
-  });
-
   it("getAccessToken returns null before tokens are stored", () => {
     expect(getAccessToken()).toBeNull();
   });
 
   it("storeTokens sets in-memory access token", () => {
-    storeTokens("mytoken", "myrefresh");
+    storeTokens("mytoken");
     expect(getAccessToken()).toBe("mytoken");
   });
 
@@ -38,9 +32,8 @@ describe("auth storage helpers", () => {
   });
 
   it("clearTokens removes stored tokens and resets memory", () => {
-    storeTokens("acc", "ref");
+    storeTokens("acc");
     clearTokens();
-    expect(getRefreshToken()).toBeNull();
     expect(getAccessToken()).toBeNull();
   });
 

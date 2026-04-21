@@ -18,8 +18,9 @@ import (
 // ── mock ──────────────────────────────────────────────────────────────────────
 
 type mockUserService struct {
-	GetProfileFn    func(context.Context, db.User) authsvc.UserResponse
-	UpdateProfileFn func(context.Context, uuid.UUID, authsvc.UpdateProfileRequest) (authsvc.UserResponse, error)
+	GetProfileFn         func(context.Context, db.User) authsvc.UserResponse
+	UpdateProfileFn      func(context.Context, uuid.UUID, authsvc.UpdateProfileRequest) (authsvc.UserResponse, error)
+	CompleteOnboardingFn func(context.Context, uuid.UUID, authsvc.CompleteOnboardingRequest) (authsvc.UserResponse, error)
 }
 
 func (m *mockUserService) GetProfile(ctx context.Context, user db.User) authsvc.UserResponse {
@@ -31,6 +32,12 @@ func (m *mockUserService) GetProfile(ctx context.Context, user db.User) authsvc.
 func (m *mockUserService) UpdateProfile(ctx context.Context, userID uuid.UUID, req authsvc.UpdateProfileRequest) (authsvc.UserResponse, error) {
 	if m.UpdateProfileFn != nil {
 		return m.UpdateProfileFn(ctx, userID, req)
+	}
+	return authsvc.UserResponse{}, nil
+}
+func (m *mockUserService) CompleteOnboarding(ctx context.Context, userID uuid.UUID, req authsvc.CompleteOnboardingRequest) (authsvc.UserResponse, error) {
+	if m.CompleteOnboardingFn != nil {
+		return m.CompleteOnboardingFn(ctx, userID, req)
 	}
 	return authsvc.UserResponse{}, nil
 }
@@ -101,5 +108,28 @@ func TestUserHandler_UpdateProfile_Success(t *testing.T) {
 	h.UpdateProfile(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Errorf("got %d, want 200", rec.Code)
+	}
+}
+
+func TestUserHandler_CompleteOnboarding_Success(t *testing.T) {
+	h := handler.NewUserHandler(&mockUserService{
+		CompleteOnboardingFn: func(_ context.Context, _ uuid.UUID, req authsvc.CompleteOnboardingRequest) (authsvc.UserResponse, error) {
+			if req.Role != "engineer" {
+				t.Fatalf("Role = %q, want engineer", req.Role)
+			}
+			return authsvc.UserResponse{Onboarded: true}, nil
+		},
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"role":"engineer","sleep_baseline":8,"timezone":"Africa/Johannesburg","estimated_score":55}`))
+	req = withUser(req, testUser)
+
+	h.CompleteOnboarding(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), `"onboarded":true`) {
+		t.Fatalf("expected onboarded=true body, got %s", rec.Body.String())
 	}
 }

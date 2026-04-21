@@ -1,14 +1,11 @@
 // frontend/lib/auth.ts
 import { clearAppStorage } from "./storage";
 
-const REFRESH_TOKEN_KEY = "overload-refresh-token";
-
 /** In-memory access token — NOT persisted to storage. XSS cannot access this. */
 let _accessToken: string | null = null;
 
-export function storeTokens(accessToken: string, refreshToken: string) {
+export function storeTokens(accessToken: string) {
   _accessToken = accessToken;
-  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
 }
 
 export function getAccessToken(): string | null {
@@ -19,14 +16,9 @@ export function setAccessToken(token: string) {
   _accessToken = token;
 }
 
-export function getRefreshToken(): string | null {
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
-}
-
 export function clearTokens() {
   _accessToken = null;
   clearAppStorage();
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
 async function updateSession(onboarded: boolean) {

@@ -26,6 +26,10 @@ func (p *Postgres) CreateUser(ctx context.Context, arg db.CreateUserParams) (db.
 	return p.q.CreateUser(ctx, arg)
 }
 
+func (p *Postgres) CompleteUserOnboarding(ctx context.Context, arg db.CompleteUserOnboardingParams) (db.User, error) {
+	return p.q.CompleteUserOnboarding(ctx, arg)
+}
+
 func (p *Postgres) GetUserByEmail(ctx context.Context, email string) (db.User, error) {
 	return p.q.GetUserByEmail(ctx, email)
 }

@@ -145,17 +145,24 @@ export interface UserResponse {
   email_verified: boolean;
   tier: string;
   calendar_connected: boolean;
+  onboarded: boolean;
 }
 
 export interface AuthResult {
   access_token: string;
-  refresh_token: string;
   user: UserResponse;
 }
 
 export interface RefreshResult {
   access_token: string;
-  refresh_token: string;
+}
+
+export interface DashboardBootstrap {
+  user: UserResponse;
+  score_card: ScoreCardResult;
+  checkins: CheckIn[];
+  insight_bundle: InsightBundle;
+  follow_up: FollowUpInfo | null;
 }
 
 export interface ScoreCardResult {

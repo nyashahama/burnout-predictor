@@ -1,17 +1,9 @@
-/**
- * Tests for the Onboarding page: handleFinish calls POST /api/auth/register.
- *
- * TDD: written BEFORE the implementation changes.
- */
 import React from "react";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
-import { http, HttpResponse } from "msw";
-import { server } from "../vitest.setup";
-import { AuthProvider } from "@/contexts/AuthContext";
-
-// ── mocks ──────────────────────────────────────────────────────────────────────
 
 const mockPush = vi.fn();
+const mockApiPost = vi.fn();
+const mockUpdateUser = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
   usePathname: () => "/onboarding",
@@ -20,6 +12,25 @@ vi.mock("next/navigation", () => ({
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
     React.createElement("a", { href, ...rest }, children),
+}));
+
+vi.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => ({
+    api: { post: mockApiPost },
+    updateUser: mockUpdateUser,
+    user: {
+      id: "u2",
+      email: "bob@example.com",
+      name: "Bob",
+      role: "engineer",
+      sleep_baseline: 8,
+      timezone: "UTC",
+      email_verified: false,
+      tier: "free",
+      calendar_connected: false,
+      onboarded: false,
+    },
+  }),
 }));
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -35,54 +46,32 @@ function makeUser(overrides: Record<string, unknown> = {}) {
     email_verified: false,
     tier: "free",
     calendar_connected: false,
-    ...overrides,
-  };
-}
-
-function makeAuthResult(overrides: Record<string, unknown> = {}) {
-  return {
-    access_token: "at-onb",
-    refresh_token: "rt-onb",
-    user: makeUser(),
+    onboarded: true,
     ...overrides,
   };
 }
 
 async function renderOnboardingPage() {
   const { default: OnboardingPage } = await import("@/app/onboarding/page");
-  render(
-    <AuthProvider>
-      <OnboardingPage />
-    </AuthProvider>
-  );
+  render(<OnboardingPage />);
 }
 
 /** Walk through all onboarding steps and click "Let's start tracking" */
 async function completeOnboarding() {
-  // Step 0 — Name
-  fireEvent.change(screen.getByPlaceholderText(/your first name/i), {
-    target: { value: "Bob" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: /continue →/i }));
-
-  // Step 1 — Opening question
   await waitFor(() =>
     screen.getByText(/when did you last feel like yourself/i)
   );
   fireEvent.click(screen.getByText("This week"));
   fireEvent.click(screen.getByRole("button", { name: /continue →/i }));
 
-  // Step 2 — Role
   await waitFor(() => screen.getByText(/what's your role/i));
   fireEvent.click(screen.getByText("Software Engineer"));
   fireEvent.click(screen.getByRole("button", { name: /continue →/i }));
 
-  // Step 3 — Sleep
   await waitFor(() => screen.getByText(/how much sleep/i));
   fireEvent.click(screen.getByText("8 hours"));
   fireEvent.click(screen.getByRole("button", { name: /calculate my score →/i }));
 
-  // Step 4 — Reveal
   await waitFor(() => screen.getByRole("button", { name: /let's start tracking →/i }));
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: /let's start tracking →/i }));
@@ -94,27 +83,15 @@ async function completeOnboarding() {
 describe("OnboardingPage", () => {
   beforeEach(() => {
     mockPush.mockReset();
+    mockApiPost.mockReset();
+    mockUpdateUser.mockReset();
     localStorage.clear();
-    sessionStorage.clear();
     document.cookie = "overload-session=; max-age=0; path=/";
     document.cookie = "overload-onboarded=; max-age=0; path=/";
   });
 
-  it("calls POST /api/auth/register with pending data and redirects to /dashboard", async () => {
-    let capturedBody: unknown = null;
-
-    server.use(
-      http.post("http://localhost:8080/api/auth/register", async ({ request }) => {
-        capturedBody = await request.json();
-        return HttpResponse.json(makeAuthResult());
-      })
-    );
-
-    // Seed sessionStorage with pending registration data
-    sessionStorage.setItem(
-      "overload-pending-register",
-      JSON.stringify({ email: "bob@example.com", password: "hunter2", name: "Bob" })
-    );
+  it("calls POST /api/user/onboarding and redirects to /dashboard", async () => {
+    mockApiPost.mockResolvedValue(makeUser());
 
     await renderOnboardingPage();
     await completeOnboarding();
@@ -123,69 +100,30 @@ describe("OnboardingPage", () => {
       expect(mockPush).toHaveBeenCalledWith("/dashboard");
     });
 
-    expect(capturedBody).toMatchObject({
-      email: "bob@example.com",
-      password: "hunter2",
-      name: "Bob",
+    expect(mockApiPost).toHaveBeenCalledWith(
+      "/api/user/onboarding",
+      expect.objectContaining({
       role: "engineer",
       sleep_baseline: 8,
       estimated_score: 28,
-    });
+      }),
+      expect.any(Function),
+    );
   });
 
-  it("clears sessionStorage pending-register key after successful registration", async () => {
-    server.use(
-      http.post("http://localhost:8080/api/auth/register", () =>
-        HttpResponse.json(makeAuthResult())
-      )
-    );
-
-    sessionStorage.setItem(
-      "overload-pending-register",
-      JSON.stringify({ email: "bob@example.com", password: "hunter2", name: "Bob" })
-    );
+  it("updates auth state after successful onboarding", async () => {
+    mockApiPost.mockResolvedValue(makeUser({ name: "Bob", role: "engineer", sleep_baseline: 8 }));
 
     await renderOnboardingPage();
     await completeOnboarding();
 
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/dashboard"));
 
-    expect(sessionStorage.getItem("overload-pending-register")).toBeNull();
-  });
-
-  it("stores user prefs in localStorage after successful registration", async () => {
-    server.use(
-      http.post("http://localhost:8080/api/auth/register", () =>
-        HttpResponse.json(makeAuthResult({ user: makeUser({ name: "Bob", role: "engineer", sleep_baseline: 8 }) }))
-      )
-    );
-
-    sessionStorage.setItem(
-      "overload-pending-register",
-      JSON.stringify({ email: "bob@example.com", password: "hunter2", name: "Bob" })
-    );
-
-    await renderOnboardingPage();
-    await completeOnboarding();
-
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/dashboard"));
-
-    expect(localStorage.getItem("overload-name")).toBe("Bob");
-    expect(localStorage.getItem("overload-role")).toBe("engineer");
-    expect(localStorage.getItem("overload-sleep")).toBe("8");
+    expect(mockUpdateUser).toHaveBeenCalledWith(expect.objectContaining({ name: "Bob", onboarded: true }));
   });
 
   it("sets overload-onboarded cookie after successful registration", async () => {
-    server.use(
-      http.post("http://localhost:8080/api/auth/register", () =>
-        HttpResponse.json(makeAuthResult())
-      )
-    );
-
-    sessionStorage.setItem(
-      "overload-pending-register",
-      JSON.stringify({ email: "bob@example.com", password: "hunter2", name: "Bob" })
-    );
+    mockApiPost.mockResolvedValue(makeUser());
 
     await renderOnboardingPage();
     await completeOnboarding();
@@ -195,17 +133,8 @@ describe("OnboardingPage", () => {
     expect(document.cookie).toContain("overload-onboarded=1");
   });
 
-  it("shows error message when register API returns an error", async () => {
-    server.use(
-      http.post("http://localhost:8080/api/auth/register", () =>
-        HttpResponse.json({ error: "email already exists" }, { status: 409 })
-      )
-    );
-
-    sessionStorage.setItem(
-      "overload-pending-register",
-      JSON.stringify({ email: "bob@example.com", password: "hunter2", name: "Bob" })
-    );
+  it("shows error message when onboarding API returns an error", async () => {
+    mockApiPost.mockRejectedValue(new Error("onboarding failed"));
 
     await renderOnboardingPage();
     await completeOnboarding();
@@ -215,9 +144,8 @@ describe("OnboardingPage", () => {
       expect(mockPush).not.toHaveBeenCalledWith("/dashboard");
     });
 
-    // Some error text should appear
     expect(
-      screen.getByText(/registration failed|email already|error|try again/i)
+      screen.getByText(/onboarding failed|error|try again/i)
     ).toBeInTheDocument();
   });
 });

@@ -1,18 +1,8 @@
-/**
- * Tests for the Login page: sign-in calls real backend, sign-up buffers to sessionStorage.
- *
- * TDD: written BEFORE the implementation changes.
- */
 import React from "react";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
-import { http, HttpResponse } from "msw";
-import { server } from "../vitest.setup";
-import { AuthProvider } from "@/contexts/AuthContext";
 
-// ── mocks ──────────────────────────────────────────────────────────────────────
-
-// Mock next/navigation so useRouter works in the test environment
 const mockPush = vi.fn();
+const mockLogin = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
   usePathname: () => "/login",
@@ -24,9 +14,16 @@ vi.mock("next/link", () => ({
     React.createElement("a", { href, ...rest }, children),
 }));
 
+vi.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => ({
+    login: mockLogin,
+    api: {},
+  }),
+}));
+
 // ── helpers ────────────────────────────────────────────────────────────────────
 
-function makeUser() {
+function makeUser(overrides: Record<string, unknown> = {}) {
   return {
     id: "u1",
     email: "user@example.com",
@@ -37,50 +34,57 @@ function makeUser() {
     email_verified: true,
     tier: "free",
     calendar_connected: false,
+    onboarded: true,
+    ...overrides,
   };
 }
 
-function makeAuthResult() {
+function makeAuthResult(overrides: Record<string, unknown> = {}) {
   return {
     access_token: "at-test",
-    refresh_token: "rt-test",
     user: makeUser(),
+    ...overrides,
   };
 }
 
 async function renderLoginPage() {
   const { default: LoginPage } = await import("@/app/login/page");
-  render(
-    <AuthProvider>
-      <LoginPage />
-    </AuthProvider>
-  );
+  render(<LoginPage />);
 }
 
 // ── tests ──────────────────────────────────────────────────────────────────────
 
 describe("LoginPage", () => {
+  let originalFetch: typeof fetch;
+
   beforeEach(() => {
     mockPush.mockReset();
+    mockLogin.mockReset();
     localStorage.clear();
     sessionStorage.clear();
     document.cookie = "overload-session=; max-age=0; path=/";
     document.cookie = "overload-onboarded=; max-age=0; path=/";
+    originalFetch = global.fetch;
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "unexpected request" }), { status: 500 })));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   describe("sign-in mode", () => {
-    it("calls POST /api/auth/login and redirects to /dashboard on success", async () => {
-      server.use(
-        http.post("http://localhost:8080/api/auth/login", () =>
-          HttpResponse.json(makeAuthResult())
-        )
-      );
+    it("signs in through the same-origin auth route", async () => {
+      const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        if (url === "/api/auth/login") {
+          return new Response(JSON.stringify(makeAuthResult()), { status: 200 });
+        }
+        return originalFetch(input);
+      });
+      vi.stubGlobal("fetch", fetchMock);
 
       await renderLoginPage();
-
-      // Switch to sign-in tab
       fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
-
       fireEvent.change(screen.getByLabelText(/email/i), {
         target: { value: "user@example.com" },
       });
@@ -94,19 +98,21 @@ describe("LoginPage", () => {
 
       await waitFor(() => {
         expect(mockPush).toHaveBeenCalledWith("/dashboard");
+        expect(fetchMock).toHaveBeenCalledWith("/api/auth/login", expect.any(Object));
       });
     });
 
     it("shows error message when login API returns an error", async () => {
-      server.use(
-        http.post("http://localhost:8080/api/auth/login", () =>
-          HttpResponse.json({ error: "invalid credentials" }, { status: 401 })
-        )
-      );
+      vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        if (url === "/api/auth/login") {
+          return new Response(JSON.stringify({ error: "invalid credentials" }), { status: 401 });
+        }
+        return originalFetch(input);
+      }));
 
       await renderLoginPage();
 
-      // Switch to sign-in tab
       fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
       fireEvent.change(screen.getByLabelText(/email/i), {
@@ -125,15 +131,16 @@ describe("LoginPage", () => {
       });
     });
 
-    it("sets overload-onboarded cookie after successful sign-in", async () => {
-      server.use(
-        http.post("http://localhost:8080/api/auth/login", () =>
-          HttpResponse.json(makeAuthResult())
-        )
-      );
+    it("redirects partially onboarded users to onboarding after sign-in", async () => {
+      vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        if (url === "/api/auth/login") {
+          return new Response(JSON.stringify(makeAuthResult({ user: makeUser({ onboarded: false }) })), { status: 200 });
+        }
+        return originalFetch(input);
+      }));
 
       await renderLoginPage();
-
       fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
       fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "user@example.com" } });
       fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "hunter2" } });
@@ -143,10 +150,8 @@ describe("LoginPage", () => {
       });
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith("/dashboard");
+        expect(mockPush).toHaveBeenCalledWith("/onboarding");
       });
-
-      expect(document.cookie).toContain("overload-onboarded=1");
     });
   });
 
@@ -186,7 +191,16 @@ describe("LoginPage", () => {
       });
     });
 
-    it("stores pending register data in sessionStorage and redirects to /onboarding on signup", async () => {
+    it("creates the account immediately and redirects to onboarding", async () => {
+      const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        if (url === "/api/auth/register") {
+          return new Response(JSON.stringify(makeAuthResult({ user: makeUser({ onboarded: false }) })), { status: 200 });
+        }
+        return originalFetch(input);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
       await renderLoginPage();
 
       fireEvent.change(screen.getByLabelText(/name/i), {
@@ -206,13 +220,8 @@ describe("LoginPage", () => {
       await waitFor(() => {
         expect(mockPush).toHaveBeenCalledWith("/onboarding");
       });
-
-      const pending = JSON.parse(
-        sessionStorage.getItem("overload-pending-register") ?? "{}"
-      );
-      expect(pending.email).toBe("bob@example.com");
-      expect(pending.password).toBe("hunter22");
-      expect(pending.name).toBe("Bob");
+      expect(fetchMock).toHaveBeenCalledWith("/api/auth/register", expect.any(Object));
+      expect(sessionStorage.getItem("overload-pending-register")).toBeNull();
     });
   });
 });
