@@ -63,7 +63,6 @@ export const parseRefreshResult = (value: unknown): RefreshResult => {
   if (!isRecord(value)) throw new Error("Invalid API response: refresh payload must be an object.");
   return {
     access_token: expectString(value.access_token, "access_token"),
-    refresh_token: expectString(value.refresh_token, "refresh_token"),
   };
 };
 
@@ -71,7 +70,6 @@ export const parseAuthResult = (value: unknown): AuthResult => {
   if (!isRecord(value)) throw new Error("Invalid API response: auth payload must be an object.");
   return {
     access_token: expectString(value.access_token, "access_token"),
-    refresh_token: expectString(value.refresh_token, "refresh_token"),
     user: parseUser(value.user),
   };
 };
