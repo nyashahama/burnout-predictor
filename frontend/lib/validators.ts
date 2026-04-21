@@ -54,6 +54,7 @@ function parseUser(value: unknown, field = "user"): UserResponse {
     email_verified: expectBoolean(value.email_verified, `${field}.email_verified`),
     tier: expectString(value.tier, `${field}.tier`),
     calendar_connected: expectBoolean(value.calendar_connected, `${field}.calendar_connected`),
+    onboarded: Boolean(value.onboarded),
   };
 }
 

@@ -2,13 +2,28 @@
 import { clearAppStorage } from "./storage";
 
 let _accessToken: string | null = null;
+let _refreshToken: string | null = null;
 
-export function storeTokens(accessToken: string) {
+export function storeTokens(accessToken: string, refreshToken?: string) {
   _accessToken = accessToken;
+  if (refreshToken) {
+    _refreshToken = refreshToken;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("overload-refresh-token", refreshToken);
+    }
+  }
 }
 
 export function getAccessToken(): string | null {
   return _accessToken;
+}
+
+export function getRefreshToken(): string | null {
+  if (_refreshToken) return _refreshToken;
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("overload-refresh-token");
+  }
+  return null;
 }
 
 export function setAccessToken(token: string) {
@@ -17,6 +32,10 @@ export function setAccessToken(token: string) {
 
 export function clearTokens() {
   _accessToken = null;
+  _refreshToken = null;
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("overload-refresh-token");
+  }
   clearAppStorage();
 }
 
