@@ -150,11 +150,13 @@ export interface UserResponse {
 
 export interface AuthResult {
   access_token: string;
+  refresh_token?: string;
   user: UserResponse;
 }
 
 export interface RefreshResult {
   access_token: string;
+  refresh_token?: string;
 }
 
 export interface ScoreCardResult {
