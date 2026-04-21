@@ -145,6 +145,7 @@ export interface UserResponse {
   email_verified: boolean;
   tier: string;
   calendar_connected: boolean;
+  onboarded: boolean;
 }
 
 export interface AuthResult {
