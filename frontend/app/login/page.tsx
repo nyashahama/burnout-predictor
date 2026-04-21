@@ -10,7 +10,8 @@ import { CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { setOnboardedCookie, setSessionCookie } from "@/lib/auth";
+import { setOnboardedCookie } from "@/lib/auth";
+
 import type { AuthResult } from "@/lib/types";
 import { parseAuthResult } from "@/lib/validators";
 
@@ -18,7 +19,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, api } = useAuth();
+  const { login } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signup");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -54,21 +55,40 @@ export default function LoginPage() {
 
     try {
       if (mode === "signup") {
-        sessionStorage.setItem(
-          "overload-pending-register",
-          JSON.stringify({ email: email.trim(), password, name: name.trim() }),
-        );
-        await setSessionCookie();
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: email.trim(),
+            password,
+            name: name.trim(),
+            role: "engineer",
+            sleep_baseline: 8,
+            timezone: tz,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error((data as { error?: string }).error ?? `Registration failed (${res.status}).`);
+        }
+        const result = parseAuthResult(data as AuthResult);
+        await login(result);
         router.push("/onboarding");
       } else if (mode === "signin") {
-        const result = await api.post<AuthResult>(
-          "/api/auth/login",
-          { email: email.trim(), password },
-          parseAuthResult,
-        );
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email.trim(), password }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error((data as { error?: string }).error ?? "Invalid credentials.");
+        }
+        const result = parseAuthResult(data as AuthResult);
         await login(result);
-        await setOnboardedCookie();
-        router.push("/dashboard");
+        if (result.user.onboarded) await setOnboardedCookie();
+        router.push(result.user.onboarded ? "/dashboard" : "/onboarding");
       } else {
         await fetch(`${API_BASE}/api/auth/forgot-password`, {
           method: "POST",
