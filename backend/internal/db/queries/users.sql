@@ -43,6 +43,17 @@ WHERE id = $1
   AND deleted_at IS NULL
 RETURNING *;
 
+-- name: CompleteUserOnboarding :one
+UPDATE users SET
+    role            = $2,
+    sleep_baseline  = $3,
+    timezone        = $4,
+    estimated_score = $5,
+    onboarded_at    = NOW()
+WHERE id = $1
+  AND deleted_at IS NULL
+RETURNING *;
+
 -- name: UpdateUserEmail :one
 UPDATE users SET
     email          = $2,

@@ -286,3 +286,22 @@ func TestVerifyEmail_InvalidToken(t *testing.T) {
 		t.Errorf("VerifyEmail() error = %v, want ErrInvalidToken", err)
 	}
 }
+
+func TestSafeUserIncludesOnboardedState(t *testing.T) {
+	svc := &auth.Service{}
+	now := time.Now()
+
+	got := svc.SafeUser(db.User{
+		ID:            uuid.New(),
+		Email:         "user@example.com",
+		Name:          "Nyasha",
+		Role:          "engineer",
+		SleepBaseline: 8,
+		Timezone:      "Africa/Johannesburg",
+		OnboardedAt:   pgtype.Timestamptz{Time: now, Valid: true},
+	})
+
+	if !got.Onboarded {
+		t.Fatalf("expected onboarded=true")
+	}
+}
