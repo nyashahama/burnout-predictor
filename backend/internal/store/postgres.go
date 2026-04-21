@@ -98,6 +98,10 @@ func (p *Postgres) UpdateUserProfile(ctx context.Context, arg db.UpdateUserProfi
 	return p.q.UpdateUserProfile(ctx, arg)
 }
 
+func (p *Postgres) CompleteUserOnboarding(ctx context.Context, arg db.CompleteUserOnboardingParams) (db.User, error) {
+	return p.q.CompleteUserOnboarding(ctx, arg)
+}
+
 func (p *Postgres) VerifyUserEmail(ctx context.Context, id uuid.UUID) error {
 	return p.q.VerifyUserEmail(ctx, id)
 }
