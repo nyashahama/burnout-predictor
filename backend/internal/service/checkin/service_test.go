@@ -123,6 +123,14 @@ func okCheckin(userID uuid.UUID, stress int) func(context.Context, db.UpsertChec
 	}
 }
 
+type stubScoreCardAI struct {
+	generateScoreCardFn func(context.Context, ai.ScoreCardInput, []db.ListRecentCheckInsRow) (ai.ScoreCardNarrative, error)
+}
+
+func (s *stubScoreCardAI) GenerateScoreCard(ctx context.Context, in ai.ScoreCardInput, history []db.ListRecentCheckInsRow) (ai.ScoreCardNarrative, error) {
+	return s.generateScoreCardFn(ctx, in, history)
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 func TestUpsert_InvalidStress(t *testing.T) {
@@ -230,22 +238,8 @@ func TestGetScoreCard_WithCheckIn(t *testing.T) {
 	}
 }
 
-type stubScoreCardAI struct {
-	generateScoreCardFn func(ctx context.Context, in ai.ScoreCardInput, history []db.ListRecentCheckInsRow) (ai.ScoreCardNarrative, error)
-}
-
-func (s *stubScoreCardAI) GenerateScoreCard(ctx context.Context, in ai.ScoreCardInput, history []db.ListRecentCheckInsRow) (ai.ScoreCardNarrative, error) {
-	return s.generateScoreCardFn(ctx, in, history)
-}
-
 func TestGetScoreCardDoesNotCallAI(t *testing.T) {
 	user := defaultUser()
-	aiStub := &stubScoreCardAI{
-		generateScoreCardFn: func(ctx context.Context, in ai.ScoreCardInput, history []db.ListRecentCheckInsRow) (ai.ScoreCardNarrative, error) {
-			t.Fatalf("GenerateScoreCard should not be called from GetScoreCard")
-			return ai.ScoreCardNarrative{}, nil
-		},
-	}
 	store := &mockCheckinStore{
 		getTodayCheckIn: func(_ context.Context, _ db.GetTodayCheckInParams) (db.CheckIn, error) {
 			return db.CheckIn{
@@ -255,7 +249,15 @@ func TestGetScoreCardDoesNotCallAI(t *testing.T) {
 			}, nil
 		},
 	}
+	aiStub := &stubScoreCardAI{
+		generateScoreCardFn: func(context.Context, ai.ScoreCardInput, []db.ListRecentCheckInsRow) (ai.ScoreCardNarrative, error) {
+			t.Fatalf("GenerateScoreCard should not be called from GetScoreCard")
+			return ai.ScoreCardNarrative{}, nil
+		},
+	}
 
 	svc := checkin.New(store, aiStub, slog.Default())
-	_, _ = svc.GetScoreCard(context.Background(), user)
+	if _, err := svc.GetScoreCard(context.Background(), user); err != nil {
+		t.Fatalf("GetScoreCard() error = %v", err)
+	}
 }

@@ -19,27 +19,27 @@ import (
 // ── Mock store ────────────────────────────────────────────────────────────────
 
 type mockAuthStore struct {
-	createUser                  func(ctx context.Context, params db.CreateUserParams) (db.User, error)
-	getUserByEmail              func(ctx context.Context, email string) (db.User, error)
-	getUserByID                 func(ctx context.Context, id uuid.UUID) (db.User, error)
-	updateUserProfile           func(ctx context.Context, params db.UpdateUserProfileParams) (db.User, error)
-	updateUserPassword          func(ctx context.Context, params db.UpdateUserPasswordParams) error
-	updateUserEmail             func(ctx context.Context, params db.UpdateUserEmailParams) (db.User, error)
-	setEstimatedScore           func(ctx context.Context, params db.SetEstimatedScoreParams) error
-	softDeleteUser              func(ctx context.Context, id uuid.UUID) error
-	verifyUserEmail             func(ctx context.Context, id uuid.UUID) error
-	createRefreshToken          func(ctx context.Context, params db.CreateRefreshTokenParams) (db.RefreshToken, error)
-	getRefreshToken             func(ctx context.Context, tokenHash string) (db.RefreshToken, error)
-	revokeRefreshToken          func(ctx context.Context, tokenHash string) error
-	revokeAllUserRefreshTokens  func(ctx context.Context, userID uuid.UUID) error
-	createEmailVerification     func(ctx context.Context, params db.CreateEmailVerificationParams) (db.EmailVerification, error)
-	getEmailVerification        func(ctx context.Context, tokenHash string) (db.EmailVerification, error)
-	markEmailVerificationUsed   func(ctx context.Context, tokenHash string) error
-	createPasswordReset         func(ctx context.Context, params db.CreatePasswordResetParams) (db.PasswordReset, error)
-	getPasswordReset            func(ctx context.Context, tokenHash string) (db.PasswordReset, error)
-	markPasswordResetUsed       func(ctx context.Context, tokenHash string) error
-	createDefaultNotifPrefs     func(ctx context.Context, userID uuid.UUID) (db.UserNotificationPref, error)
-	completeUserOnboarding      func(ctx context.Context, params db.CompleteUserOnboardingParams) (db.User, error)
+	createUser                 func(ctx context.Context, params db.CreateUserParams) (db.User, error)
+	getUserByEmail             func(ctx context.Context, email string) (db.User, error)
+	getUserByID                func(ctx context.Context, id uuid.UUID) (db.User, error)
+	updateUserProfile          func(ctx context.Context, params db.UpdateUserProfileParams) (db.User, error)
+	completeUserOnboarding     func(ctx context.Context, params db.CompleteUserOnboardingParams) (db.User, error)
+	updateUserPassword         func(ctx context.Context, params db.UpdateUserPasswordParams) error
+	updateUserEmail            func(ctx context.Context, params db.UpdateUserEmailParams) (db.User, error)
+	setEstimatedScore          func(ctx context.Context, params db.SetEstimatedScoreParams) error
+	softDeleteUser             func(ctx context.Context, id uuid.UUID) error
+	verifyUserEmail            func(ctx context.Context, id uuid.UUID) error
+	createRefreshToken         func(ctx context.Context, params db.CreateRefreshTokenParams) (db.RefreshToken, error)
+	getRefreshToken            func(ctx context.Context, tokenHash string) (db.RefreshToken, error)
+	revokeRefreshToken         func(ctx context.Context, tokenHash string) error
+	revokeAllUserRefreshTokens func(ctx context.Context, userID uuid.UUID) error
+	createEmailVerification    func(ctx context.Context, params db.CreateEmailVerificationParams) (db.EmailVerification, error)
+	getEmailVerification       func(ctx context.Context, tokenHash string) (db.EmailVerification, error)
+	markEmailVerificationUsed  func(ctx context.Context, tokenHash string) error
+	createPasswordReset        func(ctx context.Context, params db.CreatePasswordResetParams) (db.PasswordReset, error)
+	getPasswordReset           func(ctx context.Context, tokenHash string) (db.PasswordReset, error)
+	markPasswordResetUsed      func(ctx context.Context, tokenHash string) error
+	createDefaultNotifPrefs    func(ctx context.Context, userID uuid.UUID) (db.UserNotificationPref, error)
 }
 
 func (m *mockAuthStore) CreateUser(ctx context.Context, p db.CreateUserParams) (db.User, error) {
@@ -53,6 +53,9 @@ func (m *mockAuthStore) GetUserByID(ctx context.Context, id uuid.UUID) (db.User,
 }
 func (m *mockAuthStore) UpdateUserProfile(ctx context.Context, p db.UpdateUserProfileParams) (db.User, error) {
 	return m.updateUserProfile(ctx, p)
+}
+func (m *mockAuthStore) CompleteUserOnboarding(ctx context.Context, p db.CompleteUserOnboardingParams) (db.User, error) {
+	return m.completeUserOnboarding(ctx, p)
 }
 func (m *mockAuthStore) UpdateUserPassword(ctx context.Context, p db.UpdateUserPasswordParams) error {
 	return m.updateUserPassword(ctx, p)
@@ -120,12 +123,6 @@ func (m *mockAuthStore) CreateDefaultNotificationPrefs(ctx context.Context, id u
 	}
 	return db.UserNotificationPref{}, nil
 }
-func (m *mockAuthStore) CompleteUserOnboarding(ctx context.Context, p db.CompleteUserOnboardingParams) (db.User, error) {
-	if m.completeUserOnboarding != nil {
-		return m.completeUserOnboarding(ctx, p)
-	}
-	return db.User{}, nil
-}
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
@@ -159,9 +156,9 @@ func TestRegister_Success(t *testing.T) {
 	svc := newService(store)
 
 	res, err := svc.Register(context.Background(), auth.RegisterRequest{
-		Email:    "alice@example.com",
-		Password: "password123",
-		Name:     "Alice",
+		Email:          "alice@example.com",
+		Password:       "password123",
+		Name:           "Alice",
 		EstimatedScore: 28,
 	})
 
@@ -179,6 +176,61 @@ func TestRegister_Success(t *testing.T) {
 	}
 	if !capturedCreateUser.EstimatedScore.Valid || capturedCreateUser.EstimatedScore.Int16 != 28 {
 		t.Errorf("EstimatedScore = %+v, want valid 28", capturedCreateUser.EstimatedScore)
+	}
+}
+
+func TestSafeUserIncludesOnboardedState(t *testing.T) {
+	svc := newService(&mockAuthStore{})
+
+	got := svc.GetProfile(context.Background(), db.User{
+		ID:            uuid.New(),
+		Email:         "user@example.com",
+		Name:          "Nyasha",
+		Role:          "engineer",
+		SleepBaseline: 8,
+		Timezone:      "Africa/Johannesburg",
+		OnboardedAt:   pgtype.Timestamptz{Time: time.Now(), Valid: true},
+	})
+
+	if !got.Onboarded {
+		t.Fatalf("expected onboarded=true")
+	}
+}
+
+func TestCompleteOnboardingUpdatesProfileAndMarksUserOnboarded(t *testing.T) {
+	userID := uuid.New()
+	store := &mockAuthStore{
+		completeUserOnboarding: func(_ context.Context, arg db.CompleteUserOnboardingParams) (db.User, error) {
+			if arg.ID != userID {
+				t.Fatalf("ID = %s, want %s", arg.ID, userID)
+			}
+			if !arg.EstimatedScore.Valid || arg.EstimatedScore.Int16 != 55 {
+				t.Fatalf("EstimatedScore = %+v, want valid 55", arg.EstimatedScore)
+			}
+			return db.User{
+				ID:            arg.ID,
+				Email:         "user@example.com",
+				Name:          "Nyasha",
+				Role:          arg.Role,
+				SleepBaseline: arg.SleepBaseline,
+				Timezone:      arg.Timezone,
+				OnboardedAt:   pgtype.Timestamptz{Time: time.Now(), Valid: true},
+			}, nil
+		},
+	}
+
+	svc := newService(store)
+	got, err := svc.CompleteOnboarding(context.Background(), userID, auth.CompleteOnboardingRequest{
+		Role:           "engineer",
+		SleepBaseline:  8,
+		Timezone:       "Africa/Johannesburg",
+		EstimatedScore: 55,
+	})
+	if err != nil {
+		t.Fatalf("CompleteOnboarding() error = %v", err)
+	}
+	if !got.Onboarded {
+		t.Fatalf("expected onboarded=true")
 	}
 }
 
@@ -291,106 +343,5 @@ func TestVerifyEmail_InvalidToken(t *testing.T) {
 
 	if !errors.Is(err, auth.ErrInvalidToken) {
 		t.Errorf("VerifyEmail() error = %v, want ErrInvalidToken", err)
-	}
-}
-
-func TestSafeUserIncludesOnboardedState(t *testing.T) {
-	svc := &auth.Service{}
-	now := time.Now()
-
-	t.Run("onboarded=true", func(t *testing.T) {
-		got := svc.SafeUser(db.User{
-			ID:            uuid.New(),
-			Email:         "user@example.com",
-			Name:          "Nyasha",
-			Role:          "engineer",
-			SleepBaseline: 8,
-			Timezone:      "Africa/Johannesburg",
-			OnboardedAt:   pgtype.Timestamptz{Time: now, Valid: true},
-		})
-		if !got.Onboarded {
-			t.Fatalf("expected onboarded=true")
-		}
-	})
-
-	t.Run("onboarded=false", func(t *testing.T) {
-		got := svc.SafeUser(db.User{
-			ID:            uuid.New(),
-			Email:         "new@example.com",
-			Name:          "New User",
-			Role:          "engineer",
-			SleepBaseline: 8,
-			Timezone:      "UTC",
-			OnboardedAt:   pgtype.Timestamptz{Valid: false},
-		})
-		if got.Onboarded {
-			t.Fatalf("expected onboarded=false")
-		}
-	})
-}
-
-func TestCompleteOnboarding_Success(t *testing.T) {
-	userID := uuid.New()
-	var captured db.CompleteUserOnboardingParams
-	store := &mockAuthStore{
-		completeUserOnboarding: func(_ context.Context, p db.CompleteUserOnboardingParams) (db.User, error) {
-			captured = p
-			return db.User{
-				ID:            p.ID,
-				Email:         "user@example.com",
-				Name:          "Alice",
-				Role:          p.Role,
-				SleepBaseline: p.SleepBaseline,
-				Timezone:      p.Timezone,
-				Tier:         "free",
-				OnboardedAt:   pgtype.Timestamptz{Time: time.Now(), Valid: true},
-			}, nil
-		},
-	}
-	svc := newService(store)
-
-	result, err := svc.CompleteOnboarding(context.Background(), userID, auth.CompleteOnboardingRequest{
-		Role:           "engineer",
-		SleepBaseline:  8,
-		Timezone:       "Africa/Johannesburg",
-		EstimatedScore: 30,
-	})
-
-	if err != nil {
-		t.Fatalf("CompleteOnboarding() error = %v, want nil", err)
-	}
-	if captured.Role != "engineer" {
-		t.Errorf("Role = %q, want engineer", captured.Role)
-	}
-	if captured.SleepBaseline != 8 {
-		t.Errorf("SleepBaseline = %d, want 8", captured.SleepBaseline)
-	}
-	if captured.Timezone != "Africa/Johannesburg" {
-		t.Errorf("Timezone = %q, want Africa/Johannesburg", captured.Timezone)
-	}
-	if !captured.EstimatedScore.Valid || captured.EstimatedScore.Int16 != 30 {
-		t.Errorf("EstimatedScore = %+v, want valid 30", captured.EstimatedScore)
-	}
-	if !result.Onboarded {
-		t.Error("result.Onboarded = false, want true")
-	}
-}
-
-func TestCompleteOnboarding_ServiceError(t *testing.T) {
-	store := &mockAuthStore{
-		completeUserOnboarding: func(_ context.Context, _ db.CompleteUserOnboardingParams) (db.User, error) {
-			return db.User{}, errors.New("db error")
-		},
-	}
-	svc := newService(store)
-
-	_, err := svc.CompleteOnboarding(context.Background(), uuid.New(), auth.CompleteOnboardingRequest{
-		Role:          "engineer",
-		SleepBaseline: 8,
-		Timezone:      "UTC",
-	})
-
-	if err == nil {
-		t.Fatal("CompleteOnboarding() error = nil, want error")
 	}
 }

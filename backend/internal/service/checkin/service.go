@@ -32,15 +32,15 @@ type checkinStore interface {
 	CountCheckInsInRange(ctx context.Context, params db.CountCheckInsInRangeParams) (int64, error)
 }
 
-type scoreCardAI interface {
-	GenerateScoreCard(ctx context.Context, in ai.ScoreCardInput, history []db.ListRecentCheckInsRow) (ai.ScoreCardNarrative, error)
-}
-
 // Service owns check-in persistence, score computation, and follow-up scheduling.
 type Service struct {
 	store checkinStore
 	ai    scoreCardAI
 	log   *slog.Logger
+}
+
+type scoreCardAI interface {
+	GenerateScoreCard(ctx context.Context, in ai.ScoreCardInput, history []db.ListRecentCheckInsRow) (ai.ScoreCardNarrative, error)
 }
 
 func New(store checkinStore, aiClient scoreCardAI, log *slog.Logger) *Service {
@@ -223,9 +223,9 @@ func (s *Service) Upsert(ctx context.Context, user db.User, req UpsertRequest) (
 		go s.scheduleFollowUps(bgCtx, checkin.ID, user.ID, req.Note, today)
 	}
 
-	// Rule-based recovery plan — used when AI is disabled; also final fallback if AI fails.
+	// Rule-based recovery plan is the only request-path enrichment.
 	var recoveryPlan []score.PlanSection
-	if s.ai == nil && req.Stress >= 4 {
+	if req.Stress >= 4 {
 		recoveryPlan = score.BuildDynamicRecoveryPlan(score.RecoveryPlanInput{
 			Note:            req.Note,
 			Stress:          req.Stress,
@@ -234,7 +234,6 @@ func (s *Service) Upsert(ctx context.Context, user db.User, req UpsertRequest) (
 		})
 	}
 
-	// Build deterministic narrative.
 	explanation := score.BuildScoreExplanation(score.ExplanationInput{
 		Score:                 out.Score,
 		TodayStress:           &req.Stress,
@@ -257,16 +256,6 @@ func (s *Service) Upsert(ctx context.Context, user db.User, req UpsertRequest) (
 
 	dailyForecast := score.BuildDailyForecast(out.Score, int(danger), analysisEntries)
 	recommendedAction := score.BuildRecommendedAction(out.Score, int(danger), suggestion, analysisEntries, true)
-
-	// Final fallback: if AI was enabled but failed and stress >= 4, still provide a plan.
-	if recoveryPlan == nil && req.Stress >= 4 {
-		recoveryPlan = score.BuildDynamicRecoveryPlan(score.RecoveryPlanInput{
-			Note:            req.Note,
-			Stress:          req.Stress,
-			ConsecutiveDays: int(danger),
-			Role:            score.Role(user.Role),
-		})
-	}
 
 	return UpsertResult{
 		CheckIn:           checkin,
@@ -307,10 +296,7 @@ func (s *Service) GetScoreCard(ctx context.Context, user db.User) (ScoreCardResu
 
 	danger, _ := s.store.GetConsecutiveDangerDays(ctx, user.ID)
 	streak, _ := s.store.GetCheckInStreak(ctx, user.ID)
-	count, countErr := s.store.CountCheckIns(ctx, user.ID)
-	if countErr != nil {
-		s.log.WarnContext(ctx, "count check-ins failed", "err", countErr)
-	}
+	count, _ := s.store.CountCheckIns(ctx, user.ID)
 
 	twentyOneDaysAgo := today.AddDate(0, 0, -21)
 	consistencyN, _ := s.store.CountCheckInsInRange(ctx, db.CountCheckInsInRangeParams{

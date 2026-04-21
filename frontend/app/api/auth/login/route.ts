@@ -1,10 +1,9 @@
-// app/api/auth/login/route.ts
-
-import { NextRequest, NextResponse } from "next/server";
-import { parseAuthResult } from "@/lib/validators";
+import { NextResponse } from "next/server";
 
 const API_BASE = process.env.API_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+
 const REFRESH_COOKIE = "overload-refresh";
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 
 function setRefreshCookie(response: NextResponse, token: string) {
   response.cookies.set(REFRESH_COOKIE, token, {
@@ -12,34 +11,30 @@ function setRefreshCookie(response: NextResponse, token: string) {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: COOKIE_MAX_AGE,
   });
 }
 
-export async function POST(req: NextRequest) {
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
-  }
-
-  const backendRes = await fetch(`${API_BASE}/api/auth/login`, {
+export async function POST(request: Request) {
+  const body = await request.json();
+  const upstream = await fetch(`${API_BASE}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    cache: "no-store",
   });
 
-  const data = await backendRes.json();
-
-  if (!backendRes.ok) {
-    return NextResponse.json(data, { status: backendRes.status });
-  }
-
-  const auth = parseAuthResult(data);
-  const response = NextResponse.json({ user: auth.user, access_token: auth.access_token });
-  if (auth.refresh_token) {
-    setRefreshCookie(response, auth.refresh_token);
+  const payload = await upstream.json();
+  const clientPayload = { ...(payload as {
+    refresh_token?: string;
+    access_token?: string;
+    user?: unknown;
+    error?: string;
+  }) };
+  delete clientPayload.refresh_token;
+  const response = NextResponse.json(clientPayload, { status: upstream.status });
+  if (upstream.ok && payload.refresh_token) {
+    setRefreshCookie(response, payload.refresh_token);
   }
   return response;
 }

@@ -35,6 +35,7 @@ export default function DashboardPage() {
     checkins,
     insightBundle,
     loadingData,
+    loadingMessage,
     loadError,
     reload,
     handleCheckInComplete,
@@ -49,9 +50,9 @@ export default function DashboardPage() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Loading your dashboard</CardTitle>
+          <CardTitle>Preparing your dashboard</CardTitle>
           <CardDescription>
-            Please wait while we fetch your data.
+            {loadingMessage}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -74,7 +75,7 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Please try again.
+            We could not load your dashboard right now. Retry once, and if it keeps failing check the backend logs.
           </p>
           <Button onClick={() => void reload()}>
             <RefreshCcw className="h-4 w-4" />

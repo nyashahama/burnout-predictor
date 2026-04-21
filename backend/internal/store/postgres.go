@@ -26,6 +26,10 @@ func (p *Postgres) CreateUser(ctx context.Context, arg db.CreateUserParams) (db.
 	return p.q.CreateUser(ctx, arg)
 }
 
+func (p *Postgres) CompleteUserOnboarding(ctx context.Context, arg db.CompleteUserOnboardingParams) (db.User, error) {
+	return p.q.CompleteUserOnboarding(ctx, arg)
+}
+
 func (p *Postgres) GetUserByEmail(ctx context.Context, email string) (db.User, error) {
 	return p.q.GetUserByEmail(ctx, email)
 }
@@ -96,10 +100,6 @@ func (p *Postgres) UpdateUserPassword(ctx context.Context, arg db.UpdateUserPass
 
 func (p *Postgres) UpdateUserProfile(ctx context.Context, arg db.UpdateUserProfileParams) (db.User, error) {
 	return p.q.UpdateUserProfile(ctx, arg)
-}
-
-func (p *Postgres) CompleteUserOnboarding(ctx context.Context, arg db.CompleteUserOnboardingParams) (db.User, error) {
-	return p.q.CompleteUserOnboarding(ctx, arg)
 }
 
 func (p *Postgres) VerifyUserEmail(ctx context.Context, id uuid.UUID) error {

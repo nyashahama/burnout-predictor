@@ -1,29 +1,15 @@
 // frontend/lib/auth.ts
 import { clearAppStorage } from "./storage";
 
+/** In-memory access token — NOT persisted to storage. XSS cannot access this. */
 let _accessToken: string | null = null;
-let _refreshToken: string | null = null;
 
-export function storeTokens(accessToken: string, refreshToken?: string) {
+export function storeTokens(accessToken: string) {
   _accessToken = accessToken;
-  if (refreshToken) {
-    _refreshToken = refreshToken;
-    if (typeof window !== "undefined") {
-      localStorage.setItem("overload-refresh-token", refreshToken);
-    }
-  }
 }
 
 export function getAccessToken(): string | null {
   return _accessToken;
-}
-
-export function getRefreshToken(): string | null {
-  if (_refreshToken) return _refreshToken;
-  if (typeof window !== "undefined") {
-    return localStorage.getItem("overload-refresh-token");
-  }
-  return null;
 }
 
 export function setAccessToken(token: string) {
@@ -32,10 +18,6 @@ export function setAccessToken(token: string) {
 
 export function clearTokens() {
   _accessToken = null;
-  _refreshToken = null;
-  if (typeof window !== "undefined") {
-    localStorage.removeItem("overload-refresh-token");
-  }
   clearAppStorage();
 }
 
@@ -71,18 +53,4 @@ export async function clearSessionCookie() {
   }
 
   await fetch("/api/session", { method: "DELETE" });
-}
-
-export async function refreshAccessToken(): Promise<string | null> {
-  try {
-    const res = await fetch("/api/auth/refresh", { method: "GET" });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data.access_token) {
-      _accessToken = data.access_token;
-    }
-    return data.access_token;
-  } catch {
-    return null;
-  }
 }
