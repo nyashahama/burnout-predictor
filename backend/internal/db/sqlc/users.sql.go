@@ -26,6 +26,60 @@ func (q *Queries) ClearCalendarToken(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const completeUserOnboarding = `-- name: CompleteUserOnboarding :one
+UPDATE users SET
+    role            = $2,
+    sleep_baseline  = $3,
+    timezone        = $4,
+    estimated_score = $5,
+    onboarded_at    = NOW()
+WHERE id = $1
+  AND deleted_at IS NULL
+RETURNING id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference, onboarded_at
+`
+
+type CompleteUserOnboardingParams struct {
+	ID             uuid.UUID   `db:"id" json:"id"`
+	Role           string      `db:"role" json:"role"`
+	SleepBaseline  int16       `db:"sleep_baseline" json:"sleep_baseline"`
+	Timezone       string      `db:"timezone" json:"timezone"`
+	EstimatedScore pgtype.Int2 `db:"estimated_score" json:"estimated_score"`
+}
+
+func (q *Queries) CompleteUserOnboarding(ctx context.Context, arg CompleteUserOnboardingParams) (User, error) {
+	row := q.db.QueryRow(ctx, completeUserOnboarding,
+		arg.ID,
+		arg.Role,
+		arg.SleepBaseline,
+		arg.Timezone,
+		arg.EstimatedScore,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Name,
+		&i.Role,
+		&i.SleepBaseline,
+		&i.EstimatedScore,
+		&i.CalendarConnected,
+		&i.CalendarToken,
+		&i.CalendarSyncedAt,
+		&i.Tier,
+		&i.PaddleCustomerID,
+		&i.Timezone,
+		&i.EmailVerified,
+		&i.GoogleID,
+		&i.DeletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.EftPaymentReference,
+		&i.OnboardedAt,
+	)
+	return i, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (
     email,
@@ -39,7 +93,7 @@ INSERT INTO users (
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8
 )
-RETURNING id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference
+RETURNING id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference, onboarded_at
 `
 
 type CreateUserParams struct {
@@ -85,12 +139,13 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EftPaymentReference,
+		&i.OnboardedAt,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference FROM users
+SELECT id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference, onboarded_at FROM users
 WHERE email = $1
   AND deleted_at IS NULL
 `
@@ -118,12 +173,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EftPaymentReference,
+		&i.OnboardedAt,
 	)
 	return i, err
 }
 
 const getUserByGoogleID = `-- name: GetUserByGoogleID :one
-SELECT id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference FROM users
+SELECT id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference, onboarded_at FROM users
 WHERE google_id = $1
   AND deleted_at IS NULL
 `
@@ -151,12 +207,13 @@ func (q *Queries) GetUserByGoogleID(ctx context.Context, googleID pgtype.Text) (
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EftPaymentReference,
+		&i.OnboardedAt,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference FROM users
+SELECT id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference, onboarded_at FROM users
 WHERE id = $1
   AND deleted_at IS NULL
 `
@@ -184,12 +241,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EftPaymentReference,
+		&i.OnboardedAt,
 	)
 	return i, err
 }
 
 const getUserByPaddleCustomerID = `-- name: GetUserByPaddleCustomerID :one
-SELECT id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference FROM users
+SELECT id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference, onboarded_at FROM users
 WHERE paddle_customer_id = $1
   AND deleted_at IS NULL
 `
@@ -217,6 +275,7 @@ func (q *Queries) GetUserByPaddleCustomerID(ctx context.Context, paddleCustomerI
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EftPaymentReference,
+		&i.OnboardedAt,
 	)
 	return i, err
 }
@@ -584,7 +643,7 @@ UPDATE users SET
     email_verified = FALSE
 WHERE id = $1
   AND deleted_at IS NULL
-RETURNING id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference
+RETURNING id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference, onboarded_at
 `
 
 type UpdateUserEmailParams struct {
@@ -615,6 +674,7 @@ func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EftPaymentReference,
+		&i.OnboardedAt,
 	)
 	return i, err
 }
@@ -644,7 +704,7 @@ UPDATE users SET
     timezone        = COALESCE($5,       timezone)
 WHERE id = $1
   AND deleted_at IS NULL
-RETURNING id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference
+RETURNING id, email, password_hash, name, role, sleep_baseline, estimated_score, calendar_connected, calendar_token, calendar_synced_at, tier, paddle_customer_id, timezone, email_verified, google_id, deleted_at, created_at, updated_at, eft_payment_reference, onboarded_at
 `
 
 type UpdateUserProfileParams struct {
@@ -684,6 +744,7 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EftPaymentReference,
+		&i.OnboardedAt,
 	)
 	return i, err
 }

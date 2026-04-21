@@ -241,6 +241,7 @@ type User struct {
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	EftPaymentReference pgtype.Text        `db:"eft_payment_reference" json:"eft_payment_reference"`
+	OnboardedAt         pgtype.Timestamptz `db:"onboarded_at" json:"onboarded_at"`
 }
 
 // Per-user notification opt-in/-out. Upserted on settings save.

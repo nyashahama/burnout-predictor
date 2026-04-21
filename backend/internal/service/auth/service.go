@@ -123,6 +123,7 @@ type UserResponse struct {
 	EmailVerified     bool      `json:"email_verified"`
 	Tier              string    `json:"tier"`
 	CalendarConnected bool      `json:"calendar_connected"`
+	Onboarded         bool      `json:"onboarded"`
 }
 
 // RegisterResult is returned by Register and Login.
@@ -522,7 +523,8 @@ func (s *Service) sendPasswordResetEmail(to, name string, userID uuid.UUID) {
 	}
 }
 
-func (s *Service) safeUser(u db.User) UserResponse {
+// SafeUser converts db.User to UserResponse — exported for testing.
+func (s *Service) SafeUser(u db.User) UserResponse {
 	return UserResponse{
 		ID:                u.ID,
 		Email:             u.Email,
@@ -533,5 +535,10 @@ func (s *Service) safeUser(u db.User) UserResponse {
 		EmailVerified:     u.EmailVerified,
 		Tier:              u.Tier,
 		CalendarConnected: u.CalendarConnected,
+		Onboarded:         u.OnboardedAt.Valid,
 	}
+}
+
+func (s *Service) safeUser(u db.User) UserResponse {
+	return s.SafeUser(u)
 }
