@@ -223,17 +223,6 @@ func (s *Service) Upsert(ctx context.Context, user db.User, req UpsertRequest) (
 		go s.scheduleFollowUps(bgCtx, checkin.ID, user.ID, req.Note, today)
 	}
 
-	// Rule-based recovery plan is the only request-path enrichment.
-	var recoveryPlan []score.PlanSection
-	if req.Stress >= 4 {
-		recoveryPlan = score.BuildDynamicRecoveryPlan(score.RecoveryPlanInput{
-			Note:            req.Note,
-			Stress:          req.Stress,
-			ConsecutiveDays: int(danger),
-			Role:            score.Role(user.Role),
-		})
-	}
-
 	explanation := score.BuildScoreExplanation(score.ExplanationInput{
 		Score:                 out.Score,
 		TodayStress:           &req.Stress,
@@ -241,6 +230,56 @@ func (s *Service) Upsert(ctx context.Context, user db.User, req UpsertRequest) (
 		RecentStresses:        in.RecentStresses,
 	})
 	suggestion := score.BuildSuggestion(out.Score, true, int(danger))
+
+	checkinCount, countErr := s.store.CountCheckIns(ctx, user.ID)
+	if countErr != nil {
+		s.log.WarnContext(ctx, "upsert: count check-ins failed", "request_id", reqid.FromCtx(ctx), "err", countErr)
+		checkinCount = 0
+	}
+
+	var recoveryPlan []score.PlanSection
+	if s.ai != nil {
+		aiCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		narrative, aiErr := s.ai.GenerateScoreCard(aiCtx, ai.ScoreCardInput{
+			Role:          user.Role,
+			SleepBaseline: int(user.SleepBaseline),
+			CheckInCount:  checkinCount,
+			TodayStress:   req.Stress,
+			TodayEnergy:   req.EnergyLevel,
+			TodayFocus:    req.FocusQuality,
+			TodayHours:    req.HoursWorked,
+			TodaySymptoms: req.PhysicalSymptoms,
+			TodayNote:     req.Note,
+			TodayScore:    out.Score,
+		}, recent)
+		cancel()
+
+		if aiErr == nil {
+			if narrative.Explanation != "" {
+				explanation = narrative.Explanation
+			}
+			if narrative.Suggestion != "" {
+				suggestion = narrative.Suggestion
+			}
+			if len(narrative.Signals) > 0 {
+				out.Signals = narrative.Signals
+			}
+			if len(narrative.RecoveryPlan) > 0 {
+				recoveryPlan = narrative.RecoveryPlan
+			}
+		} else {
+			s.log.WarnContext(ctx, "ai score card failed, using fallback", "request_id", reqid.FromCtx(ctx), "err", aiErr)
+		}
+	}
+
+	if len(recoveryPlan) == 0 && req.Stress >= 4 {
+		recoveryPlan = score.BuildDynamicRecoveryPlan(score.RecoveryPlanInput{
+			Note:            req.Note,
+			Stress:          req.Stress,
+			ConsecutiveDays: int(danger),
+			Role:            score.Role(user.Role),
+		})
+	}
 
 	analysisEntries := analysisEntriesFromRecentRows(recent)
 	analysisEntries = append([]score.AnalysisEntry{{
@@ -286,9 +325,13 @@ func (s *Service) GetScoreCard(ctx context.Context, user db.User) (ScoreCardResu
 	}
 
 	var todayStress *int
+	var todayNote string
 	if hasTodayCI {
 		stressVal := int(todayCI.Stress)
 		todayStress = &stressVal
+		if todayCI.Note.Valid {
+			todayNote = todayCI.Note.String
+		}
 	}
 
 	in := BuildScoreInput(user, recent, todayStress, today)
@@ -328,6 +371,62 @@ func (s *Service) GetScoreCard(ctx context.Context, user db.User) (ScoreCardResu
 		}
 	}
 
+	explanation := score.BuildScoreExplanation(score.ExplanationInput{
+		Score:                 out.Score,
+		TodayStress:           todayStress,
+		ConsecutiveDangerDays: int(danger),
+		RecentStresses:        in.RecentStresses,
+	})
+	suggestion := score.BuildSuggestion(out.Score, hasTodayCI, int(danger))
+	if hasTodayCI && s.ai != nil {
+		var todayEnergy, todayFocus *int
+		if todayCI.EnergyLevel.Valid {
+			v := int(todayCI.EnergyLevel.Int16)
+			todayEnergy = &v
+		}
+		if todayCI.FocusQuality.Valid {
+			v := int(todayCI.FocusQuality.Int16)
+			todayFocus = &v
+		}
+
+		var todayHours *float64
+		if todayCI.HoursWorked.Valid {
+			f, err := todayCI.HoursWorked.Float64Value()
+			if err == nil && f.Valid {
+				todayHours = &f.Float64
+			}
+		}
+
+		aiCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		narrative, aiErr := s.ai.GenerateScoreCard(aiCtx, ai.ScoreCardInput{
+			Role:          user.Role,
+			SleepBaseline: int(user.SleepBaseline),
+			CheckInCount:  count,
+			TodayStress:   int(todayCI.Stress),
+			TodayEnergy:   todayEnergy,
+			TodayFocus:    todayFocus,
+			TodayHours:    todayHours,
+			TodaySymptoms: todayCI.PhysicalSymptoms,
+			TodayNote:     todayNote,
+			TodayScore:    out.Score,
+		}, recent)
+		cancel()
+
+		if aiErr == nil {
+			if narrative.Explanation != "" {
+				explanation = narrative.Explanation
+			}
+			if narrative.Suggestion != "" {
+				suggestion = narrative.Suggestion
+			}
+			if len(narrative.Signals) > 0 {
+				out.Signals = narrative.Signals
+			}
+		} else {
+			s.log.WarnContext(ctx, "ai score card failed, using fallback", "request_id", reqid.FromCtx(ctx), "err", aiErr)
+		}
+	}
+
 	trajectory := score.BuildTrajectoryInsight(score.TrajectoryInput{
 		Score:                 out.Score,
 		RecentStresses:        in.RecentStresses,
@@ -337,15 +436,7 @@ func (s *Service) GetScoreCard(ctx context.Context, user db.User) (ScoreCardResu
 		},
 	})
 
-	explanation := score.BuildScoreExplanation(score.ExplanationInput{
-		Score:                 out.Score,
-		TodayStress:           todayStress,
-		ConsecutiveDangerDays: int(danger),
-		RecentStresses:        in.RecentStresses,
-	})
-	suggestion := score.BuildSuggestion(out.Score, hasTodayCI, int(danger))
 	analysisEntries := analysisEntriesFromRecentRows(recent)
-
 	if hasTodayCI {
 		var todayEnergy, todayFocus *int
 		if todayCI.EnergyLevel.Valid {
@@ -367,7 +458,7 @@ func (s *Service) GetScoreCard(ctx context.Context, user db.User) (ScoreCardResu
 			Date:             today,
 			Stress:           int(todayCI.Stress),
 			Score:            out.Score,
-			Note:             todayCI.Note.String,
+			Note:             todayNote,
 			EnergyLevel:      todayEnergy,
 			FocusQuality:     todayFocus,
 			HoursWorked:      todayHours,

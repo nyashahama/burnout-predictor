@@ -238,26 +238,44 @@ func TestGetScoreCard_WithCheckIn(t *testing.T) {
 	}
 }
 
-func TestGetScoreCardDoesNotCallAI(t *testing.T) {
+func TestGetScoreCard_CallsAI(t *testing.T) {
 	user := defaultUser()
+	var called bool
 	store := &mockCheckinStore{
 		getTodayCheckIn: func(_ context.Context, _ db.GetTodayCheckInParams) (db.CheckIn, error) {
 			return db.CheckIn{
-				Stress:        3,
-				Score:         50,
+				Stress:        4,
+				Score:         70,
+				Note:          pgtype.Text{String: "deadline day", Valid: true},
 				CheckedInDate: pgtype.Date{Time: time.Now().UTC(), Valid: true},
 			}, nil
 		},
 	}
 	aiStub := &stubScoreCardAI{
 		generateScoreCardFn: func(context.Context, ai.ScoreCardInput, []db.ListRecentCheckInsRow) (ai.ScoreCardNarrative, error) {
-			t.Fatalf("GenerateScoreCard should not be called from GetScoreCard")
-			return ai.ScoreCardNarrative{}, nil
+			called = true
+			return ai.ScoreCardNarrative{
+				Explanation: "AI explanation for today",
+				Suggestion:  "AI suggestion for today",
+			}, nil
 		},
 	}
 
 	svc := checkin.New(store, aiStub, slog.Default())
-	if _, err := svc.GetScoreCard(context.Background(), user); err != nil {
+	res, err := svc.GetScoreCard(context.Background(), user)
+	if !called {
+		t.Fatal("GenerateScoreCard was not called from GetScoreCard")
+	}
+	if err != nil {
 		t.Fatalf("GetScoreCard() error = %v", err)
+	}
+	if res.Explanation != "AI explanation for today" {
+		t.Errorf("GetScoreCard() explanation = %q, want %q", res.Explanation, "AI explanation for today")
+	}
+	if res.Suggestion != "AI suggestion for today" {
+		t.Errorf("GetScoreCard() suggestion = %q, want %q", res.Suggestion, "AI suggestion for today")
+	}
+	if res.Score.Score == 0 {
+		t.Error("GetScoreCard() score = 0, want non-zero")
 	}
 }

@@ -131,10 +131,10 @@ export function DashboardDataProvider({
           ? {
               ...prev,
               score: result.score,
-              explanation: result.explanation,
-              suggestion: result.suggestion,
-              daily_forecast: result.daily_forecast,
-              recommended_action: result.recommended_action,
+              explanation: result.explanation || prev.explanation,
+              suggestion: result.suggestion || prev.suggestion,
+              daily_forecast: result.daily_forecast || prev.daily_forecast,
+              recommended_action: result.recommended_action || prev.recommended_action,
               has_checkin: true,
             }
           : null,
@@ -145,7 +145,22 @@ export function DashboardDataProvider({
           (c) => c.checked_in_date !== result.check_in.checked_in_date,
         ),
       ]);
-      void reload();
+      void (async () => {
+        await reload();
+        setScoreCard((prev) =>
+          prev
+            ? {
+                ...prev,
+                score: prev.score,
+                explanation: result.explanation || prev.explanation,
+                suggestion: result.suggestion || prev.suggestion,
+                daily_forecast: result.daily_forecast || prev.daily_forecast,
+                recommended_action: result.recommended_action || prev.recommended_action,
+                has_checkin: true,
+              }
+            : null,
+        );
+      })();
     },
     [reload],
   );
